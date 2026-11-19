@@ -19,3 +19,8 @@ identity metadata, late associations and usage/context replay replacement. Its
 256-entry recent bounds and 1,000 ms matching slack are pinned in the inventory.
 Unlisted or unknown versions are untested; synthetic controls prove conformance,
 not observed emission. No private live transcript is copied here.
+
+`codex-compaction.jsonl` (Stage 3b amendment 1, Task 10) carries the turn starts,
+turn context, token counts and own and inherited `compacted` records of OBS 7a2804ce's
+native compaction cases, so every declared compaction, turn and occupancy read occurs in
+a catalogued sample.

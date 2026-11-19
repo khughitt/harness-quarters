@@ -133,32 +133,42 @@ def test_origin_and_byte_sizes_match_original_blocks():
     assert "pasted_content" not in json.dumps(state)
 
 
+def leaves(value, prefix):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield from leaves(child, prefix + "." + key if prefix else key)
+    elif isinstance(value, list):
+        for child in value:
+            yield from leaves(child, prefix + "[]")
+    else:
+        yield prefix
+
+
+def undeclared_fields(out, defaults):
+    """Event fact leaves that no provenance declaration names or contains."""
+    missing = set()
+    for value in out:
+        if value["object"] == "index_event":
+            facts = {key: value[key] for key in ("native_kind", "at_ms", "eligible", "flush_response",
+                "identity", "context", "response", "message", "calls", "injections",
+                "execution", "notifications", "compaction", "interruption", "fork_boundary", "turn_end",
+                "turn", "occupancy")}
+            for field in leaves(facts, ""):
+                if value.get(field) is None and field in {"context", "response", "message", "turn", "occupancy"}:
+                    continue
+                if not any(field == declared or field.startswith(declared + ".") or field.startswith(declared + "[]")
+                           for declared in defaults):
+                    missing.add(field)
+    return sorted(missing)
+
+
 def test_all_codex_fields_have_coverage_and_provenance(tmp_path):
     from harness_evidence import index_codex, index_codex_coverage
     defaults = index_codex.provenance_defaults()
     out = decode(tmp_path)
     assert out[0]["provenance_defaults"] == defaults
 
-    def leaves(value, prefix):
-        if isinstance(value, dict):
-            for key, child in value.items():
-                yield from leaves(child, prefix + "." + key if prefix else key)
-        elif isinstance(value, list):
-            for child in value:
-                yield from leaves(child, prefix + "[]")
-        else:
-            yield prefix
-
-    for value in out:
-        if value["object"] == "index_event":
-            facts = {key: value[key] for key in ("native_kind", "at_ms", "eligible", "flush_response",
-                "identity", "context", "response", "message", "calls", "injections",
-                "execution", "notifications", "compaction", "interruption", "fork_boundary", "turn_end")}
-            for field in leaves(facts, ""):
-                if value.get(field) is None and field in {"context", "response", "message"}:
-                    continue
-                assert any(field == declared or field.startswith(declared + ".") or field.startswith(declared + "[]")
-                           for declared in defaults), field
+    assert undeclared_fields(out, defaults) == []
     encode = index_stream._provenance_encoder(defaults, index_codex.PROVENANCE)
     for value in out:
         if value["object"] != "index_event":
@@ -204,9 +214,8 @@ def test_counts_deduplicate_without_fabricating_usage_populations():
             if v["record_kind"] == "applied:usage" and v["field"] == "input:output_tokens"] == [(1, 1)]
 
 
-@pytest.mark.parametrize("sample", ["codex-basic.jsonl", "codex-context.jsonl", "codex-execution.jsonl"])
-def test_basic_native_reads_are_declared_without_parent_wildcards(monkeypatch, sample):
-    """Original support.tracing read audit, over this step's implemented controls."""
+def undeclared_reads(monkeypatch, source):
+    """Native reads of `source` lines that no WATCHED, UNWATCHED or common path declares."""
     from types import SimpleNamespace
     from harness_evidence import index_codex as cx, index_codex_coverage as cv
     reads = set()
@@ -242,7 +251,6 @@ def test_basic_native_reads_are_declared_without_parent_wildcards(monkeypatch, s
         return wrap(value, "", cv.record_kind(value)) if isinstance(value, dict) and "payload" in value else value
 
     monkeypatch.setattr(cx, "json", SimpleNamespace(loads=traced, dumps=json.dumps))
-    source = (FIXTURES / sample).read_bytes().splitlines(keepends=True)
     place = Place("codex", "file", None, "explicit", "control", Path("control"))
     list(cx.extract(enumerate(source), {}, place=place, text=True))
     missing = []
@@ -251,7 +259,15 @@ def test_basic_native_reads_are_declared_without_parent_wildcards(monkeypatch, s
                  *cv.UNWATCHED.get(kind, {}))
         if not any(path == item or item.startswith(path + ".") or item.startswith(path + "[]") for item in paths):
             missing.append((kind, path))
-    assert sorted(missing) == []
+    return sorted(missing)
+
+
+@pytest.mark.parametrize("sample", ["codex-basic.jsonl", "codex-context.jsonl", "codex-execution.jsonl",
+                                    "codex-compaction.jsonl"])
+def test_basic_native_reads_are_declared_without_parent_wildcards(monkeypatch, sample):
+    """Original support.tracing read audit, over this step's implemented controls."""
+    from harness_evidence import index_codex_coverage as cv
+    assert undeclared_reads(monkeypatch, (FIXTURES / sample).read_bytes().splitlines(keepends=True)) == []
     targets = {f"applied:{site}/input:{name}" for site, inputs in cv.APPLIED.items() for name in inputs}
     assert all(path in declaration["sources"] and set(feeds) <= targets
                for declaration in cv.WATCHED.values() for path, feeds in declaration.get("feeds", {}).items())
@@ -394,3 +410,175 @@ def test_codex_results_carry_a_null_exit_code_declared_absent(tmp_path):
     assert results and all("exit_code" in result and result["exit_code"] is None for result in results)
     assert index_codex.provenance_defaults()["results[].exit_code"] == {
         "native_paths": [], "coverage_keys": [], "basis": "native", "rule": "absent:not_decoded"}
+
+
+def lines_of(records):
+    return [(json.dumps(record, ensure_ascii=False) + "\n").encode() for record in records]
+
+
+TURN_RECORDS = [
+    record("event_msg", {"type": "task_started", "turn_id": "t1"}),
+    record("event_msg", {"type": "turn_started", "turn_id": 7}),
+    record("event_msg", {"type": "task_started"}),
+    record("turn_context", {"model": "m", "turn_id": "t1"}),
+    record("turn_context", {"model": "m"}),
+    record("event_msg", {"type": "turn_aborted"}),
+]
+COMPACTION_USAGE = {"turn_id": "t", "response_id": "c", "usage": {"input_tokens": 216410}}
+COMPACTION_RECORDS = [
+    record("compacted", {"compaction_response_id": "c", "latest_token_usage_record": COMPACTION_USAGE,
+                         "resume_metadata": {"previous_turn_settings": {"model": "m"}},
+                         "replacement_history": []}),
+    record("compacted", {"replacement_history": [{"x": 1}]}),
+    record("compacted", {"compaction_response_id": "c", "latest_token_usage_record": None}),
+    record("compacted", {"latest_token_usage_record": "text"}),
+    record("compacted", {"latest_token_usage_record": {"usage": {"input_tokens": False}},
+                         "resume_metadata": {}}),
+]
+
+
+def token_count(**info):
+    return record("event_msg", {"type": "token_count", "info": info})
+
+
+def test_turn_facts_mark_turn_starts_and_turn_contexts():
+    rows, _ = native([META, *TURN_RECORDS])
+    assert rows[0]["turn"] is None
+    assert [row["turn"] for row in rows[1:-1]] == [
+        {"id": "t1", "start": True}, {"id": 7, "start": True}, {"id": None, "start": True},
+        {"id": "t1", "start": False}, {"id": None, "start": False}, None]
+    sessionless, _ = native(TURN_RECORDS[:1])
+    assert sessionless[0]["eligible"] is False and sessionless[0]["turn"] is None
+
+
+def test_turn_started_is_counted_unknown_and_adds_no_field_presence():
+    rows, _ = native([META, *TURN_RECORDS[:2]])
+    coverage = rows[-1]
+    records = {row["record_kind"]: (row["known"], row["records"]) for row in coverage["records"]}
+    assert records["event_msg:turn_started"] == (0, 1)
+    assert records["event_msg:task_started"] == (1, 1)
+    assert not [row for row in coverage["fields"]
+                if row["record_kind"] in ("event_msg:turn_started", "event_msg:task_started")]
+    from harness_evidence import index_codex_coverage as cv
+    assert cv.UNWATCHED["event_msg:turn_started"] == {"payload.turn_id": "dimension"}
+    assert "event_msg:turn_started" not in cv.HANDLED_KINDS | cv.IGNORED_KINDS
+
+
+def test_occupancy_is_every_token_count_with_info_whatever_the_usage_source():
+    recorded, state = native([META, record("token_usage_record", {"response_id": "r", "usage": {"input_tokens": 1}}),
+        token_count(total_token_usage={"input_tokens": 1}, last_token_usage={"input_tokens": 9},
+                    model_context_window=100),
+        token_count(last_token_usage={"input_tokens": True}, model_context_window=None),
+        token_count(last_token_usage={"input_tokens": 2.5}, model_context_window=1.5),
+        token_count(),
+        record("event_msg", {"type": "token_count", "info": None})])
+    assert state["usage_source"] == "record"
+    assert [row["occupancy"] for row in recorded[2:7]] == [
+        {"input_tokens": 9, "context_window": 100}, {"input_tokens": True, "context_window": None},
+        {"input_tokens": 2.5, "context_window": 1.5}, {"input_tokens": None, "context_window": None}, None]
+    assert all(row["response"] is None for row in recorded[2:7])
+    counted, state = native([META, token_count(total_token_usage={"input_tokens": 1},
+                                               last_token_usage={"input_tokens": 9}, model_context_window=100)])
+    assert state["usage_source"] == "count"
+    assert counted[1]["occupancy"] == {"input_tokens": 9, "context_window": 100}
+    assert counted[1]["response"]["usage"]["context_total"] == 9
+    assert [row["occupancy"] for row in recorded[:2]] == [None, None]
+
+
+def test_compaction_carries_its_id_and_embedded_usage_record_unrepaired():
+    rows, _ = native([META, *COMPACTION_RECORDS])
+    base = {"summary": True, "basis": "native", "rule": "codex_compacted", "trigger": None, "reason": None}
+    assert rows[1]["compaction"] == {**base, "id": "c", "usage_record": {
+        "turn_id": "t", "response_id": "c", "input_tokens": 216410, "model": "m"}}
+    assert rows[2]["compaction"] == {**base, "id": None, "usage_record": None}
+    assert rows[3]["compaction"] == {**base, "id": "c", "usage_record": None}
+    assert rows[4]["compaction"] == {**base, "id": None, "usage_record": None}
+    assert rows[5]["compaction"] == {**base, "id": None, "usage_record": {
+        "turn_id": None, "response_id": None, "input_tokens": False, "model": None}}
+    assert rows[1]["injections"] == [{"piece": 0, "native_kind": "compact_summary", "source": None, "bytes": 2}]
+
+
+@pytest.mark.parametrize("payload, message", [
+    ({"compaction_response_id": 7}, "compaction_response_id is not a string"),
+    ({"compaction_response_id": True}, "compaction_response_id is not a string"),
+    ({"compaction_response_id": ["c"]}, "compaction_response_id is not a string"),
+    ({"compaction_response_id": {"id": "c"}}, "compaction_response_id is not a string"),
+    ({"latest_token_usage_record": {"usage": [1]}}, "latest_token_usage_record usage is not an object"),
+    ({"latest_token_usage_record": {}, "resume_metadata": "x"}, "resume_metadata is not an object"),
+    ({"latest_token_usage_record": {}, "resume_metadata": {"previous_turn_settings": ["m"]}},
+     "previous_turn_settings is not an object"),
+])
+def test_unexpected_compaction_types_fail_the_file_and_are_not_malformed_lines(tmp_path, payload, message):
+    with pytest.raises(TypeError, match=f"^Codex compacted {message}$"):
+        native([META, record("compacted", payload)])
+    source = tmp_path / "rollout.jsonl"
+    source.write_bytes(b"".join(lines_of([META, record("compacted", payload)])))
+    proc = subprocess.run([str(TOOLS / "harness-evidence"), "decode"],
+                          input=json.dumps(request(source)) + "\n", text=True,
+                          capture_output=True, timeout=60, env=environment(tmp_path))
+    assert proc.returncode != 0
+    assert message in proc.stderr
+    assert not any(json.loads(line).get("object") in ("unparsed", "coverage", "file_end")
+                   for line in proc.stdout.splitlines())
+
+
+def test_own_marks_events_of_the_files_first_session_meta_thread():
+    child = record("session_meta", {"id": "child", "parent_thread_id": "parent"})
+    parent = record("session_meta", {"id": "parent"})
+    context = record("turn_context", {"model": "m"})
+    rows, _ = native([context, record("session_meta", {"cwd": "/w"}), child, context, parent,
+                      context, child, context])
+    assert [row["identity"]["own"] for row in rows[:-1]] == [False, False, True, True, False, False, True, True]
+    split, state = native([child])
+    assert split[0]["identity"]["own"] is True
+    state = json.loads(json.dumps(state))
+    raw = lines_of([parent, context])
+    place = Place("codex", "file", None, "explicit", "control", Path("control"))
+    from harness_evidence import index_codex
+    later = list(index_codex.extract([(100, raw[0]), (100 + len(raw[0]), raw[1])], state, place=place, text=True))
+    assert [row["identity"]["own"] for row in later[:-1]] == [False, False]
+
+
+def test_new_compaction_reads_are_declared(monkeypatch):
+    assert undeclared_reads(monkeypatch, lines_of([META, *TURN_RECORDS, *COMPACTION_RECORDS,
+        token_count(last_token_usage={"input_tokens": 1}, model_context_window=2)])) == []
+
+
+def test_compaction_turn_and_occupancy_provenance_is_declared():
+    from harness_evidence import index_codex
+    defaults = index_codex.provenance_defaults()
+    assert defaults["identity.own"] == {"native_paths": ["payload.id"], "coverage_keys": ["session_meta/input:session"],
+                                        "basis": "convention", "rule": "codex_identity_own"}
+    assert defaults["turn.id"]["native_paths"] == ["payload.turn_id"]
+    assert defaults["occupancy.context_window"]["coverage_keys"] == ["event_msg:token_count/input:context_window"]
+    assert defaults["compaction.id"]["native_paths"] == ["payload.compaction_response_id"]
+    assert defaults["compaction.trigger"] == {"native_paths": [], "coverage_keys": [], "basis": "native",
+                                              "rule": "absent:not_recorded"}
+    assert defaults["compaction.usage_record"]["native_paths"] == [
+        "payload.latest_token_usage_record.turn_id", "payload.latest_token_usage_record.response_id",
+        "payload.latest_token_usage_record.usage.input_tokens",
+        "payload.resume_metadata.previous_turn_settings.model"]
+
+
+def test_compaction_control_sample_publishes_declared_codex_facts(tmp_path):
+    from harness_evidence import index_codex
+    out = decode(tmp_path, "codex-compaction.jsonl")
+    assert undeclared_fields(out, index_codex.provenance_defaults()) == []
+    rows = [value for value in out if value["object"] == "index_event"]
+    assert [row["identity"]["own"] for row in rows] == [True] * 7 + [False, False]
+    assert [row["turn"] for row in rows[1:3]] == [{"id": "resume", "start": True}] * 2
+    assert rows[5]["turn"] == {"id": "resume", "start": False}
+    assert rows[3]["occupancy"] == {"input_tokens": 240000, "context_window": 258400}
+    assert rows[4]["compaction"]["id"] == "compact-a"
+    assert rows[4]["compaction"]["usage_record"] == {"turn_id": "resume", "response_id": "compact-a",
+                                                     "input_tokens": 216410, "model": "gpt-6-astra"}
+    assert rows[8]["compaction"]["id"] == "compact-p" and rows[8]["compaction"]["usage_record"] is None
+    coverage = next(value for value in out if value["object"] == "coverage")
+    assert {row["record_kind"]: row["known"] for row in coverage["records"]}["event_msg:turn_started"] == 0
+
+
+@pytest.mark.parametrize("last", ["text", [1], 7])
+def test_occupancy_refuses_a_token_count_usage_that_is_not_an_object(last):
+    with pytest.raises(TypeError, match="^Codex token_count last_token_usage is not an object$"):
+        native([META, record("token_usage_record", {"usage": {}}),
+                token_count(last_token_usage=last, model_context_window=1)])

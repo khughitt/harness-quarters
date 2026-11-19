@@ -92,6 +92,16 @@ PROVENANCE = {
     "calls[].paths_complete": ["payload.arguments", "payload.input", "payload.cwd"],
     "injections": ["payload.base_instructions.text", "payload.content", "payload.replacement_history"],
     "compaction": ["payload.replacement_history"], "interruption": ["payload.type"],
+    "identity.own": ["payload.id"],
+    "turn.id": ["payload.turn_id"], "turn.start": ["type", "payload.type"],
+    "occupancy.input_tokens": ["payload.info.last_token_usage.input_tokens"],
+    "occupancy.context_window": ["payload.info.model_context_window"],
+    "compaction.id": ["payload.compaction_response_id"],
+    "compaction.trigger": [], "compaction.reason": [],
+    "compaction.usage_record": ["payload.latest_token_usage_record.turn_id",
+                                "payload.latest_token_usage_record.response_id",
+                                "payload.latest_token_usage_record.usage.input_tokens",
+                                "payload.resume_metadata.previous_turn_settings.model"],
 }
 COVERAGE_KEYS = {
     "identity.session": ["session_meta/input:session"],
@@ -118,6 +128,9 @@ COVERAGE_KEYS = {
     "calls[].commands": ["applied:tool_call/input:value", "applied:shell_arguments/input:workdir"],
     "injections": ["applied:base_instructions/input:text", "applied:text_block/input:text", "compacted/input:history"],
     "compaction": ["compacted/input:history"],
+    "identity.own": ["session_meta/input:session"],
+    "occupancy.input_tokens": ["event_msg:token_count/payload.info.last_token_usage.input_tokens"],
+    "occupancy.context_window": ["event_msg:token_count/input:context_window"],
     "calls[].kind": ["applied:tool_call/input:name"],
     "calls[].prompt": ["applied:tool_call/input:value"],
     **{field: ["applied:tool_call/input:value"] for field in
@@ -130,7 +143,7 @@ for _field in (*USAGE, "input_uncached", "uncached_total"):
         PROVENANCE[_prefix + _field] = _paths
         COVERAGE_KEYS[_prefix + _field] = [f"applied:usage/input:{name}" for name in _names]
 
-CONVENTIONS = frozenset({"flush_response", "execution", "notifications", "fork_boundary", "turn_end", "response.phase", "response.id", "message.origin", "identity.subagent",
+CONVENTIONS = frozenset({"flush_response", "execution", "notifications", "fork_boundary", "turn_end", "response.phase", "response.id", "message.origin", "identity.subagent", "identity.own",
                           "calls[].kind", "calls[].paths", "calls[].paths_complete", "calls[].commands"})
 
 
@@ -199,6 +212,8 @@ def provenance_defaults():
             for field, paths in PROVENANCE.items()}
     defaults["context.context_window"]["source"] = "context_window_snapshot"
     defaults["results[].exit_code"]["rule"] = "absent:not_decoded"
+    for field in ("compaction.trigger", "compaction.reason"):
+        defaults[field]["rule"] = "absent:not_recorded"
     for field in ("calls[].skills", "execution.runs", "execution.commands", "execution.call_updates", "execution.writes", "execution.operations"):
         defaults[field]["basis"] = "heuristic"
     for field in METADATA_PROVENANCE:
@@ -232,6 +247,31 @@ def _identity(state, payload):
     for parent in (payload.get("forked_from_id"), _parent(payload)):
         if parent and parent not in identity["ancestors"]:
             identity["ancestors"].append(parent)
+
+
+def _object(value, name):
+    """A nested native object, read as the original reader reads it (absent when falsy)."""
+    if value and not isinstance(value, dict):
+        raise TypeError(f"Codex compacted {name} is not an object")
+    return value or {}
+
+
+def _compaction(payload):
+    """The compaction's response id and the latest usage record it embeds, unrepaired.
+
+    Matching the record to the compaction's turn and model is the consumer's rule."""
+    event_id = payload.get("compaction_response_id")
+    if event_id is not None and not isinstance(event_id, str):
+        raise TypeError("Codex compacted compaction_response_id is not a string")
+    usage, record = payload.get("latest_token_usage_record"), None
+    if isinstance(usage, dict):
+        settings = _object(_object(payload.get("resume_metadata"), "resume_metadata").get(
+            "previous_turn_settings"), "previous_turn_settings")
+        record = {"turn_id": usage.get("turn_id"), "response_id": usage.get("response_id"),
+                  "input_tokens": _object(usage.get("usage"), "latest_token_usage_record usage").get("input_tokens"),
+                  "model": settings.get("model")}
+    return {"summary": True, "basis": "native", "rule": "codex_compacted", "id": event_id,
+            "trigger": None, "reason": None, "usage_record": record}
 
 
 def _usage(raw):
@@ -364,6 +404,7 @@ def extract(lines, state, *, place: Place, text: bool):
                  "response": None, "flush_response": False, "message": None, "context": None,
                  "calls": [], "results": [], "injections": [], "notifications": [],
                  "compaction": None, "interruption": None, "fork_boundary": None, "turn_end": None,
+                 "turn": None, "occupancy": None,
                  "execution": {"runs": [], "commands": [], "call_updates": [], "writes": [],
                                "operations": [], "diagnostics": {}}, "provenance": {}}
         if kind == "session_meta":
@@ -379,8 +420,13 @@ def extract(lines, state, *, place: Place, text: bool):
             source = payload.get("source")
             if isinstance(source, dict) and "subagent" in source:
                 applied(state, session, day, "spawn", {"parent_thread_id": _parent(payload) is not None})
+        # After this record's identity: the file's first session_meta is its own thread.
+        event["identity"]["own"] = session is not None and session == state.get("identity", {}).get("thread_id")
         if session is not None:
+            if native_kind in ("event_msg:task_started", "event_msg:turn_started"):
+                event["turn"] = {"id": payload.get("turn_id"), "start": True}
             if kind == "turn_context":
+                event["turn"] = {"id": payload.get("turn_id"), "start": False}
                 settings = (payload.get("collaboration_mode") or {}).get("settings") or {}
                 state.update(model=payload.get("model"), effort=payload.get("effort") or settings.get("reasoning_effort"), turn_cwd=payload.get("cwd"))
                 event["context"] = {"model": state["model"], "effort": state["effort"], "cwd": state["turn_cwd"], "context_window": state.get("context_window")}
@@ -392,6 +438,10 @@ def extract(lines, state, *, place: Place, text: bool):
                 info = payload.get("info")
                 if info is not None:
                     window = info.get("model_context_window")
+                    last = info.get("last_token_usage") or {}
+                    if not isinstance(last, dict):
+                        raise TypeError("Codex token_count last_token_usage is not an object")
+                    event["occupancy"] = {"input_tokens": last.get("input_tokens"), "context_window": window}
                     if window is not None:
                         state["context_window"] = window
                         event["context"] = {"model": state.get("model"), "effort": state.get("effort"), "cwd": state.get("turn_cwd"), "context_window": window}
@@ -437,7 +487,7 @@ def extract(lines, state, *, place: Place, text: bool):
             elif native_kind in ("response_item:function_call_output", "response_item:custom_tool_call_output"):
                 tools.on_output(state, event, payload, day)
             elif kind == "compacted":
-                event["compaction"] = {"summary": True, "basis": "native", "rule": "codex_compacted"}
+                event["compaction"] = _compaction(payload)
                 event["injections"] = [{"piece": 0, "native_kind": "compact_summary", "source": None,
                                         "bytes": _size(payload.get("replacement_history") or [])}]
             elif native_kind == "event_msg:turn_aborted":

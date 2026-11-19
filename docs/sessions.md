@@ -410,6 +410,29 @@ A Claude compaction appears on up to three events that share `compaction.id`, th
 records no reason, even when its trigger is `auto`. Other informational notices are
 not compactions. agy checkpoints keep `{summary, basis, rule}`.
 
+Codex events, and only Codex events, carry the evidence a consumer needs to classify a
+compaction; the decoder does not classify it:
+
+- `identity.own` (basis `convention`): the event's session is the file's first
+  `session_meta` id, computed after that record's own identity, so the first
+  `session_meta` is own and inherited parent sessions are not.
+- `turn`: `{id, start:true}` on `event_msg` `task_started` and `turn_started`,
+  `{id, start:false}` on `turn_context`, null otherwise; `id` is the native `turn_id`.
+  `turn_started` stays an unknown record kind in `record_counts`.
+- `occupancy`: `{input_tokens, context_window}` on every `token_count` with `info`,
+  from `info.last_token_usage.input_tokens` and `info.model_context_window`, whatever the
+  usage source and whether or not the window is null.
+- A `compacted` record's `compaction` adds `id` (native `compaction_response_id`, a
+  string or null; another type stops the decode request with a `TypeError`), `trigger`
+  and `reason` (null, `absent:not_recorded`) and `usage_record`: null unless
+  `latest_token_usage_record` is an object, else `{turn_id, response_id, input_tokens,
+  model}` from that record and `resume_metadata.previous_turn_settings.model`. A
+  `resume_metadata`, `previous_turn_settings` or usage `usage` that is present but not
+  an object also stops the request.
+
+Turn ids, token counts and windows pass through unrepaired, as JSON scalars. These reads
+are unwatched dimensions, so `field_presence` and `record_counts` are unchanged.
+
 ### agy index events
 
 The agy index profile shares Claude's complete provenance field set. Its shared

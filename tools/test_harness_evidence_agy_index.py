@@ -92,6 +92,8 @@ def test_every_step_is_one_event_with_shared_position_and_identity(store):
                                      "subagent": False, "cwd": "/w/alpha", "entrypoint": "agy", "version": None}
         assert event["eligible"] and event["at_ms"] is not None
         assert event["turn_end"] is None and event["fork_boundary"] is None
+        # Codex's turn, occupancy and compaction usage-record facts are absent from agy events.
+        assert not {"turn", "occupancy"} & event.keys() and event["compaction"] is None
         offset += len(raw)
 
 

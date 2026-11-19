@@ -1,9 +1,10 @@
 {
  "built_from": {
   "catalogue_sha256": "d497e0863943f9d2fdd919bb3e243671f5d5ea9632e376b8fee9a2fe6903477c",
-  "index_catalogue_sha256": "a178debc3bf9d2d186bd832b15b46a9cc238fdeafc4f9314ec6c5462cdd18ea2",
+  "index_catalogue_sha256": "0dcbaeb1f5afa1625b4c949ac419f94359507c9467f876f12298aff579142906",
   "index_samples": {
    "codex-basic.jsonl": "a7238f2c4cc4903f0247967deb9b95360302563cbf315624ae92ac2cb588fe76",
+   "codex-compaction.jsonl": "acfb33d93e23fcafa976b624cf251f4305b315409fcc78f43bb779a2d109ab5d",
    "codex-context.jsonl": "dcbe4630c1b00f0afc13d26e20c08d7ee5e37eb562204828d5204872194135d8",
    "codex-execution.jsonl": "210585b77ecc3ed7da3b06146a0db214d98d11aa3922cd54dc1f6bb15ec50191"
   },
@@ -3023,6 +3024,29 @@
       "payload.replacement_history"
      ]
     },
+    "compaction.id": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.compaction_response_id"
+     ]
+    },
+    "compaction.reason": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "compaction.trigger": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "compaction.usage_record": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.latest_token_usage_record.response_id",
+      "payload.latest_token_usage_record.turn_id",
+      "payload.latest_token_usage_record.usage.input_tokens",
+      "payload.resume_metadata.previous_turn_settings.model"
+     ]
+    },
     "context.context_window": {
      "coverage_keys": [
       "event_msg:token_count/input:context_window"
@@ -3435,6 +3459,14 @@
       "payload.id"
      ]
     },
+    "identity.own": {
+     "coverage_keys": [
+      "session_meta/input:session"
+     ],
+     "provenance": [
+      "payload.id"
+     ]
+    },
     "identity.parent": {
      "coverage_keys": [
       "applied:spawn/input:parent_thread_id"
@@ -3811,6 +3843,22 @@
       "type"
      ]
     },
+    "occupancy.context_window": {
+     "coverage_keys": [
+      "event_msg:token_count/input:context_window"
+     ],
+     "provenance": [
+      "payload.info.model_context_window"
+     ]
+    },
+    "occupancy.input_tokens": {
+     "coverage_keys": [
+      "event_msg:token_count/payload.info.last_token_usage.input_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.input_tokens"
+     ]
+    },
     "origin.markers": {
      "coverage_keys": [],
      "provenance": [
@@ -4150,6 +4198,19 @@
       "payload.summary"
      ]
     },
+    "turn.id": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.turn_id"
+     ]
+    },
+    "turn.start": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.type",
+      "type"
+     ]
+    },
     "turn_end": {
      "coverage_keys": [],
      "provenance": [
@@ -4309,6 +4370,13 @@
      "write_stdin": "poll"
     },
     "unwatched": {
+     "compacted": {
+      "payload.compaction_response_id": "dimension",
+      "payload.latest_token_usage_record.response_id": "dimension",
+      "payload.latest_token_usage_record.turn_id": "dimension",
+      "payload.latest_token_usage_record.usage.input_tokens": "dimension",
+      "payload.resume_metadata.previous_turn_settings.model": "dimension"
+     },
      "event_msg:exec_command_end": {
       "payload.call_id": "applied:exec_end",
       "payload.duration": "applied:exec_end",
@@ -4341,6 +4409,12 @@
       "payload.call_id": "applied:patch_end",
       "payload.success": "applied:patch_end"
      },
+     "event_msg:task_started": {
+      "payload.turn_id": "dimension"
+     },
+     "event_msg:turn_started": {
+      "payload.turn_id": "dimension"
+     },
      "response_item:custom_tool_call": {
       "payload.input.message": "dimension"
      },
@@ -4364,7 +4438,8 @@
       "payload.source.subagent.thread_spawn.parent_thread_id": "applied:spawn"
      },
      "turn_context": {
-      "payload.cwd": "dimension"
+      "payload.cwd": "dimension",
+      "payload.turn_id": "dimension"
      }
     },
     "watched": {
@@ -4617,12 +4692,14 @@
        "identity.cwd",
        "identity.entrypoint",
        "identity.index_session",
+       "identity.own",
        "identity.parent",
        "identity.session",
        "identity.subagent",
        "identity.version",
        "injections",
-       "native_kind"
+       "native_kind",
+       "turn.start"
       ]
      },
      "observed": [],
@@ -4688,15 +4765,24 @@
        "abort_reason",
        "answer_phase",
        "at",
+       "at_ms",
        "block_type",
        "call.command",
        "call.id",
        "call.tool",
+       "compaction",
+       "compaction.id",
+       "compaction.usage_record",
+       "context.context_window",
+       "context.cwd",
+       "context.model",
        "copy",
        "copy_basis",
        "copy_rule",
+       "eligible",
        "encrypted",
        "flags",
+       "flush_response",
        "header.agent_path",
        "header.child",
        "header.child_basis",
@@ -4715,18 +4801,43 @@
        "header.session",
        "header.start_ms",
        "header.turn_ids",
+       "identity.cwd",
+       "identity.entrypoint",
+       "identity.index_session",
+       "identity.own",
+       "identity.session",
+       "identity.version",
+       "injections",
        "kind",
        "links[].call.id",
        "links[].target",
        "message_id",
        "model.value",
+       "native_kind",
+       "occupancy.context_window",
+       "occupancy.input_tokens",
        "origin.unrecognized_tag.joined",
        "origin.unrecognized_tag.lead",
        "original",
        "phase",
        "readable_text",
+       "response.id",
+       "response.native",
+       "response.phase",
+       "response.usage.cache_read",
+       "response.usage.context_total",
+       "response.usage.input_uncached",
+       "response.usage.output",
+       "response.usage.uncached_total",
+       "response.usage_present.cache_read",
+       "response.usage_present.context_total",
+       "response.usage_present.input_uncached",
+       "response.usage_present.output",
+       "response.usage_present.uncached_total",
        "session",
        "text",
+       "turn.id",
+       "turn.start",
        "turn_end_message",
        "turn_id",
        "waits_for_user"
@@ -4734,6 +4845,7 @@
      },
      "observed": [],
      "synthetic": [
+      "index:codex-compaction.jsonl",
       "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-00-00-01900000-0000-7000-8000-0000000000e1.jsonl",
       "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-05-00-01900000-0000-7000-8000-0000000000f1.jsonl",
       "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl"
@@ -4791,6 +4903,7 @@
        "identity.cwd",
        "identity.entrypoint",
        "identity.index_session",
+       "identity.own",
        "identity.parent",
        "identity.session",
        "identity.subagent",
@@ -4806,6 +4919,8 @@
        "message.origin",
        "message.text",
        "native_kind",
+       "occupancy.context_window",
+       "occupancy.input_tokens",
        "origin.markers",
        "origin.unrecognized_tag.joined",
        "origin.unrecognized_tag.lead",
@@ -4835,6 +4950,7 @@
        "results[].truncation",
        "session",
        "text",
+       "turn.start",
        "turn_end_message",
        "turn_id"
       ]

@@ -1006,6 +1006,9 @@ def test_claude_compaction_reasons_pair_boundary_summary_and_idle_notice(tmp_pat
     assert next(row for row in rows if row["line"] == 18)["compaction"] is None
     proof = next(row for row in rows if row["line"] == 8)["provenance"]["compaction"]
     assert proof["native_paths"] == COMPACTION_PATHS and proof["basis"] == "native"
+    # Codex's turn, occupancy, own-session and usage-record facts are absent from Claude events.
+    assert not any({"turn", "occupancy"} & row.keys() or "own" in row["identity"]
+                   or "usage_record" in (row["compaction"] or {}) for row in rows)
 
 
 @pytest.mark.parametrize("cut", range(1, 22))
