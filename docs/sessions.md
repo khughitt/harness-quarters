@@ -384,12 +384,43 @@ declares native skill events and question option labels. These describe decoder
 behavior, without claims about untested harness versions or consumer metrics.
 The capability artifact publishes native field provenance and coverage declarations separately from reader declarations.
 
+A Claude compaction appears on up to three events that share `compaction.id`, the
+`compact_boundary` record's uuid. Each `compaction` object carries `summary`, `id`,
+`trigger`, `reason`, `basis:"native"` and `rule`:
+
+- The boundary (`rule:"compact_boundary"`) has `summary:false` and `trigger`, the
+  native `compactMetadata.trigger` (`auto` or `manual`), null when absent. A
+  `compactMetadata` that is not an object, or a trigger that is not a string, stops
+  the decode request with a `TypeError`, like the decoder's other invalid native types.
+- The summary (`rule:"compact_summary"`, the `isCompactSummary` user record) has
+  `summary:true`. Count compactions from these events only. Its `id` is the boundary's
+  when it reaches the open boundary chain by `parentUuid`, directly or through
+  injected context (Claude can write attachments between the two), and null otherwise.
+- An idle notice (`rule:"idle_compaction_notice"`) has `summary:false` and
+  `reason:"idle"`. Claude writes it as a later `system`/`informational` record whose
+  content starts "Compacted while idle, before the prompt cache expired". It carries
+  no compaction id, so the decoder follows `parentUuid` from the boundary through the
+  summary and injected context: attachment records and `isMeta` user records. That chain stays
+  open in the resumable index state and closes at the first record that does not
+  extend it. A notice outside an open chain has a null `id` rather than a guessed one.
+
+`reason` is null on boundaries and summaries. A boundary with no paired notice
+records no reason, even when its trigger is `auto`. Other informational notices are
+not compactions. agy checkpoints keep `{summary, basis, rule}`.
+
 ### agy index events
 
 The agy index profile shares Claude's complete provenance field set. Its shared
 context is null and its execution collections are empty, declared unrecorded;
 ordinary step responses carry the convention phase `fragment`. These constants
 add no native extraction, execution associations or coverage counts.
+
+The index capability `harnesses.agy.index.origin_kinds` classifies native user-channel
+origins: `USER_EXPLICIT` maps to `{class: "user_typed", basis: "native"}`. All other
+origin strings, including new values from a future writer, are deliberately unclassified.
+Consumers must not infer human authorship from the user channel alone. Claude omits
+`origin_kinds` and retains its existing marker policy. This declaration does not change
+index events or their original source values.
 
 agy emits one `index_event` per transcript step, with the same object kinds, framing
 and `provenance_defaults` field set as Claude. Fields agy does not record are null and

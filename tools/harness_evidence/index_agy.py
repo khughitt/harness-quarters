@@ -193,6 +193,9 @@ _ABSENT = {
     "fork_boundary": "no_fork_records", "turn_end": "no_turn_end_records",
 }
 ABSENT = _ABSENT  # Published in the capabilities index block (spec rev 2 §7).
+# Native source values pass through unchanged. Every unlisted kind is deliberately
+# unclassified; a new writer value never silently becomes evidence of human authorship.
+ORIGIN_KINDS = {"USER_EXPLICIT": {"class": "user_typed", "basis": "native"}}
 _SUMMARY = [f"{agy_summaries.TABLE}.{column}" for column in ("parent_conversation_id",)]
 PROVENANCE = {
     "context": [], "execution": [], "response.phase": [],

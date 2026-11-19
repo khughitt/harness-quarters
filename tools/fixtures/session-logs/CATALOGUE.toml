@@ -1981,3 +1981,11 @@ harness = "claude-code"
 version = "unknown"
 provenance = "synthetic"
 profile = "index"
+
+# A boundary, summary and later idle notice share one compaction id; manual has no notice.
+[[sample]]
+path = "index/compaction-reasons.jsonl"
+harness = "claude-code"
+version = "2.1.325"
+provenance = "synthetic"
+profile = "index"

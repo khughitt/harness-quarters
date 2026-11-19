@@ -14,6 +14,17 @@ import time
 from .counters import TurnState
 from .limits import Limits
 from .record import Record, jencode_compact as _ENCODE, jloads_strict
+from .spend import (
+    Entry,
+    Signal,
+    SpendRecord,
+    entry_from_dict,
+    entry_to_dict,
+    signal_from_dict,
+    signal_to_dict,
+    spend_record_from_dict,
+    spend_record_to_dict,
+)
 
 IDLE_SECONDS = 7 * 86400
 ENDED_SECONDS = 30 * 86400
@@ -87,18 +98,19 @@ class Wakeup(Record):
 
 class RootState(Record):
     __slots__ = _fields = ('harness', 'root', 'turn', 'paused', 'grace_used', 'workers', 'worker_names',
-                           'cron_jobs', 'wakeups', 'harness_pid', 'cwd', 'notified', 'notify_error', 'budget_note')
+                           'cron_jobs', 'wakeups', 'harness_pid', 'cwd', 'notified', 'notify_error', 'budget_note',
+                           'spend_cache', 'spend_snapshot')
     _defaults = {'paused': None, 'harness_pid': None, 'cwd': None, 'notified': False, 'notify_error': None,
-                 'budget_note': None}
+                 'budget_note': None, 'spend_cache': None, 'spend_snapshot': None}
     _factories = {'grace_used': dict, 'workers': set, 'worker_names': set, 'cron_jobs': dict, 'wakeups': list}
 
 
 class RootRecord(Record):
     __slots__ = _fields = ('version', 'harness', 'root', 'generation', 'created_at', 'turn_serial',
                            'event_serial', 'state', 'ended_at', 'events', 'dropped_count', 'dropped_through',
-                           'prompt_guards')
+                           'prompt_guards', 'spend')
     _defaults = {'version': 1, 'turn_serial': 0, 'event_serial': 0, 'state': None,
-                 'ended_at': None, 'dropped_count': 0, 'dropped_through': None}
+                 'ended_at': None, 'dropped_count': 0, 'dropped_through': None, 'spend': None}
     _factories = {'events': list, 'prompt_guards': _empty_guards}
 
     def __getattribute__(self, name: str):
@@ -110,6 +122,12 @@ class RootRecord(Record):
 
     def __reduce__(self):
         return (type(self), self._astuple())
+
+
+_ALL_STATE_FIELDS = frozenset(RootState._fields)
+_REQUIRED_STATE_FIELDS = _ALL_STATE_FIELDS - {'spend_cache', 'spend_snapshot'}
+_ALL_RECORD_FIELDS = frozenset(RootRecord._fields)
+_REQUIRED_RECORD_FIELDS = _ALL_RECORD_FIELDS - {'spend'}
 
 
 def new_record(harness: str, root: str, now: float) -> RootRecord:
@@ -204,7 +222,7 @@ def _turn_from_dict(t: dict) -> TurnState:
 
 
 def state_dict(st: RootState) -> dict:
-    return {
+    out = {
         'harness': st.harness, 'root': st.root,
         'turn': None if st.turn is None else st.turn.to_dict(),
         'paused': st.paused, 'grace_used': st.grace_used,
@@ -214,11 +232,16 @@ def state_dict(st: RootState) -> dict:
         'harness_pid': st.harness_pid, 'cwd': st.cwd, 'notified': st.notified,
         'notify_error': st.notify_error, 'budget_note': st.budget_note,
     }
+    if st.spend_cache is not None:
+        out['spend_cache'] = signal_to_dict(st.spend_cache)
+    if st.spend_snapshot is not None:
+        out['spend_snapshot'] = entry_to_dict(st.spend_snapshot)
+    return out
 
 
 def state_from_dict(d: dict) -> RootState:
     _check(d, dict, 'state')
-    if set(d) != set(RootState._fields):
+    if not (_REQUIRED_STATE_FIELDS <= set(d) <= _ALL_STATE_FIELDS):
         raise ValueError('active state fields differ')
     turn = d['turn']
     wakeups = []
@@ -229,6 +252,8 @@ def state_from_dict(d: dict) -> RootState:
         wakeups.append(Wakeup(_check(text_, str, 'wakeup text'),
                               _num(before, 'wakeup not_before'),
                               _num(after, 'wakeup not_after')))
+    raw_cache = d.get('spend_cache')
+    raw_snap = d.get('spend_snapshot')
     return RootState(
         harness=_check(d['harness'], str, 'harness'),
         root=_check(d['root'], str, 'root'),
@@ -244,6 +269,8 @@ def state_from_dict(d: dict) -> RootState:
         notified=_check(d['notified'], bool, 'notified'),
         notify_error=_opt(d['notify_error'], str, 'notify_error'),
         budget_note=_opt(d['budget_note'], str, 'budget_note'),
+        spend_cache=None if raw_cache is None else signal_from_dict(raw_cache),
+        spend_snapshot=None if raw_snap is None else entry_from_dict(raw_snap),
     )
 
 
@@ -268,8 +295,10 @@ def record_json(record: RootRecord) -> str:
         'ended_at': record.ended_at,
         'dropped_count': record.dropped_count,
         'dropped_through': record.dropped_through,
-        'prompt_guards': record.prompt_guards,
     }
+    if record.spend is not None:
+        header['spend'] = spend_record_to_dict(record.spend)
+    header['prompt_guards'] = record.prompt_guards
     prefix = _ENCODE(header)
     if type(raw_ev) is _LazyEvents:
         return f'{prefix[:-1]},"events":{raw_ev.raw}}}'
@@ -312,9 +341,11 @@ def parse_record(text: str, *, lazy_events: bool = False, path: str | None = Non
         raise ValueError('unversioned pause state needs explicit offline migration')
     if type(d['version']) is not int or d['version'] != 1:
         raise ValueError('unsupported pause record version')
-    if set(d) != set(RootRecord._fields):
+    if not (_REQUIRED_RECORD_FIELDS <= set(d) <= _ALL_RECORD_FIELDS):
         raise ValueError('root record fields differ')
     _validate_guards(d['prompt_guards'])
+    raw_spend = d.get('spend')
+    d['spend'] = None if raw_spend is None else spend_record_from_dict(raw_spend)
     for name in ('harness', 'root', 'generation'):
         if not _check(d[name], str, name):
             raise ValueError(f'{name} must not be empty')
@@ -486,6 +517,16 @@ class Store:
             finally:
                 os.close(fd)
 
+    @staticmethod
+    def _durable_marker(record: RootRecord) -> tuple:
+        sp = record.spend
+        return (
+            record.turn_serial,
+            record.event_serial,
+            record.ended_at,
+            None if sp is None else sp._astuple(),
+        )
+
     @_contextmanager
     def locked(self, harness: str, root: str, *, create: bool = True) -> Iterator[RootRecord | None]:
         stem = self._stem(harness, root)
@@ -495,10 +536,10 @@ class Store:
             creating = record is None
             if creating and create:
                 record = new_record(harness, root, time.time())
-            before = None if record is None else (record.turn_serial, record.event_serial, record.ended_at)
+            before = None if record is None else self._durable_marker(record)
             yield record
             if record is not None:
-                sync_dir = creating or (record.turn_serial, record.event_serial, record.ended_at) != before
+                sync_dir = creating or self._durable_marker(record) != before
                 self._write(path, record, sync_dir=sync_dir)
 
     def read(self, harness: str, root: str) -> RootState | None:

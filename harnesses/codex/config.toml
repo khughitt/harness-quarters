@@ -5,10 +5,15 @@ approvals_reviewer = "user"
 
 personality = "pragmatic"
 web_search = "live"
+# Lets one write_stdin wait up to 1 h on a background command (default 300000 ms);
+# the wait rule pairs it with an @exec yield_time_ms pragma. Fact: long-shell-wait.
+background_terminal_max_timeout = 3600000
 
-# codex-specific instructions
-# codex-specific instructions: none; the profile fragments carry the per-project rules.
-developer_instructions = ""
+# Generated from lore rule:369c00284c7e47028337d6e8c06e41e7 (the long-wait bullet) by
+# `just codex-instructions`; never edit by hand. A change alters every Codex session's
+# instructions, so it reaches main only with the user's approval. Per-project rules
+# still come from the profile fragments.
+developer_instructions = "Never end a turn waiting on work the harness does not track. Run a long check in the\nforeground with a timeout that covers it, or through the harness's own background\nmechanism; a job detached with `&` or `nohup` never wakes you, so no turn ends waiting\non a monitor of one. Claude Code's background Bash (`run_in_background`) is stopped at\nits `timeout`, 30 min when unset and at most 2 h: set it to cover the run. A run\nlonger than 2 h is split into resumable slices (an incremental job run in bounded\npasses, each under the limit, e.g. with `timeout --signal=INT`) or handed to a tracked\nprocess the user agrees to. A controller with a running child ends its turn only where\nthe harness is known to start its next turn when the child finishes (Claude Code: yes;\nCodex: no — probed 2026-09-24 and recorded in ops `hooks/claim-guard`'s\n`CHILD_WAKES`), and otherwise waits with the harness's bounded wait, at its longest\n(Codex: `wait_agent` with `timeout_ms: 3600000`; for its own command, an empty\n`write_stdin` with `yield_time_ms: 3600000` in an exec cell whose first line is\n`// @exec: {\"yield_time_ms\": 3600000}`, capped by the `background_terminal_max_timeout`\nsetting; each returns as soon as the child or command finishes), never a loop of\nshorter waits. A Codex `write_stdin` that returns after 300 s with the command still\nrunning means that setting is at its 300000 default: hand the rest of the wait to a\nfresh small-context child that watches the command, and wait on the child. Before each\nsuch wait, post one line naming what you await, how long it should take and the wait's\nlimit; when it returns, post one status line.\nThis outranks a harness's own shorter guidance: Codex's base instructions' 60-second\ncap on blocking waits and on gaps between updates, and the vendored superpowers\n`codex-tools` reference's 5–10 minute stretches. A worker's turn end is its final\nreport: it reports and stops only when its assignment is complete or blocked on its\ncontroller or a person, never with its own check still running. A child's \"waiting on\nbackground work\" is unverified until you check that the process or its output exists;\nafter a wake-up, report what you observed, never a notification that did not arrive.\n"
 
 [permissions.workspace-local]
 extends = ":workspace"

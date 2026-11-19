@@ -1,17 +1,18 @@
 """Bounded transition data; no transcript reads, delivery claims or heavy imports."""
 from __future__ import annotations
 
-import json
 import math
 import os
+
+from .record import jencode_compact as _ENCODE
 
 MAX_EVENTS = 128
 MAX_BYTES = 131072
 SCOPES = {'active': 'tree_active_seconds', 'calls': 'root_attempts',
           'spawns': 'tree_started', 'compactions': 'root'}
 REASONS = {'turn_start': {'genuine_user', 'implicit'},
-           'warning': {'active', 'calls', 'spawns', 'compactions'},
-           'enforced_pause': {'active', 'calls', 'spawns', 'compactions', 'limits-changed'},
+           'warning': {'active', 'calls', 'spawns', 'compactions', 'spend'},
+           'enforced_pause': {'active', 'calls', 'spawns', 'compactions', 'limits-changed', 'spend'},
            'notification': {None}, 'turn_reset': {'genuine_user'},
            'turn_resume': {'genuine_user'}, 'session_end': {'session_end', 'idle'}}
 EVENT_FIELDS = frozenset({'version', 'harness', 'root', 'generation', 'turn', 'sequence', 'host',
@@ -23,7 +24,6 @@ PAIR_KEYS = frozenset({'used', 'limit'})
 NOTICE_KEYS = frozenset({'outcome', 'error_code', 'desktop', 'relay', 'receipt', 'pause_sequence'})
 OUTCOMES = frozenset({'pending', 'attempted', 'error', 'unknown'})
 ERROR_CODES = frozenset({None, 'notify_failed'})
-_ENCODE = json.JSONEncoder(ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode
 _HOST = os.uname().nodename
 
 

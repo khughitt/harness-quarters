@@ -3,16 +3,17 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
 
-from turn_pause import limits as limits_mod
+from turn_pause import limits as limits_mod, spend as spend_mod
 from turn_pause.counters import TurnState
 from turn_pause.state import Store, state_path
 
 TOOL = Path(__file__).resolve().parent / "hq"
-LINE = "active 1h12m/16h00m root calls 140/2000 tree spawns 3/60 root compactions 0/2 (advisory) paused:no budget:none notify:ok"
+LINE = "active 1h12m/16h00m root calls 140/2000 tree spawns 3/60 root compactions 0/2 (advisory) paused:no budget:none notify:ok spend:absent"
 
 
 @pytest.fixture
@@ -143,7 +144,330 @@ def test_status_paused_budget_and_notify_error(home):
     seed(home, "claude-code", "s1", paused="spawns", budget_note="2h", notified=False,
          notify_error="boom\nbad")
     out = hq(home, "status", "--session", "s1").stdout.strip()
-    assert out.endswith("paused:spawns budget:2h notify:error: boom bad")
+    assert out.endswith("paused:spawns budget:2h notify:error: boom bad spend:absent")
+
+
+def write_spend_signal(home, *, trees=(), generated_at=None, stale_after_ms=600_000,
+                       status="ok", claude_state="ok", codex_state="ok"):
+    now_ms = int(time.time() * 1000) if generated_at is None else generated_at
+    obs_dir = home / "state" / "obs"
+    obs_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema": 1,
+        "generated_at": now_ms,
+        "status": status,
+        "stale_after_ms": stale_after_ms,
+        "baseline": {
+            "id": "b1",
+            "computed_at": now_ms,
+            "harnesses": {
+                "claude-code": {"state": claude_state, "threshold": 250_000_000.0, "trees": 40},
+                "codex": {"state": codex_state, "threshold": 350_000_000.0, "trees": 40},
+            },
+        },
+        "trees": list(trees),
+    }
+    path = obs_dir / "spend-signals.json"
+    path.write_text(json.dumps(payload))
+    return path
+
+
+def make_spend_tree(harness="claude-code", root_session="s1", *, episode="ep-1",
+                    value=500_000_000, threshold=350_000_000.0, ratio=1.43,
+                    window_hours=72, measured_at=None, complete=True,
+                    credits_drawn_24h=None, root_resolved=True):
+    if measured_at is None:
+        measured_at = int(time.time() * 1000)
+    return {
+        "root": f"{harness}:{root_session}",
+        "harness": harness,
+        "root_session": root_session,
+        "root_resolved": root_resolved,
+        "episode": episode,
+        "value": value,
+        "threshold": threshold,
+        "ratio": ratio,
+        "window_hours": window_hours,
+        "measured_at": measured_at,
+        "complete": complete,
+        "credits_drawn_24h": credits_drawn_24h,
+    }
+
+
+def write_host_latch(home, *, seen_fresh, outage=None):
+    pause_dir = Path(state_path({"XDG_STATE_HOME": str(home / "state")}))
+    pause_dir.mkdir(parents=True, exist_ok=True)
+    payload = spend_mod.host_latch_to_dict(spend_mod.HostLatch(seen_fresh=seen_fresh, outage=outage))
+    (pause_dir / spend_mod.HOST_FILE).write_text(json.dumps(payload))
+
+
+def test_status_spend_states(home):
+    seed(home, "claude-code", "s1")
+
+    # 1. absent: no file, seen_fresh=False
+    before = snapshot_tree(home / "state")
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:absent")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp == {
+        "signal": "absent",
+        "error": None,
+        "age_s": None,
+        "producer": None,
+        "baseline": None,
+        "episode": None,
+        "record": None,
+        "pending": False,
+        "due": False,
+        "latch": None,
+    }
+    assert snapshot_tree(home / "state") == before
+
+    # 2. vanished: no file, seen_fresh=True, with latched outage
+    vanished_outage = {
+        "state": "vanished",
+        "alerted_at": 1700000000.0,
+        "outcome": "attempted",
+        "error": None,
+    }
+    write_host_latch(home, seen_fresh=True, outage=vanished_outage)
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:vanished")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["signal"] == "vanished"
+    assert sp["error"] is None and sp["age_s"] is None
+    assert sp["producer"] is None and sp["baseline"] is None and sp["episode"] is None
+    assert sp["pending"] is False and sp["due"] is False
+    assert sp["latch"] == vanished_outage
+
+    # 3. unreadable: malformed signal file, error outage latch
+    obs_dir = home / "state" / "obs"
+    obs_dir.mkdir(parents=True, exist_ok=True)
+    sig_path = obs_dir / "spend-signals.json"
+    sig_path.write_text("{corrupt")
+    unreadable_outage = {
+        "state": "unreadable",
+        "alerted_at": 1700000100.0,
+        "outcome": "error",
+        "error": "notify-send exited 1",
+    }
+    write_host_latch(home, seen_fresh=True, outage=unreadable_outage)
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:unreadable")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["signal"] == "unreadable"
+    assert isinstance(sp["error"], str) and sp["error"]
+    assert sp["age_s"] is None and sp["producer"] is None and sp["baseline"] is None
+    assert sp["episode"] is None and sp["latch"] == unreadable_outage
+
+    # 4. stale: valid schema-1 file past stale_after_ms; entry inside stale file is not fresh
+    now_ms = int(time.time() * 1000)
+    write_spend_signal(
+        home,
+        trees=[make_spend_tree("claude-code", "s1", measured_at=now_ms - 900_000)],
+        generated_at=now_ms - 900_000,
+        stale_after_ms=600_000,
+        status="partial",
+        claude_state="insufficient",
+    )
+    write_host_latch(home, seen_fresh=True, outage=None)
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:stale")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["signal"] == "stale" and sp["error"] is None
+    assert isinstance(sp["age_s"], float) and sp["age_s"] >= 899.0
+    assert sp["producer"] == "partial" and sp["baseline"] == "insufficient"
+    assert sp["episode"] is None and sp["due"] is False and sp["latch"] is None
+
+    # 5a. fresh without an entry for this root (and stale entry in a fresh file is ignored)
+    now_ms = int(time.time() * 1000)
+    write_spend_signal(
+        home,
+        trees=[make_spend_tree("claude-code", "s1", measured_at=now_ms - 900_000)],
+        generated_at=now_ms - 2_000,
+        stale_after_ms=600_000,
+        status="ok",
+        claude_state="ok",
+    )
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:fresh")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["signal"] == "fresh" and sp["error"] is None
+    assert isinstance(sp["age_s"], float) and 0.0 <= sp["age_s"] < 30.0
+    assert sp["producer"] == "ok" and sp["baseline"] == "ok"
+    assert sp["episode"] is None and sp["pending"] is False and sp["due"] is False
+
+    # 5b. fresh with a fresh entry for this root
+    now_ms = int(time.time() * 1000)
+    meas_ms = now_ms - 5_000
+    write_spend_signal(
+        home,
+        trees=[make_spend_tree(
+            "claude-code", "s1", episode="ep-fresh", value=500_000_000,
+            threshold=350_000_000.0, ratio=1.43, window_hours=72,
+            measured_at=meas_ms, complete=False, credits_drawn_24h=12.5,
+        )],
+        generated_at=now_ms - 2_000,
+        stale_after_ms=600_000,
+    )
+    before_fresh = snapshot_tree(home / "state")
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:fresh episode 1.43x due")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["signal"] == "fresh" and sp["record"] is None
+    assert sp["pending"] is False and sp["due"] is True
+    ep = sp["episode"]
+    assert ep is not None
+    assert ep["episode"] == "ep-fresh"
+    assert ep["value"] == 500_000_000 and ep["threshold"] == 350_000_000.0
+    assert ep["ratio"] == 1.43 and ep["window_hours"] == 72
+    assert ep["measured_at"] == meas_ms and isinstance(ep["measured_age_s"], float) and ep["measured_age_s"] >= 4.0
+    assert ep["complete"] is False and ep["credits_drawn_24h"] == 12.5
+    assert snapshot_tree(home / "state") == before_fresh
+
+
+def test_status_spend_episode_record(home):
+    seed(home, "claude-code", "s1")
+    st = store(home)
+
+    def set_spend(sr):
+        with st.locked("claude-code", "s1", create=False) as rec:
+            rec.spend = sr
+
+    # 1. Pending record + fresh entry
+    now_ms = int(time.time() * 1000)
+    write_spend_signal(
+        home,
+        trees=[make_spend_tree("claude-code", "s1", episode="ep-1", value=500_000_000,
+                               ratio=1.43, measured_at=now_ms - 1_000)],
+        generated_at=now_ms - 1_000,
+    )
+    set_spend(spend_mod.SpendRecord("ep-1", 500_000_000, 500_000_000, None))
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:fresh episode 1.43x pending")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["record"] == {
+        "episode": "ep-1",
+        "seen_value": 500_000_000,
+        "delivered_value": 500_000_000,
+        "acked_value": None,
+    }
+    assert sp["pending"] is True and sp["due"] is False
+
+    # 2. Acked record + fresh entry below 2x
+    now_ms = int(time.time() * 1000)
+    write_spend_signal(
+        home,
+        trees=[make_spend_tree("claude-code", "s1", episode="ep-1", value=600_000_000,
+                               ratio=1.71, measured_at=now_ms - 1_000)],
+        generated_at=now_ms - 1_000,
+    )
+    set_spend(spend_mod.SpendRecord("ep-1", 550_000_000, 500_000_000, 550_000_000))
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:fresh episode 1.71x acked")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["record"]["acked_value"] == 550_000_000
+    assert sp["pending"] is False and sp["due"] is False
+
+    # 3. Acked record + stale signal (no fresh entry): ` spend:stale acked`
+    now_ms = int(time.time() * 1000)
+    write_spend_signal(home, generated_at=now_ms - 900_000, stale_after_ms=600_000)
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:stale acked")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["signal"] == "stale" and sp["episode"] is None
+    assert sp["record"]["acked_value"] == 550_000_000
+    assert sp["pending"] is False and sp["due"] is False
+
+    # 4. Pending record + stale signal: ` spend:stale pending`
+    set_spend(spend_mod.SpendRecord("ep-1", 500_000_000, 500_000_000, None))
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:stale pending")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["pending"] is True and sp["due"] is False
+
+    # 5. Child-only undelivered record + stale signal: neither pending, due, nor acked
+    set_spend(spend_mod.SpendRecord("ep-1", 500_000_000, None, None))
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:stale")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["pending"] is False and sp["due"] is False
+
+    # 6. Acked record + fresh entry at >= 2x acked_value: due beats acked
+    now_ms = int(time.time() * 1000)
+    write_spend_signal(
+        home,
+        trees=[make_spend_tree("claude-code", "s1", episode="ep-1", value=1_100_000_000,
+                               ratio=3.14, measured_at=now_ms - 1_000)],
+        generated_at=now_ms - 1_000,
+    )
+    set_spend(spend_mod.SpendRecord("ep-1", 550_000_000, 500_000_000, 550_000_000))
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:fresh episode 3.14x due")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["pending"] is False and sp["due"] is True
+
+    # 7. Persisted record acked for E1 + fresh signal entry for new episode E2:
+    # reconciles in memory so due=True, pending=False, while --json record keeps persisted E1
+    now_ms = int(time.time() * 1000)
+    set_spend(spend_mod.SpendRecord("E1", 500_000_000, 500_000_000, 500_000_000))
+    write_spend_signal(
+        home,
+        trees=[make_spend_tree("claude-code", "s1", episode="E2", value=525_000_000,
+                               ratio=1.50, measured_at=now_ms - 1_000)],
+        generated_at=now_ms - 1_000,
+    )
+    before_e2 = snapshot_tree(home / "state")
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:fresh episode 1.50x due")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["episode"]["episode"] == "E2"
+    assert sp["record"] == {
+        "episode": "E1",
+        "seen_value": 500_000_000,
+        "delivered_value": 500_000_000,
+        "acked_value": 500_000_000,
+    }
+    assert sp["pending"] is False and sp["due"] is True
+    assert snapshot_tree(home / "state") == before_e2
+
+
+def test_status_reads_file_not_cache(home):
+    now_ms = int(time.time() * 1000)
+    stale_cached = spend_mod.Signal(
+        identity=(1, 2, 3),
+        generated_at=now_ms - 1_200_000,
+        stale_after_ms=600_000,
+        status="partial",
+        baseline="stale",
+        entry=None,
+        error=None,
+    )
+    seed(home, "claude-code", "s1", spend_cache=stale_cached)
+    write_spend_signal(
+        home,
+        trees=[make_spend_tree("claude-code", "s1", episode="ep-live", ratio=1.43,
+                               measured_at=now_ms - 1_000)],
+        generated_at=now_ms - 1_000,
+        status="ok",
+        claude_state="ok",
+    )
+    txt = hq(home, "status", "--session", "s1").stdout.strip()
+    assert txt.endswith(" notify:ok spend:fresh episode 1.43x due")
+    sp = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)["spend"]
+    assert sp["signal"] == "fresh"
+    assert sp["producer"] == "ok" and sp["baseline"] == "ok"
+    assert sp["episode"]["episode"] == "ep-live"
+
+
+def test_status_corrupt_host_latch_exits_cleanly(home):
+    seed(home, "claude-code", "s1")
+    latch_path = Path(state_path({"XDG_STATE_HOME": str(home / "state")})) / spend_mod.HOST_FILE
+    for bad in ("[]", '{"seen_fresh": "nope", "outage": null}', "[" * 1500 + "]" * 1500):
+        latch_path.write_text(bad)
+        res = hq(home, "status", "--session", "s1")
+        assert res.returncode == 1 and res.stdout == ""
+        assert res.stderr.startswith("hq: ") and "Traceback" not in res.stderr
 
 
 def test_status_json(home):
@@ -422,6 +746,14 @@ def test_history_and_list_do_not_publish_prompt_guards(home):
     assert st.end("claude-code", "guarded", 20.0, compactions_counted=True)
     with st.locked("claude-code", "guarded", create=False) as rec:
         rec.prompt_guards = {"cron": [digest], "wakeups": [[digest, 100.0, 200.0]]}
+        rec.spend = spend_mod.SpendRecord("private_spend_episode_sentinel", 500_000_000, 500_000_000, 500_000_000)
+    write_host_latch(home, seen_fresh=True, outage={
+        "state": "unreadable",
+        "alerted_at": 15.0,
+        "outcome": "error",
+        "error": "private_latch_error_sentinel",
+    })
+    (Path(state_path({"XDG_STATE_HOME": str(home / "state")})) / spend_mod.HOST_LOCK).write_text("")
 
     for subcmd in ("history", "list"):
         for extra in ((), ("--json",)):
@@ -429,10 +761,13 @@ def test_history_and_list_do_not_publish_prompt_guards(home):
             assert res.returncode == 0, res.stderr
             out = res.stdout
             for forbidden in (sentinel, digest, "prompt_guards", "/private/cwd/sentinel",
-                              "private_notify_sentinel", "private_budget_sentinel"):
+                              "private_notify_sentinel", "private_budget_sentinel",
+                              "private_spend_episode_sentinel", "private_latch_error_sentinel",
+                              "seen_value", "delivered_value", "acked_value", "seen_fresh"):
                 assert forbidden not in out
             if extra:
                 parsed = json.loads(out)
+                assert parsed["coverage"]["roots_observed"] == 1
                 rows = parsed.get("events") or parsed.get("summaries")
                 for row in rows:
                     snap = row.get("snapshot")

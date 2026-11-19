@@ -126,7 +126,7 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
         "samples": {s["path"]: hashlib.sha256((FIXTURES / s["path"]).read_bytes()).hexdigest()
                     for s in samples},
     }
-    assert len(samples) == 240
+    assert len(samples) == 241
     assert sorted(artifact["harnesses"]) == ["agy", "claude-code", "codex"]
     for slug, harness in artifact["harnesses"].items():
         assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header", "index"} | ({"side_inputs"} if slug == "agy" else {"discovery"})

@@ -634,3 +634,26 @@ def test_shared_additions_preserve_original_agy_capability_block():
     digest = hashlib.sha256(json.dumps(agy, sort_keys=True, separators=(",", ":"),
                                        ensure_ascii=True).encode()).hexdigest()
     assert digest == "6814b8cb5ede33ebe0069b8a7c8d66882c9467a863c03be6cd57af30e0f9a16b"
+
+
+def test_user_channel_origin_classification_is_published_and_unknown_kinds_stay_unclassified(store):
+    from harness_evidence import capabilities, index_agy
+    declaration = json.loads(capabilities.ARTIFACT.read_text())["harnesses"]["agy"]["index"]["origin_kinds"]
+    assert declaration == {"USER_EXPLICIT": {"class": "user_typed", "basis": "native"}}
+    assert declaration == index_agy.ORIGIN_KINDS
+    # The adapter passes arbitrary native source strings through. Every other value is
+    # deliberately unclassified, including values introduced by a future writer.
+    path = transcript(store, H)
+    base = json.loads(path.read_text().splitlines()[0])
+    for source in ("USER_EXPLICIT", "SYSTEM", "USER_DERIVED", "future-origin", None):
+        value = dict(base, source=source)
+        path.write_text(json.dumps(value) + "\n")
+        [only] = events(decode(store, H))
+        kind = only["message"]["origin"]["native_kind"]
+        assert kind == str(source)
+        classified = declaration.get(kind)
+        if source == "USER_EXPLICIT":
+            assert classified == {"class": "user_typed", "basis": "native"}
+        else:
+            assert classified is None  # Deliberate unclassified default, never user_typed.
+    assert "origin_kinds" not in json.loads(capabilities.ARTIFACT.read_text())["harnesses"]["claude-code"]["index"]
