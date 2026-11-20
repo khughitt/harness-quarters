@@ -30,8 +30,9 @@ WATCHED = {
     "session": {"sources": ("version", "cwd", "parentSession"), "inputs": {}},
     "model_change": {"sources": ("modelId",), "inputs": {"model": ("modelId",)}},
     "thinking_level_change": {"sources": ("thinkingLevel",), "inputs": {"effort": ("thinkingLevel",)}},
-    "message": {"sources": ("message.role", "message.model", "message.content", "message.thinkingLevel",
-                            "message.usage", "message.stopReason"), "inputs": {}},
+    "message": {"sources": ("message.role", "message.model", "message.responseModel", "message.content",
+                            "message.thinkingLevel", "message.providerThinkingLevel", "message.usage",
+                            "message.stopReason"), "inputs": {}},
     **{kind: {"sources": ("usage",), "inputs": {}} for kind in _USAGE_SITES},
 }
 APPLIED = {"usage": _COUNTERS, "fork_origin": ("verified",)}
@@ -59,10 +60,11 @@ PROVENANCE = {
     "identity.cwd": ["cwd"], "identity.parent": ["parentSession"], "identity.agent": [],
     "identity.subagent": [], "identity.entrypoint": [], "identity.version": [],
     "at_ms": ["timestamp"], "response.id": ["id", "parentSession"],
-    "response.model": ["message.model", "modelId", "model"],
-    "response.effort": ["message.thinkingLevel", "thinkingLevel"],
+    "response.model": ["message.responseModel", "message.model", "modelId", "model"],
+    "response.effort": ["message.providerThinkingLevel"],
     "response.native": [*_counter_paths(*_COUNTERS), "message.stopReason", "message.api",
-                        "message.provider", "provider", "kind"],
+                        "message.provider", "provider", "kind", "message.model", "modelId",
+                        "message.thinkingLevel", "thinkingLevel"],
     "response.usage_present.output": _counter_paths("output"),
     "response.usage_present.thinking": [],
     "response.usage.input_uncached": _counter_paths("input"),
@@ -179,7 +181,8 @@ def _is_response(row):
     if kind == "message":
         message = row.get("message")
         return isinstance(message, dict) and message.get("role") == "assistant"
-    return kind == "usage" or kind in _SUMMARIES and isinstance(row.get("usage"), dict)
+    return (kind == "usage" or kind in _SUMMARIES
+            and (row.get("fromHook") is not True or isinstance(row.get("usage"), dict)))
 
 
 def _parent_chain(place, origin):
@@ -201,24 +204,26 @@ def _parent_chain(place, origin):
                 ancestor = _first(handle, limit)
                 if not _header(ancestor) or ancestor["id"] in seen_sessions:
                     return chain, "invalid_parent_header"
-                fork_ms = _at_ms(origin["timestamp"])
-                # Capture a fixed span from this read-only ancestor. Ignore any
-                # partial tail and records that postdate its child's creation.
+                # Compare complete native entries from a fixed span. The fork header's
+                # clock is independent of the timestamps on copied entries.
                 entries = {}
+                malformed = False
                 while (remaining := limit - handle.tell()) > 0:
                     raw = handle.readline(remaining)
                     if not raw.endswith(b"\n"):
                         break
                     row = _record(raw)
-                    if row is None or not _is_response(row):
+                    if row is None:
+                        malformed = True
                         continue
-                    entry, at = _string(row.get("id")), _at_ms(row.get("timestamp"))
-                    if entry is not None and at is not None and at <= fork_ms:
+                    if not _is_response(row):
+                        continue
+                    entry = _string(row.get("id"))
+                    if entry is not None and _at_ms(row.get("timestamp")) is not None:
                         entries[entry] = None if entry in entries else _entry_digest(row)
         except (OSError, ValueError, RecursionError):
             return chain, "parent_unavailable"
-        chain.append((ancestor["id"], _at_ms(ancestor["timestamp"]),
-                      ancestor.get("parentSession") is not None, entries))
+        chain.append((ancestor["id"], entries, not malformed))
         seen_paths.add(candidate)
         seen_sessions.add(ancestor["id"])
         origin = ancestor
@@ -261,6 +266,7 @@ def side_inputs(facts) -> dict:
 
 def bind(state, facts) -> None:
     state["ancestry"] = list(getattr(facts, "chain", ()))
+    state["ancestry_complete"] = "reason" in facts and facts["reason"] is None
     state["snapshot_header"] = [getattr(facts, "session", None), getattr(facts, "parent", None)]
 
 
@@ -288,27 +294,35 @@ def provenance_defaults() -> dict[str, dict]:
     return defaults
 
 
-def _origin(row, at, identity, state):
-    """Use an ancestor's ID only when the matching physical entry is proved."""
-    owner, rule = identity["session"], "pi_session_entry"
-    versioned = state["session_header"]
-    if versioned[1] and at <= versioned[2]:
-        rule = "unresolved:pi_fork_origin"
-        digest = _entry_digest(row)
-        for parent, created, has_parent, entries in state.get("ancestry", ()):
-            if entries.get(row["id"]) != digest:
-                break
-            if not has_parent or at > created:
-                return parent, "pi_verified_parent_entry"
-    return owner, rule
+def _origin(row, session, state):
+    """Follow exact copies back to the physical owner without wall-clock ordering."""
+    local = session, "pi_session_entry"
+    if not state["has_parent"]:
+        return local
+    unresolved = session, "unresolved:pi_fork_origin"
+    owner = session
+    digest = _entry_digest(row)
+    for ancestor, entries, readable in state["ancestry"]:
+        if row["id"] not in entries:
+            if not readable:
+                return unresolved
+            return local if owner == session else (owner, "pi_verified_parent_entry")
+        if entries[row["id"]] != digest:
+            return unresolved
+        owner = ancestor
+    if not state["ancestry_complete"]:
+        return unresolved
+    return local if owner == session else (owner, "pi_verified_parent_entry")
 
 
 def _counter(usage, key):
     value = usage.get(key)
-    return value if type(value) is int and value >= 0 else None
+    # Native usage has no per-counter presence flag. The transport can write a zero
+    # for an omitted field, even beside a positive counter in the same usage object.
+    return value if type(value) is int and value > 0 else None
 
 
-def _response(row, at, identity, model, effort, state):
+def _response(row, identity, model, effort, state):
     kind = row["type"]
     message = row.get("message") if kind == "message" else {}
     usage = message.get("usage") if kind == "message" else row.get("usage")
@@ -325,17 +339,20 @@ def _response(row, at, identity, model, effort, state):
     stop = message.get("stopReason")
     if stop in ("stop", "length", "toolUse", "error", "aborted"):
         native["stopReason"] = stop
-    # Pi initializes assistant usage to zero before it sees a provider chunk.
-    # Without any positive counter, these zeros do not attest to measured usage.
-    if kind == "message" and not any(value > 0 for key, value in native.items() if key in _COUNTERS):
-        raw = {}
+    if kind == "message":
+        if model := _string(message.get("model")) or model:
+            native["requestedModel"] = model
+        if selected_effort := _string(message.get("thinkingLevel")) or effort:
+            native["requestedThinkingLevel"] = selected_effort
+        model = _string(message.get("responseModel")) or model
+        effort = _string(message.get("providerThinkingLevel"))
     inp, read, write, out = (_counter(raw, name) for name in ("input", "cacheRead", "cacheWrite", "output"))
     usage = {
         "input_uncached": inp, "cache_read": read, "cache_write": None, "output": out,
         "thinking": None, "context_total": None if inp is None or read is None else inp + read + (write or 0),
         "uncached_total": None if inp is None else inp + (write or 0),
     }
-    owner, rule = _origin(row, at, identity, state)
+    owner, rule = _origin(row, identity["session"], state)
     return {
         "id": f"{owner}:{row['id']}", "model": model, "effort": effort, "usage": usage,
         "usage_present": {"output": out is not None, "thinking": False}, "native": native,
@@ -370,11 +387,12 @@ def _event(row, position, state, text):
     at = _at_ms(row.get("timestamp"))
     entry = _string(row.get("id"))
     if position["line"] == 1 and _header(row):
-        state["session_header"] = [entry, row.get("parentSession") is not None, at]
+        state["has_parent"] = row.get("parentSession") is not None
         chain = state.get("ancestry", ())
         snapshot = state.get("snapshot_header")
         if snapshot != [entry, row.get("parentSession")]:
             state["ancestry"] = chain = []
+            state["ancestry_complete"] = False
         state["identity"] = {"session": entry, "index_session": entry, "agent": None,
                              "parent": chain[0][0] if chain else None, "subagent": None,
                              "cwd": _string(row.get("cwd")) if text else None,
@@ -391,7 +409,7 @@ def _event(row, position, state, text):
              "message": None, "calls": [], "results": [], "injections": [], "notifications": [],
              "compaction": None, "interruption": None, "fork_boundary": None, "turn_end": None,
              "provenance": {}}
-    if state["session_header"][1] and identity["parent"] is None:
+    if state["has_parent"] and identity["parent"] is None:
         event["provenance"]["identity.parent"] = {"rule": "unresolved:pi_parent_session"}
     if not eligible or kind == "session":
         return event
@@ -410,18 +428,12 @@ def _event(row, position, state, text):
         if message.get("stopReason") in ("aborted", "error"):
             event["interruption"] = {"user_marker": False, "system": True,
                                      "basis": "native", "rule": "pi_assistant_stop_reason"}
-        if channel == "assistant":
-            for field, key, configured_path, configured in (
-                ("model", "model", "modelId", model), ("effort", "thinkingLevel", "thinkingLevel", effort),
-            ):
-                if _string(message.get(key)) is not None:
-                    event["provenance"][f"response.{field}"] = {"native_paths": [f"message.{key}"]}
-                elif configured is not None:
-                    event["provenance"][f"response.{field}"] = {
-                        "native_paths": [configured_path], "basis": "convention", "rule": "pi_branch_selection",
-                    }
-            model = _string(message.get("model")) or model
-            effort = _string(message.get("thinkingLevel")) or effort
+        if channel == "assistant" and _string(message.get("responseModel")) is None:
+            path = "message.model" if _string(message.get("model")) else "modelId"
+            if _string(message.get("model")) or model:
+                event["provenance"]["response.model"] = {
+                    "native_paths": [path], "basis": "convention", "rule": "pi_requested_model",
+                }
     elif kind in _SUMMARIES:
         event["message"] = _message("system", row.get("summary"), text)
         if kind == "compaction":
@@ -432,14 +444,14 @@ def _event(row, position, state, text):
         event["message"] = _message("system", None, text)
         model, effort = _string(row.get("model")), None
     if _is_response(row):
-        response, rule = _response(row, at, identity, model, effort, state)
+        response, rule = _response(row, identity, model, effort, state)
         event.update(response=response, flush_response=True)
         event["provenance"]["response.id"] = {"rule": rule}
         if rule == "pi_verified_parent_entry":
             event["fork_boundary"] = {"next_response": False, "copied_response": True,
                                       "basis": "native", "rule": rule}
-        if state["session_header"][1] and at <= state["session_header"][2]:
-            applied(state, session, day, "fork_origin", {"verified": rule == "pi_verified_parent_entry"})
+        if state["has_parent"]:
+            applied(state, session, day, "fork_origin", {"verified": rule != "unresolved:pi_fork_origin"})
         present = {name: name in response["native"] for name in _COUNTERS}
         for name, field in (("input", "input_uncached"), ("cacheRead", "cache_read"), ("output", "output")):
             present[name] = response["usage"][field] is not None
@@ -468,6 +480,7 @@ def extract(lines, state, *, place, text: bool):
         else:
             yield event
     state.pop("ancestry", None)
+    state.pop("ancestry_complete", None)
     state.pop("snapshot_header", None)
     counts, fields = coverage_rows(state)
     yield {"object": "coverage", "key": "coverage", "records": counts, "fields": fields,

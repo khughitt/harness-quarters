@@ -63,8 +63,11 @@ def test_pi_usage_and_effective_changes(session):
     first, retry = [event["response"] for event in events[:2]]
     assert events[0]["identity"]["index_session"] == "pi-example"
     assert events[0]["at_ms"] == 1767225604000
-    assert (first["model"], first["effort"]) == ("kimi-k3.1-pro", "high")
-    assert (retry["model"], retry["effort"]) == ("glm-5.3", "high")  # Per-response level wins.
+    assert (first["model"], first["effort"]) == ("kimi-k3.1-pro", None)
+    assert (retry["model"], retry["effort"]) == ("glm-5.3", "high")
+    assert first["native"]["requestedThinkingLevel"] == "high"  # Branch selection.
+    assert retry["native"]["requestedThinkingLevel"] == "high"  # Per-response request.
+    assert events[0]["provenance"]["response.model"]["rule"] == "pi_requested_model"
     assert first["usage"] == {"input_uncached": 100, "cache_read": 900, "cache_write": None,
                               "output": 50, "thinking": None, "context_total": 1000,
                               "uncached_total": 100}
@@ -104,7 +107,7 @@ def test_pi_resume_fork_charge_identity(session):
 
 def test_pi_auxiliary_usage(session):
     rows = {row["native_kind"]: row["response"] for row in responses(frame(session))}
-    assert [rows[k]["usage"]["output"] for k in ("usage", "compaction", "branch_summary")] == [0, 2, 3]
+    assert [rows[k]["usage"]["output"] for k in ("usage", "compaction", "branch_summary")] == [None, 2, 3]
     assert rows["usage"]["native"]["kind"] == "cache_warm"
     assert rows["usage"]["model"] == "glm-5.3"
 
@@ -190,3 +193,49 @@ def test_pi_sanitized_observed_transport_sample(session):
     assert response["native"]["api"] == message["api"]
     assert response["native"]["input"] == message["usage"]["input"]
     assert response["usage"]["output"] == message["usage"]["output"]
+
+
+def test_pi_partial_usage_defaults_and_summary_population(session):
+    rows = [json.loads(line) for line in session.read_text().splitlines()]
+    partial = {**rows[4], "message": {**rows[4]["message"], "stopReason": "aborted",
+               "usage": {"input": 100, "output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 100}}}
+    empty_compaction = {**rows[9], "usage": {"input": 0, "cacheRead": 0, "output": 0}}
+    no_usage_summary = {key: value for key, value in rows[10].items() if key != "usage"}
+    hook_summary = {**no_usage_summary, "id": "0000000f", "fromHook": True}
+    write(session, [*rows[:4], partial, empty_compaction, no_usage_summary, hook_summary])
+    observed = responses(frame(session))
+    assert observed[0]["response"]["usage"]["input_uncached"] == 100
+    assert observed[0]["response"]["usage"]["output"] is None
+    assert observed[0]["response"]["usage_present"]["output"] is False
+    assert observed[0]["response"]["native"]["output"] == 0
+    assert [row["native_kind"] for row in observed] == ["message", "compaction", "branch_summary"]
+    for row in observed[1:]:
+        assert not row["response"]["usage_present"]["output"]
+        assert not any(value is not None for value in row["response"]["usage"].values())
+    output_coverage = next(row for row in frame(session)[-2]["fields"]
+                           if row["record_kind"] == "applied:usage" and row["field"] == "input:output")
+    assert (output_coverage["seen"], output_coverage["present"]) == (3, 0)
+
+
+def test_pi_retains_served_model_and_effective_effort(session):
+    rows = [json.loads(line) for line in session.read_text().splitlines()]
+    rows[4]["message"].update(responseModel="kimi-served-revision", providerThinkingLevel="max", thinkingLevel="high")
+    write(session, rows[:5])
+    response = responses(frame(session))[0]["response"]
+    assert (response["model"], response["effort"]) == ("kimi-served-revision", "max")
+    assert response["native"]["requestedModel"] == "kimi-k3.1-pro"
+    assert response["native"]["requestedThinkingLevel"] == "high"
+
+
+def test_pi_copied_entry_proof_survives_clock_regression(session):
+    rows = [json.loads(line) for line in session.read_text().splitlines()]
+    root = responses(frame(session))[0]["response"]["id"]
+    fork = session.with_name("skewed-fork.jsonl")
+    write(fork, [{**rows[0], "id": "pi-fork", "parentSession": str(session),
+                  "timestamp": "2025-12-31T23:59:00Z"},
+                 *rows[1:5],
+                 {**rows[4], "id": "ff00ff00", "parentId": rows[4]["id"],
+                  "timestamp": "2025-12-31T23:59:02Z"}])
+    copied, retry = responses(frame(fork))
+    assert copied["response"]["id"] == root
+    assert retry["response"]["id"] == "pi-fork:ff00ff00"

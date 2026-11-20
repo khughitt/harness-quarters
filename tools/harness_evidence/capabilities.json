@@ -238,7 +238,7 @@
    "origin/codex-wrapper-then-plain.jsonl": "f8836a93dcc01cc6d68f4c3202d263c3c05b29e82dfb90a7a110aac9ebb5ab2c",
    "pi/fork.jsonl": "a12ba4795261cbf532e5ad3a653fe1104113b5741266e4b84c1ad3cf68fd9be9",
    "pi/sanitized-observed.jsonl": "9e51d82f942becc13a98c57f1bb2911aa30d689cae72e273ec3c095b0ec85f98",
-   "pi/session.jsonl": "20e7426c6695196c8a0ade5a074f46b8d552e63546a9fa09cb633bc43f4e5fda",
+   "pi/session.jsonl": "f942117e5be12cc3de135632dc0b18525e5fdd6f8b91a72981d590fe012f9f87",
    "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000021.jsonl": "0287b2a1f7ec8a59670b2c0d2a6b7500a8550f28711c76ffa49e55b225e27a51",
    "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000022.jsonl": "0d61b470dd8c0b355ea69220418d1ad6aaa0c687956735f98e15c4164430f811",
    "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000023.jsonl": "5f5a31bb9ca46f86dc58de1e5b0b9289bf7ec732d0117675bf4491df3d44ef5f",
@@ -3433,8 +3433,7 @@
     "response.effort": {
      "coverage_keys": [],
      "provenance": [
-      "message.thinkingLevel",
-      "thinkingLevel"
+      "message.providerThinkingLevel"
      ]
     },
     "response.id": {
@@ -3450,6 +3449,7 @@
      "coverage_keys": [],
      "provenance": [
       "message.model",
+      "message.responseModel",
       "model",
       "modelId"
      ]
@@ -3459,15 +3459,19 @@
      "provenance": [
       "kind",
       "message.api",
+      "message.model",
       "message.provider",
       "message.stopReason",
+      "message.thinkingLevel",
       "message.usage.cacheRead",
       "message.usage.cacheWrite",
       "message.usage.input",
       "message.usage.output",
       "message.usage.reasoning",
       "message.usage.totalTokens",
+      "modelId",
       "provider",
+      "thinkingLevel",
       "usage.cacheRead",
       "usage.cacheWrite",
       "usage.input",
@@ -3619,8 +3623,10 @@
       "sources": [
        "message.role",
        "message.model",
+       "message.responseModel",
        "message.content",
        "message.thinkingLevel",
+       "message.providerThinkingLevel",
        "message.usage",
        "message.stopReason"
       ]
@@ -3725,11 +3731,8 @@
        "message.origin",
        "message.text",
        "native_kind",
-       "response.effort",
        "response.id",
        "response.native",
-       "response.usage.cache_read",
-       "response.usage.context_total",
        "response.usage.input_uncached",
        "response.usage.output",
        "response.usage.uncached_total",

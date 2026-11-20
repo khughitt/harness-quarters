@@ -428,22 +428,25 @@ response ID combines the owning session and native entry ID. For forked history,
 the decoder verifies a matching entry against the `parentSession` chain inside
 the selected store, using the recorded entry ID, timestamp and content. Pi can
 rechain entries when it copies a branch. Identical assistant text or token
-totals alone never prove a copy. When the source cannot be verified, older
-copied-looking entries keep local IDs and carry unresolved origin coverage.
+totals alone never prove a copy. When the source cannot be verified, affected
+entries keep local IDs and carry unresolved origin coverage. A clock change
+between source and fork does not invalidate a matching entry.
 Discovery and index frames publish the `pi_parent_sessions` side-input
 fingerprint. A changed ancestor snapshot invalidates resume even when the
 child bytes stay fixed. Partial tails are provisional and a changed source
 prefix restarts under the shared protocol.
 
 Assistant usage, separate usage entries, compactions and branch summaries
-contribute any recorded usage. Native message model and thinking level take
-precedence over the selection recorded on their parent branch. Auxiliary
-summaries can record usage without naming a model. Input excludes cached
+contribute recorded usage. The decoder prefers a recorded served model and uses
+recorded provider-native effort when present. Requested model and thinking
+level remain available as selection evidence. Native summaries without usage
+remain in the unknown usage population. Hook-generated summaries enter that
+population when they carry usage. Input excludes cached
 tokens, and output already includes reasoning. Context totals include recorded
 cache hits and any native cache-write contribution. Normalized thinking and
 cache-write counters are declared unrecorded for aggregate use. Their native
-values remain evidence, including zeros that could be Pi defaults. An assistant
-with only default zeros provides no measured totals.
+values remain evidence, including zeros that could be Pi defaults. A zero adjacent to a positive count can also come from an omitted field. The
+decoder leaves such counters unknown because Pi stores no per-counter presence.
 
 ## Read evidence, not mentions
 
