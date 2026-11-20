@@ -596,6 +596,77 @@ date = 2026-10-11
 evidence = "hq-57132d"
 note = "After a subagent run the root's pi.usage held 1518 tokens, exactly its own assistant entries, and the child's held 586. harness.usage() is every conversation in the storage summed (its type says so): it read 2104 only because the probe gave the run a storage of its own. A task's spend in a shared storage is the integrator's sum over the conversations it owns."
 
+[facts.pi-rpc-exit-status]
+type = "set"
+description = "Observed process exit statuses and turn outcomes for pi in RPC mode."
+
+[facts.pi-rpc-exit-status.harness.pi]
+status = "probed"
+value = [
+  "stdin-eof=0",
+  "sigterm=143",
+  "sigkill=signal-9",
+  "completed-turn-keeps-rpc-open",
+  "aborted-turn-keeps-rpc-open",
+  "provider-auth-error-keeps-rpc-open",
+  "missing-credential-keeps-rpc-open",
+]
+version = "1.1.0"
+date = 2026-11-20
+evidence = "hq-f1aff0"
+note = "Linux, hq launcher, loopback provider. Normal completion, RPC abort and provider HTTP 401 each left the process responsive and reached agent_settled. The final assistant stopReason was stop, aborted and error, respectively. A missing credential failed prompt preflight with an RPC error and left the process responsive. Closing stdin after each case returned 0. SIGTERM after RPC startup returned exit status 143. SIGKILL terminated by signal 9 (Python returncode -9, shell status 137). Judge the turn from its RPC response and events."
+
+[facts.pi-rpc-session-directory]
+type = "set"
+description = "Observed sources of pi RPC session storage, including the fallback."
+
+[facts.pi-rpc-session-directory.harness.pi]
+status = "probed"
+value = ["cli-session-dir", "env-session-dir", "pre-trust-project-session-dir", "agent-sessions-by-cwd"]
+version = "1.1.0"
+date = 2026-11-20
+evidence = "hq-f1aff0"
+note = "The tested precedence, highest first, was --session-dir, PI_CODING_AGENT_SESSION_DIR, .pi/settings.json sessionDir, then <agent-dir>/sessions/<encoded-cwd>. The project value took effect with --no-approve. The fallback used the scratch PI_CODING_AGENT_DIR, and each case checked the written file through get_state.sessionFile. The pinned source also consults agent settings for sessionDir."
+
+[facts.pi-rpc-extension-api]
+type = "set"
+description = "Extension loading controls and lifecycle events observed in pi RPC mode."
+
+[facts.pi-rpc-extension-api.harness.pi]
+status = "probed"
+value = [
+  "agent-directory-discovery",
+  "no-extensions-disables-discovery",
+  "explicit-extension-loads-with-no-extensions",
+  "registerCommand",
+  "session_start",
+  "input",
+  "before_agent_start",
+  "agent_start",
+  "before_provider_request",
+  "message_end",
+  "agent_end",
+  "agent_before_settle",
+  "agent_settled",
+  "session_shutdown",
+]
+version = "1.1.0"
+date = 2026-11-20
+evidence = "hq-f1aff0"
+note = "A TypeScript factory in <agent-dir>/extensions received ExtensionAPI, registered a command visible in get_commands, and observed the listed events in ctx.mode=rpc. --no-extensions suppressed its discovery and the built-in commands observed in the control. Explicit --extension loaded the same file even with --no-extensions. The event set describes a single text turn and EOF."
+
+[facts.pi-rpc-context-file-reporting]
+type = "set"
+description = "Where pi RPC callers can read the initial system prompt's loaded context files."
+
+[facts.pi-rpc-context-file-reporting.harness.pi]
+status = "probed"
+value = ["session-system-project-context", "rpc-get-messages-system-project-context"]
+version = "1.1.0"
+date = 2026-11-20
+evidence = "hq-f1aff0; lore-ba22f3; band-dac554"
+note = "The persisted initial system message's sections.project_context wraps included file text with project_instructions path markers. After the first request get_messages returned the same section. Before that request get_messages was empty and get_state named a session file that did not exist yet. The probe observed the agent file first, then parent and project files, with AGENTS.override.md taking precedence over AGENTS.md and CLAUDE.md in the project. There is no dedicated context-file command, and the raw wrapper can be ambiguous if instruction text imitates it."
+
 [facts.pi-extension-symlink-load]
 type = "boolean"
 description = "pi discovers an extension through a symlink in the agent extensions directory."

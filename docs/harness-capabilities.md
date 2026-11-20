@@ -157,8 +157,11 @@ The first interactive run may write tracked lastChangelogVersion; account for it
 
 Run the picker-extension probe in its scratch agent directory, starting with
 --check P1a, then its remaining cases. That local dummy-provider probe makes no
-API calls. RPC/durable probes need a real model key and paid calls; documentation
-and a pin change do not authorize that spend. MCP protocol revisions require
+API calls. The separate loopback driver attached to hq-f1aff0 covers the RPC
+exit status, session directory, extension API and context-file reporting facts
+with synthetic credentials. The general RPC and durable probes for model
+behavior need a real model key and paid calls. Documentation and a pin change
+do not authorize that spend. MCP protocol revisions require
 checking the pinned client construction too; the probe server's acceptance alone
 does not establish the requested revision. Changes to the external analyst
 runtime/tool epoch need their owning project's requalification independently.
