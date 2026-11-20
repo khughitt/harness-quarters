@@ -53,6 +53,8 @@ def _read(source, roots, inherited):
             data = handle.read(size)
         size = len(data)
         if place.store != "explicit":
+            if place.harness == "pi":
+                raise ProtocolError("Pi supports only extract:index")
             fmt = {"codex": "codex", "agy": "agy"}.get(place.harness, "claude")
         else:
             try:

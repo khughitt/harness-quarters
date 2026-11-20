@@ -81,7 +81,10 @@ def test_catalogue_covers_all_samples_without_claiming_live_provenance():
     assert {sample['path'] for sample in CATALOGUE} == {
         str(p.relative_to(FIXTURES)) for p in FIXTURES.rglob('*.jsonl')}
     assert len({sample['path'] for sample in CATALOGUE}) == len(CATALOGUE)
-    assert all(s['version'] and s['provenance'] == 'synthetic' for s in CATALOGUE)
+    assert all(s['version'] and s['provenance'] == 'synthetic'
+               for s in CATALOGUE if s['path'] != 'pi/sanitized-observed.jsonl')
+    assert [s['path'] for s in CATALOGUE if s['provenance'] == 'observed'] == [
+        'pi/sanitized-observed.jsonl']
     assert any(s['path'] == 'captures/turn-evidence-claude.jsonl' for s in CATALOGUE)
 
 

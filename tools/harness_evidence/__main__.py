@@ -10,8 +10,8 @@ from . import DECODER_VERSION, SCHEMA, RevisionUnknown, revision
 
 def _root(value: str) -> tuple[str, Path]:
     harness, separator, path = value.partition("=")
-    if not separator or not path or harness not in ("claude-code", "codex", "agy"):
-        raise argparse.ArgumentTypeError("root must be claude-code=PATH, codex=PATH or agy=PATH")
+    if not separator or not path or harness not in ("claude-code", "codex", "agy", "pi"):
+        raise argparse.ArgumentTypeError("root must be claude-code=PATH, codex=PATH, agy=PATH or pi=PATH")
     if harness == "agy" and Path(path).name != "brain":
         raise argparse.ArgumentTypeError(f"agy root must be a brain directory: {path}")  # As discover.roots.
     return harness, Path(path)
@@ -45,7 +45,8 @@ def _discover(args: argparse.Namespace, envelope: dict) -> None:
             aliases.append({"path": str(path), "place": location,
                             "filename_identity": discover.filename_identity(place.harness, path),
                             "filename_lookup": discover.filename_lookup(place.harness, path, root=root),
-                            "path_facts": discover.path_facts(place)})
+                            "path_facts": _file_facts(place)[0] if place.harness == "pi"
+                            else discover.path_facts(place)})
         print(json.dumps({**envelope, "object": "root", "path": str(root.path), **entry,
                           "aliases": aliases}))
     for path in listing.files:

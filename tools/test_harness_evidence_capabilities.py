@@ -121,19 +121,23 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
         "samples": {s["path"]: hashlib.sha256((FIXTURES / s["path"]).read_bytes()).hexdigest()
                     for s in samples},
     }
-    assert len(samples) == 241
-    assert sorted(artifact["harnesses"]) == ["agy", "claude-code", "codex"]
+    assert len(samples) == 244
+    assert sorted(artifact["harnesses"]) == ["agy", "claude-code", "codex", "pi"]
     for slug, harness in artifact["harnesses"].items():
         assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header"} | (
-            {"index"} if slug == "claude-code" else {"index", "side_inputs"} if slug == "agy" else set())
+            {"index"} if slug == "claude-code" else {"index", "side_inputs"} if slug in ("agy", "pi") else set())
         assert harness["exceptions"] == []
-        assert harness["header"] == ({"implemented": True, "line_limit": 50} if slug in ("claude-code", "agy")
+        assert harness["header"] == ({"implemented": True, "line_limit": 50} if slug in ("claude-code", "agy", "pi")
                                       else {"implemented": False})
         if slug == "codex":
             assert all(f["coverage_keys"] == [] for f in harness["fields"].values())
         elif slug == "agy":  # Index declarations only: agy has no reader decode.
             assert harness["record_kinds"] == [] and harness["labels"] == {}
             assert harness["fields"]["results[].exit_code"]["coverage_keys"] == ["applied:exit_line/input:exit_code"]
+            assert harness["index"]["mode"] == "incremental" and harness["index"]["resume"]
+        elif slug == "pi":
+            assert harness["index"]["absent"]["response.usage.thinking"] == "not_recorded"
+            assert harness["index"]["absent"]["response.usage.cache_write"] == "not_recorded"
             assert harness["index"]["mode"] == "incremental" and harness["index"]["resume"]
         else:
             assert harness["fields"]["calls[].raw_path"]["provenance"] == [
@@ -143,9 +147,11 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
             assert harness["index"]["mode"] == "incremental" and harness["index"]["resume"]
         for version, value in harness["versions"].items():
             assert set(value) == {"synthetic", "observed", "fields_seen"}
-            assert value["observed"] == [] and value["fields_seen"]["observed"] == []
-            assert value["synthetic"] == sorted(s["path"] for s in samples
-                                                  if s["harness"] == slug and s["version"] == version)
+            for provenance in ("synthetic", "observed"):
+                assert value[provenance] == sorted(s["path"] for s in samples
+                    if s["harness"] == slug and s["version"] == version and s["provenance"] == provenance)
+                if not value[provenance]:
+                    assert value["fields_seen"][provenance] == []
     assert set(artifact["harnesses"]["codex"]["versions"]) == {"0.163.0", "0.164.0", "unknown"}
     assert ARTIFACT.read_text() == json.dumps(artifact, sort_keys=True, indent=1) + "\n"
 

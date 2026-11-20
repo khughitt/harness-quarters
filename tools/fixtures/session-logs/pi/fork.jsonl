@@ -1,0 +1,5 @@
+{"type":"session","version":3,"id":"pi-fork","timestamp":"2026-01-01T00:00:20.000Z","cwd":"/example","parentSession":"/example/sessions/session.jsonl"}
+{"type":"model_change","id":"00000001","parentId":null,"timestamp":"2026-01-01T00:00:01.000Z","provider":"hyper","modelId":"kimi-k3.1-pro"}
+{"type":"thinking_level_change","id":"00000002","parentId":"00000001","timestamp":"2026-01-01T00:00:02.000Z","thinkingLevel":"high"}
+{"type":"message","id":"00000003","parentId":"00000002","timestamp":"2026-01-01T00:00:03.000Z","message":{"role":"user","content":[{"type":"text","text":"Example input"}]}}
+{"type":"message","id":"00000004","parentId":"00000003","timestamp":"2026-01-01T00:00:04.000Z","message":{"role":"assistant","api":"openai-completions","provider":"hyper","model":"kimi-k3.1-pro","content":[{"type":"thinking","thinking":"Example reasoning"},{"type":"text","text":"Example answer"}],"stopReason":"stop","usage":{"input":100,"cacheRead":900,"output":50,"cacheWrite":0,"reasoning":0,"totalTokens":1050}}}

@@ -86,13 +86,14 @@ def test_homes_are_the_store_adapters_homes(tmp_path):
     for adapter in harness_stores.ADAPTERS:
         assert adapter.homes(tmp_path) == homes.homes(tmp_path, adapter.alias)
     assert harness_stores.Home is homes.Home
-    assert harness_stores.homes(tmp_path) == homes.homes(tmp_path)
+    assert homes.homes(tmp_path) == harness_stores.homes(tmp_path) + homes.homes(tmp_path, "pi")
 
 
 @pytest.mark.parametrize("harness, expected", [
     ("claude", [("claude", "personal", ".claude"), ("claude-work", "work", ".claude-work")]),
     ("codex", [("codex", "personal", ".codex"), ("codex-work", "work", ".codex-work")]),
     ("agy", [("agy", "personal", ".gemini/antigravity-cli")]),
+    ("pi", [("pi", "personal", ".pi/agent")]),
 ])
 def test_home_paths_and_stores(tmp_path, harness, expected):
     found = homes.homes(tmp_path, harness)
@@ -103,6 +104,7 @@ def test_home_paths_and_stores(tmp_path, harness, expected):
             "claude": (("live", home.path / "projects"),),
             "codex": (("live", home.path / "sessions"), ("archived", home.path / "archived_sessions")),
             "agy": (("live", home.path / "brain"),),
+            "pi": (("live", home.path / "sessions"),),
         }
         assert homes.stores(home) == expected_stores[harness]
 

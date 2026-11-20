@@ -1,4 +1,4 @@
-# Session evidence sample catalogue. All fixtures are synthetic conformance inputs.
+# Session evidence sample catalogue. Observed derivatives are labelled separately from synthetic cases.
 # Consumer oracle: obs fe61869f0041eff423ed495d10845ef3cf3d5638; hq 3163fab9d3bea604617003b46ca63d0f8a076b57.
 # Origin evidence/labels are hand-derived; consumer results were run once from frozen code.
 # TOML has no null: omitted native_kind and marker lead/joined mean null only.
@@ -1988,4 +1988,28 @@ path = "index/compaction-reasons.jsonl"
 harness = "claude-code"
 version = "2.1.325"
 provenance = "synthetic"
+profile = "index"
+
+# Pi CLI/RPC session v3. Synthetic cases follow the pinned Pi 1.1.0 writer.
+# The fork's parentSession is a portable placeholder; tests bind it to their own root.
+[[sample]]
+path = "pi/session.jsonl"
+harness = "pi"
+version = "1.1.0"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "pi/fork.jsonl"
+harness = "pi"
+version = "1.1.0"
+provenance = "synthetic"
+profile = "index"
+
+# Sanitized persisted band pilot evidence; native usage and transport shape only.
+[[sample]]
+path = "pi/sanitized-observed.jsonl"
+harness = "pi"
+version = "unknown"
+provenance = "observed"
 profile = "index"

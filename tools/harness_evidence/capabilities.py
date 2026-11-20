@@ -130,6 +130,7 @@ DECLARED: dict[str, dict[str, list[str]]] = {
 DECLARED["claude-code"].update(ADAPTERS["claude-code"].PROVENANCE)
 # agy has no reader decode; its fields are its index extractor's declarations.
 DECLARED["agy"] = dict(ADAPTERS["agy"].PROVENANCE)
+DECLARED["pi"] = dict(ADAPTERS["pi"].PROVENANCE)
 
 # Descendant metadata extends capability resolution, never the hot event proof table.
 DECLARED["claude-code"].update({
@@ -196,22 +197,21 @@ _UNREAD_SUMMARIES = {"parent": None, "subagent": None, "cwd": None, "agent_name"
                      "reason": "summaries_unreadable", "basis": "native", "rule": "agy_conversation_summaries"}
 
 
-def _agy_index_evidence(name, path, data, seen):
-    from .lines import Place, decode, lines
-    adapter = ADAPTERS["agy"]
-    relpath = name[name.index("brain/"):]
-    place = Place("agy", "agy", "personal", "live", relpath, path)
+def _index_sample(place, data, seen, facts):
+    from .lines import decode, lines
+    slug = place.harness
+    adapter = ADAPTERS[slug]
     native = {line.number: row for line in lines(data, len(data))
               if line.complete and (row := decode(line)) is not None}
     state = {}
-    adapter.bind(state, {**_UNREAD_SUMMARIES, "ref": name})
+    adapter.bind(state, facts)
     offsets, offset = [], 0
     for raw in data.splitlines(keepends=True):
         offsets.append((offset, raw))
         offset += len(raw)
     for event in adapter.extract(offsets, state, place=place, text=True):
         if event["object"] == "index_event":
-            seen.update(_seen(event, [native[event["line"]]], DECLARED["agy"]))
+            seen.update(_seen(event, [native[event["line"]]], DECLARED[slug]))
 
 
 def build(catalogue: Path) -> dict:
@@ -224,7 +224,7 @@ def build(catalogue: Path) -> dict:
     samples = tomllib.loads(raw_catalogue.decode("utf-8"))["sample"]
     harnesses = {slug: {"record_kinds": set(), "fields": {
         field: {"provenance": sorted(paths), "coverage_keys": COVERAGE_KEYS.get(field, []) if slug == "claude-code"
-                else ADAPTERS["agy"].COVERAGE_KEYS.get(field, []) if slug == "agy" else [],
+                else ADAPTERS[slug].COVERAGE_KEYS.get(field, []) if slug in ADAPTERS else [],
                 **({"coverage_scopes": COVERAGE_SCOPES[field]} if slug == "claude-code" and field in COVERAGE_SCOPES else {})} for field, paths in fields.items()
     }, "labels": {}, "versions": {}, "exceptions": []} for slug, fields in DECLARED.items()}
     hashes = {}
@@ -243,6 +243,12 @@ def build(catalogue: Path) -> dict:
         data = path.read_bytes()
         hashes[name] = hashlib.sha256(data).hexdigest()
         evidence[provenance].append(name)
+        if slug == "pi":  # Pi is index-only; do not widen reader format detection.
+            if sample.get("profile") != "index":
+                raise ValueError("Pi samples require the index profile")
+            place = Place(slug, slug, "personal", "live", name, path)
+            _index_sample(place, data, evidence["fields_seen"][provenance], {})
+            continue
         try:
             fmt = detect_format(data, len(data))
         except UnknownFormat:
@@ -252,7 +258,10 @@ def build(catalogue: Path) -> dict:
         if fmt == "agy":
             # agy has no reader decode (spec rev 2 §3): its evidence is the index extractor's.
             if sample.get("profile") == "index" and not sample.get("index_error"):
-                _agy_index_evidence(name, path, data, evidence["fields_seen"][provenance])
+                relpath = name[name.index("brain/"):]
+                place = Place(slug, slug, "personal", "live", relpath, path)
+                _index_sample(place, data, evidence["fields_seen"][provenance],
+                              {**_UNREAD_SUMMARIES, "ref": name})
             continue
         # Explicit place prevents metadata sidecars and sibling transcript discovery.
         place = Place(slug, "file", None, "explicit", name, path)

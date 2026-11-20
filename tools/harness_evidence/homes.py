@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-SLUG = {"claude": "claude-code", "codex": "codex", "agy": "agy"}
+SLUG = {"claude": "claude-code", "codex": "codex", "agy": "agy", "pi": "pi"}
 
 __all__ = ["Home", "SLUG", "homes", "stores"]
 
@@ -10,7 +10,7 @@ __all__ = ["Home", "SLUG", "homes", "stores"]
 @dataclass(frozen=True)
 class Home:
     name: str       # the launch-config key
-    harness: str    # the adapter alias: "claude", "codex" or "agy"
+    harness: str    # the adapter alias: "claude", "codex", "agy" or "pi"
     kind: str       # "personal" or "work"
     path: Path
 
@@ -26,6 +26,7 @@ def homes(user_home: Path, harness: str | None = None) -> tuple[Home, ...]:
             Home("codex-work", "codex", "work", user_home / ".codex-work"),
         ),
         "agy": (Home("agy", "agy", "personal", user_home / ".gemini" / "antigravity-cli"),),
+        "pi": (Home("pi", "pi", "personal", user_home / ".pi" / "agent"),),
     }
     if harness is not None:
         return by_harness[harness]
@@ -37,5 +38,6 @@ def stores(home: Home) -> tuple[tuple[str, Path], ...]:
         "claude": (("live", home.path / "projects"),),
         "codex": (("live", home.path / "sessions"), ("archived", home.path / "archived_sessions")),
         "agy": (("live", home.path / "brain"),),
+        "pi": (("live", home.path / "sessions"),),
     }
     return paths[home.harness]

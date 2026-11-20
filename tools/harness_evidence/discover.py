@@ -34,21 +34,21 @@ def roots(user_home: Path | None = None,
     if explicit is None:
         user_home = Path.home() if user_home is None else user_home
         explicit = [(homes.SLUG[home.harness], path)
-                    for harness in ("claude", "codex", "agy")
+                    for harness in tuple(homes.SLUG)
                     for home in homes.homes(user_home, harness)
                     for _store, path in homes.stores(home)]
     found = []
     for harness, path in explicit:
-        if harness not in ("claude-code", "codex", "agy"):
+        if harness not in homes.SLUG.values():
             raise ValueError(f"unsupported discovery harness: {harness}")
         if harness == "agy" and path.name != "brain":
             # Conversation ids and the summaries database are found from brain/<id>/...
             raise ValueError(f"agy root must be a brain directory: {path}")
         name = path.parent.name
-        # agy's home directory is antigravity-cli; its refs name the harness instead.
-        home = "agy" if harness == "agy" else name[1:] if name.startswith(".") else name
+        # agy and Pi refs name the harness rather than the home directory.
+        home = harness if harness in ("agy", "pi") else name[1:] if name.startswith(".") else name
         found.append(Root(harness, home, "work" if home.endswith("-work") else "personal",
-                          "archived" if path.name == "archived_sessions" else "live", path))
+                          "archived" if harness == "codex" and path.name == "archived_sessions" else "live", path))
     return found
 
 

@@ -246,7 +246,7 @@ def test_registry_refuses_a_harness_without_an_adapter():
     import pytest
     from harness_evidence import index_adapters
     from harness_evidence._protocol import ProtocolError
-    assert sorted(index_adapters.ADAPTERS) == ["agy", "claude-code"]
+    assert sorted(index_adapters.ADAPTERS) == ["agy", "claude-code", "pi"]
     home = CATALOGUE.parent / "home"
     codex = home / ".codex/sessions/2026/10/08"
     path = next(codex.glob("rollout-*.jsonl"))

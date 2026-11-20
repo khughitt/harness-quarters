@@ -1,6 +1,6 @@
 {
  "built_from": {
-  "catalogue_sha256": "d497e0863943f9d2fdd919bb3e243671f5d5ea9632e376b8fee9a2fe6903477c",
+  "catalogue_sha256": "77d9bd48145c700ea1070b268740153e5ca4f60d310794fe43d1fc2042206e47",
   "samples": {
    "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000001/.system_generated/logs/transcript_full.jsonl": "665c7874fd0d6fd14d98b5d65ab52c6aa0257d634231a80d166a2ddea6b0eb54",
    "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000002/.system_generated/logs/transcript_full.jsonl": "b86df9c5a4eee90e7563000b4b9ef9c53cbb85cd3eb7999b2c7aef8d7bb33d15",
@@ -236,6 +236,9 @@
    "origin/codex-unrecognized-tag.jsonl": "673764a743f963f43f97ec002b9208d69df29c3959610261114dbfb66c139f0e",
    "origin/codex-user_shell.jsonl": "7156dbbe8a3e2480da7df1695365605822d2331e84b0b2284cabf9ed2ed23710",
    "origin/codex-wrapper-then-plain.jsonl": "f8836a93dcc01cc6d68f4c3202d263c3c05b29e82dfb90a7a110aac9ebb5ab2c",
+   "pi/fork.jsonl": "a12ba4795261cbf532e5ad3a653fe1104113b5741266e4b84c1ad3cf68fd9be9",
+   "pi/sanitized-observed.jsonl": "9e51d82f942becc13a98c57f1bb2911aa30d689cae72e273ec3c095b0ec85f98",
+   "pi/session.jsonl": "20e7426c6695196c8a0ade5a074f46b8d552e63546a9fa09cb633bc43f4e5fda",
    "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000021.jsonl": "0287b2a1f7ec8a59670b2c0d2a6b7500a8550f28711c76ffa49e55b225e27a51",
    "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000022.jsonl": "0d61b470dd8c0b355ea69220418d1ad6aaa0c687956735f98e15c4164430f811",
    "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000023.jsonl": "5f5a31bb9ca46f86dc58de1e5b0b9289bf7ec732d0117675bf4491df3d44ef5f",
@@ -245,7 +248,7 @@
    "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl": "30b550b6f035815a4123c8a8fd18fbbf7059ec89c04b0749ecda738e24b2fde3"
   }
  },
- "decoder_version": "21",
+ "decoder_version": "22",
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
   "agy": {
@@ -3287,6 +3290,457 @@
       "origin/codex-user_shell.jsonl",
       "origin/codex-wrapper-then-plain.jsonl"
      ]
+    }
+   }
+  },
+  "pi": {
+   "exceptions": [],
+   "fields": {
+    "at_ms": {
+     "coverage_keys": [],
+     "provenance": [
+      "timestamp"
+     ]
+    },
+    "compaction": {
+     "coverage_keys": [],
+     "provenance": [
+      "id",
+      "type"
+     ]
+    },
+    "eligible": {
+     "coverage_keys": [],
+     "provenance": [
+      "id",
+      "timestamp",
+      "version"
+     ]
+    },
+    "flush_response": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "fork_boundary": {
+     "coverage_keys": [],
+     "provenance": [
+      "id",
+      "parentSession"
+     ]
+    },
+    "identity.agent": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "identity.cwd": {
+     "coverage_keys": [],
+     "provenance": [
+      "cwd"
+     ]
+    },
+    "identity.entrypoint": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "identity.index_session": {
+     "coverage_keys": [],
+     "provenance": [
+      "id"
+     ]
+    },
+    "identity.parent": {
+     "coverage_keys": [],
+     "provenance": [
+      "parentSession"
+     ]
+    },
+    "identity.session": {
+     "coverage_keys": [],
+     "provenance": [
+      "id"
+     ]
+    },
+    "identity.subagent": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "identity.version": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "interruption": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.stopReason"
+     ]
+    },
+    "message.assistant_output_bytes": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content"
+     ]
+    },
+    "message.blocks": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content",
+      "summary"
+     ]
+    },
+    "message.channel": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.role",
+      "type"
+     ]
+    },
+    "message.joined_bytes": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content",
+      "summary"
+     ]
+    },
+    "message.joined_nonempty": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content",
+      "summary"
+     ]
+    },
+    "message.origin": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.role",
+      "type"
+     ]
+    },
+    "message.text": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content",
+      "summary"
+     ]
+    },
+    "native_kind": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "response.effort": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.thinkingLevel",
+      "thinkingLevel"
+     ]
+    },
+    "response.id": {
+     "coverage_keys": [
+      "applied:fork_origin/input:verified"
+     ],
+     "provenance": [
+      "id",
+      "parentSession"
+     ]
+    },
+    "response.model": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.model",
+      "model",
+      "modelId"
+     ]
+    },
+    "response.native": {
+     "coverage_keys": [],
+     "provenance": [
+      "kind",
+      "message.api",
+      "message.provider",
+      "message.stopReason",
+      "message.usage.cacheRead",
+      "message.usage.cacheWrite",
+      "message.usage.input",
+      "message.usage.output",
+      "message.usage.reasoning",
+      "message.usage.totalTokens",
+      "provider",
+      "usage.cacheRead",
+      "usage.cacheWrite",
+      "usage.input",
+      "usage.output",
+      "usage.reasoning",
+      "usage.totalTokens"
+     ]
+    },
+    "response.usage.cache_read": {
+     "coverage_keys": [
+      "applied:usage/input:cacheRead"
+     ],
+     "provenance": [
+      "message.usage.cacheRead",
+      "usage.cacheRead"
+     ]
+    },
+    "response.usage.cache_write": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "response.usage.context_total": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.usage.cacheRead",
+      "message.usage.cacheWrite",
+      "message.usage.input",
+      "usage.cacheRead",
+      "usage.cacheWrite",
+      "usage.input"
+     ]
+    },
+    "response.usage.input_uncached": {
+     "coverage_keys": [
+      "applied:usage/input:input"
+     ],
+     "provenance": [
+      "message.usage.input",
+      "usage.input"
+     ]
+    },
+    "response.usage.output": {
+     "coverage_keys": [
+      "applied:usage/input:output"
+     ],
+     "provenance": [
+      "message.usage.output",
+      "usage.output"
+     ]
+    },
+    "response.usage.thinking": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "response.usage.uncached_total": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.usage.input",
+      "usage.input"
+     ]
+    },
+    "response.usage_present.output": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.usage.output",
+      "usage.output"
+     ]
+    },
+    "response.usage_present.thinking": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "turn_end": {
+     "coverage_keys": [],
+     "provenance": []
+    }
+   },
+   "header": {
+    "implemented": true,
+    "line_limit": 50
+   },
+   "index": {
+    "absent": {
+     "identity.agent": "not_recorded",
+     "identity.entrypoint": "not_recorded",
+     "identity.subagent": "not_recorded",
+     "identity.version": "not_recorded",
+     "response.usage.cache_write": "not_recorded",
+     "response.usage.thinking": "not_recorded",
+     "turn_end": "no_turn_end_records"
+    },
+    "applied": {
+     "fork_origin": [
+      "verified"
+     ],
+     "usage": [
+      "input",
+      "cacheRead",
+      "cacheWrite",
+      "output",
+      "reasoning",
+      "totalTokens"
+     ]
+    },
+    "common_reads": [
+     "type",
+     "timestamp",
+     "id",
+     "parentId"
+    ],
+    "features": {
+     "native_skill_events": false,
+     "question_option_labels": false
+    },
+    "known_kinds": [
+     "branch_summary",
+     "compaction",
+     "context_edit",
+     "custom",
+     "custom_message",
+     "label",
+     "message",
+     "model_change",
+     "session",
+     "session_info",
+     "thinking_level_change",
+     "usage"
+    ],
+    "mode": "incremental",
+    "profile": "index",
+    "resume": true,
+    "tool_kinds": {},
+    "unwatched": {},
+    "watched": {
+     "branch_summary": {
+      "inputs": {},
+      "sources": [
+       "usage"
+      ]
+     },
+     "compaction": {
+      "inputs": {},
+      "sources": [
+       "usage"
+      ]
+     },
+     "message": {
+      "inputs": {},
+      "sources": [
+       "message.role",
+       "message.model",
+       "message.content",
+       "message.thinkingLevel",
+       "message.usage",
+       "message.stopReason"
+      ]
+     },
+     "model_change": {
+      "inputs": {
+       "model": [
+        "modelId"
+       ]
+      },
+      "sources": [
+       "modelId"
+      ]
+     },
+     "session": {
+      "inputs": {},
+      "sources": [
+       "version",
+       "cwd",
+       "parentSession"
+      ]
+     },
+     "thinking_level_change": {
+      "inputs": {
+       "effort": [
+        "thinkingLevel"
+       ]
+      },
+      "sources": [
+       "thinkingLevel"
+      ]
+     },
+     "usage": {
+      "inputs": {},
+      "sources": [
+       "usage"
+      ]
+     }
+    }
+   },
+   "labels": {},
+   "record_kinds": [],
+   "side_inputs": {
+    "pi_parent_sessions": {
+     "fingerprint": "sha256 of the complete-line ancestor snapshots and resolution status",
+     "path": "parentSession",
+     "relative_to": "session store"
+    }
+   },
+   "versions": {
+    "1.1.0": {
+     "fields_seen": {
+      "observed": [],
+      "synthetic": [
+       "at_ms",
+       "compaction",
+       "eligible",
+       "flush_response",
+       "identity.cwd",
+       "identity.index_session",
+       "identity.session",
+       "interruption",
+       "message.assistant_output_bytes",
+       "message.blocks",
+       "message.channel",
+       "message.joined_bytes",
+       "message.joined_nonempty",
+       "message.origin",
+       "message.text",
+       "native_kind",
+       "response.effort",
+       "response.id",
+       "response.model",
+       "response.native",
+       "response.usage.cache_read",
+       "response.usage.context_total",
+       "response.usage.input_uncached",
+       "response.usage.output",
+       "response.usage.uncached_total",
+       "response.usage_present.output"
+      ]
+     },
+     "observed": [],
+     "synthetic": [
+      "pi/fork.jsonl",
+      "pi/session.jsonl"
+     ]
+    },
+    "unknown": {
+     "fields_seen": {
+      "observed": [
+       "at_ms",
+       "eligible",
+       "flush_response",
+       "identity.cwd",
+       "identity.index_session",
+       "identity.session",
+       "message.assistant_output_bytes",
+       "message.channel",
+       "message.joined_bytes",
+       "message.joined_nonempty",
+       "message.origin",
+       "message.text",
+       "native_kind",
+       "response.effort",
+       "response.id",
+       "response.native",
+       "response.usage.cache_read",
+       "response.usage.context_total",
+       "response.usage.input_uncached",
+       "response.usage.output",
+       "response.usage.uncached_total",
+       "response.usage_present.output"
+      ],
+      "synthetic": []
+     },
+     "observed": [
+      "pi/sanitized-observed.jsonl"
+     ],
+     "synthetic": []
     }
    }
   }

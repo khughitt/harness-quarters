@@ -4,9 +4,9 @@ import subprocess
 from pathlib import Path
 
 SCHEMA = "harness-evidence/1"
-DECODER_VERSION = "21"
+DECODER_VERSION = "22"
 
-__all__ = ["SCHEMA", "DECODER_VERSION", "RevisionUnknown", "revision", "index_adapters", "index_claude", "index_events", "index_stream", "index_coverage", "header"]
+__all__ = ["SCHEMA", "DECODER_VERSION", "RevisionUnknown", "revision", "index_adapters", "index_claude", "index_pi", "index_events", "index_stream", "index_coverage", "header"]
 
 
 class RevisionUnknown(Exception):

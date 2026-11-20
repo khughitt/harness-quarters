@@ -49,11 +49,12 @@ valid terminal index stops the listing with an error.
 The adapters share `Home` and home discovery from `tools/harness_evidence/homes.py`.
 That standalone package also names transcript stores without importing hq or its
 configuration. `tools/harness-evidence discover [--home PATH] [--root HARNESS=PATH]...`
-lists Claude Code and Codex transcript paths and filesystem metadata as
+lists Claude Code, Codex, agy and Pi transcript paths and filesystem metadata as
 JSONL under schema version 1 (`root`, `file`, then `discover_end`). Explicit roots replace
-all default roots; supported harness names are `claude-code` and `codex`. Defaults use
+all default roots; supported harness names are `claude-code`, `codex`, `agy` and `pi`. Defaults use
 the shared personal/work homes, including Codex's archived stores, and ignore obs's
-environment overrides. Discovery reads no transcript text. Matching `.jsonl` paths remain selected even
+environment overrides. Pi discovery also reads ancestry evidence for its side-input fingerprint;
+no transcript text is emitted by discovery. Matching `.jsonl` paths remain selected even
 when a non-symlink directory occupies a transcript position, including subagents
 and explicit archive roots. Their stat metadata is listed; opening such a source
 fails visibly in header and decode instead of silently dropping the path. Codex filename identity is
@@ -83,7 +84,7 @@ These hints assert neither canonical filename identity nor recorded session iden
 Consumers retain query grammar/alias policy and confirm identity from evidence.
 
 Discovery files/aliases and decode `file_start` also carry `path_facts`, null outside
-Claude and agy; agy alias rows carry null `path_facts`, and alias rows carry no
+Claude, agy and Pi; agy alias rows carry null `path_facts`, and alias rows carry no
 `side_inputs` or `copy`. Claude's convention object has `session` (logical filename stem), `agent`
 (one filename `agent-` prefix removed, otherwise null; empty string stays distinct),
 `subagent` (immediate parent is `subagents`), `parent` (grandparent name in that case,
@@ -132,7 +133,7 @@ reads as `unknown_format` (as before agy was detected), and an agy `context` ent
 skipped.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `19`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
@@ -198,14 +199,14 @@ replay, while request ids and decoder revision changes alone do not.
 Records themselves retain native numeric block order, including when a line has
 ten or more blocks.
 
-## Cheap Claude and agy headers
+## Cheap Claude, agy and Pi headers
 
 `tools/harness-evidence header` accepts one JSON request per stdin line with
 `id`, `files` and explicit `roots`. Files use the same logical `path`, optional
-`read_path`, fixed `size` and `identity:{device,inode}` as index decoding. Claude
-or agy roots must contain every logical path; Codex headers are explicitly
+`read_path`, fixed `size` and `identity:{device,inode}` as index decoding. Claude,
+agy or Pi roots must contain every logical path; Codex headers are explicitly
 unsupported ("no index adapter for codex"). No default roots or guessed harness are
-used. The capability view marks Claude and agy headers implemented (50 lines) and
+used. The capability view marks Claude, agy and Pi headers implemented (50 lines) and
 Codex headers unimplemented; this declares implementation, not evidence that a
 harness version emits a field.
 
@@ -236,7 +237,7 @@ reader. It has no resumable checkpoint or index extraction side effects.
 
 ## Native index extraction
 
-The opt-in `extract: "index"` request emits Claude and agy native evidence. Each
+The opt-in `extract: "index"` request emits Claude, agy and Pi native evidence. Each
 harness has an index adapter, looked up by the file's harness (`no index adapter for
 <harness>` otherwise); Codex has none yet. Include each file's `identity: {"device": ..., "inode": ...}`, keep
 `cross_file` and `raw` false, and omit `context`. Pass a saved index `state` whole:
@@ -413,6 +414,36 @@ not absent.
 - `results[].exit_code` is a shared field: Claude emits null (`absent:not_decoded`).
 - Text-off requests drop the same text fields as Claude's, `identity.cwd` included;
   agy's `path_facts` in `file_start` and the checkpoint binding still name the cwd.
+
+### Pi CLI/RPC index events
+
+Discovery includes `~/.pi/agent/sessions`. Give `--root pi=PATH` (or a
+`{harness: "pi", path: PATH}` request root) for a different or isolated store.
+Explicit roots replace the defaults. Pi-durable stores and the transcript reader
+profile are outside this adapter. The Pi header reads the first complete v3
+session header and reports its recorded session ID, start timestamp and cwd.
+
+The index walks physical entries, including abandoned branches. The normalized
+response ID combines the owning session and native entry ID. For forked history,
+the decoder verifies a matching entry against the `parentSession` chain inside
+the selected store, using the recorded entry ID, timestamp and content. Pi can
+rechain entries when it copies a branch. Identical assistant text or token
+totals alone never prove a copy. When the source cannot be verified, older
+copied-looking entries keep local IDs and carry unresolved origin coverage.
+Discovery and index frames publish the `pi_parent_sessions` side-input
+fingerprint. A changed ancestor snapshot invalidates resume even when the
+child bytes stay fixed. Partial tails are provisional and a changed source
+prefix restarts under the shared protocol.
+
+Assistant usage, separate usage entries, compactions and branch summaries
+contribute any recorded usage. Native message model and thinking level take
+precedence over the selection recorded on their parent branch. Auxiliary
+summaries can record usage without naming a model. Input excludes cached
+tokens, and output already includes reasoning. Context totals include recorded
+cache hits and any native cache-write contribution. Normalized thinking and
+cache-write counters are declared unrecorded for aggregate use. Their native
+values remain evidence, including zeros that could be Pi defaults. An assistant
+with only default zeros provides no measured totals.
 
 ## Read evidence, not mentions
 
