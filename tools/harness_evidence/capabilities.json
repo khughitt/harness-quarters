@@ -3733,6 +3733,7 @@
        "native_kind",
        "response.id",
        "response.native",
+       "response.usage.context_total",
        "response.usage.input_uncached",
        "response.usage.output",
        "response.usage.uncached_total",

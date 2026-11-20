@@ -181,8 +181,16 @@ def _is_response(row):
     if kind == "message":
         message = row.get("message")
         return isinstance(message, dict) and message.get("role") == "assistant"
-    return (kind == "usage" or kind in _SUMMARIES
-            and (row.get("fromHook") is not True or isinstance(row.get("usage"), dict)))
+    if kind == "usage":
+        return True
+    if kind not in _SUMMARIES:
+        return False
+    if isinstance(row.get("usage"), dict):
+        return True
+    # Pi 1.1.0's branch summarizer returns this before calling a provider.
+    return row.get("fromHook") is not True and not (
+        kind == "branch_summary" and row.get("summary") == "No content to summarize"
+    )
 
 
 def _parent_chain(place, origin):
@@ -207,14 +215,15 @@ def _parent_chain(place, origin):
                 # Compare complete native entries from a fixed span. The fork header's
                 # clock is independent of the timestamps on copied entries.
                 entries = {}
-                malformed = False
+                complete = True
                 while (remaining := limit - handle.tell()) > 0:
                     raw = handle.readline(remaining)
                     if not raw.endswith(b"\n"):
+                        complete = False
                         break
                     row = _record(raw)
                     if row is None:
-                        malformed = True
+                        complete = False
                         continue
                     if not _is_response(row):
                         continue
@@ -223,7 +232,7 @@ def _parent_chain(place, origin):
                         entries[entry] = None if entry in entries else _entry_digest(row)
         except (OSError, ValueError, RecursionError):
             return chain, "parent_unavailable"
-        chain.append((ancestor["id"], entries, not malformed))
+        chain.append((ancestor["id"], entries, complete))
         seen_paths.add(candidate)
         seen_sessions.add(ancestor["id"])
         origin = ancestor
@@ -347,9 +356,16 @@ def _response(row, identity, model, effort, state):
         model = _string(message.get("responseModel")) or model
         effort = _string(message.get("providerThinkingLevel"))
     inp, read, write, out = (_counter(raw, name) for name in ("input", "cacheRead", "cacheWrite", "output"))
+    context_read = read
+    if (api == "openai-completions" and inp is not None
+            and type(raw.get("cacheRead")) is int and raw["cacheRead"] == 0
+            and type(raw.get("cacheWrite")) is int and raw["cacheWrite"] >= 0):
+        # Positive net input means Pi subtracted its cache components from an
+        # observed prompt total. That total is recoverable even if read is unknown.
+        context_read = 0
     usage = {
         "input_uncached": inp, "cache_read": read, "cache_write": None, "output": out,
-        "thinking": None, "context_total": None if inp is None or read is None else inp + read + (write or 0),
+        "thinking": None, "context_total": None if inp is None or context_read is None else inp + context_read + (write or 0),
         "uncached_total": None if inp is None else inp + (write or 0),
     }
     owner, rule = _origin(row, identity["session"], state)

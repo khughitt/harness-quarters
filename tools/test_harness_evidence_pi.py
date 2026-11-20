@@ -193,6 +193,8 @@ def test_pi_sanitized_observed_transport_sample(session):
     assert response["native"]["api"] == message["api"]
     assert response["native"]["input"] == message["usage"]["input"]
     assert response["usage"]["output"] == message["usage"]["output"]
+    assert response["usage"]["context_total"] == 4778
+    assert response["usage"]["cache_read"] is None
 
 
 def test_pi_partial_usage_defaults_and_summary_population(session):
@@ -239,3 +241,31 @@ def test_pi_copied_entry_proof_survives_clock_regression(session):
     copied, retry = responses(frame(fork))
     assert copied["response"]["id"] == root
     assert retry["response"]["id"] == "pi-fork:ff00ff00"
+
+
+def test_pi_native_branch_summary_without_a_model_call(session):
+    rows = [json.loads(line) for line in session.read_text().splitlines()]
+    summary = {key: value for key, value in rows[10].items() if key != "usage"}
+    no_content = {**summary, "id": "0000000f", "summary": "No content to summarize", "fromHook": False}
+    write(session, [rows[0], summary, no_content])
+    events = [row for row in frame(session, text=True) if row.get("native_kind") == "branch_summary"]
+    assert events[0]["response"] is not None and events[0]["response"]["usage"]["output"] is None
+    assert events[1]["message"]["text"] == "No content to summarize"
+    assert events[1]["response"] is None
+
+
+def test_pi_fork_origin_with_a_partial_intermediate_parent(session):
+    rows = [json.loads(line) for line in session.read_text().splitlines()]
+    middle = session.with_name("middle.jsonl")
+    leaf = session.with_name("leaf.jsonl")
+    write(middle, [{**rows[0], "id": "pi-middle", "parentSession": str(session)}, *rows[1:5]])
+    full = middle.read_bytes()
+    middle.write_bytes(full[:-4])
+    write(leaf, [{**rows[0], "id": "pi-leaf", "parentSession": str(middle)}, *rows[1:5]])
+    initial = frame(leaf)
+    assert responses(initial)[0]["provenance"]["response.id"]["rule"] == "unresolved:pi_fork_origin"
+    with middle.open("ab") as handle:
+        handle.write(full[-4:])
+    repaired = frame(leaf, state=initial[-1]["state"])
+    assert repaired[0]["replaces"] == "all"
+    assert responses(repaired)[0]["response"]["id"] == responses(frame(session))[0]["response"]["id"]

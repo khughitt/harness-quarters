@@ -441,12 +441,15 @@ contribute recorded usage. The decoder prefers a recorded served model and uses
 recorded provider-native effort when present. Requested model and thinking
 level remain available as selection evidence. Native summaries without usage
 remain in the unknown usage population. Hook-generated summaries enter that
-population when they carry usage. Input excludes cached
+population when they carry usage. The native branch summary that reports no
+content to summarize carries no response. Input excludes cached
 tokens, and output already includes reasoning. Context totals include recorded
 cache hits and any native cache-write contribution. Normalized thinking and
 cache-write counters are declared unrecorded for aggregate use. Their native
 values remain evidence, including zeros that could be Pi defaults. A zero adjacent to a positive count can also come from an omitted field. The
 decoder leaves such counters unknown because Pi stores no per-counter presence.
+A positive net input in the OpenAI-compatible transport can still recover the
+prompt total from its stored cache components.
 
 ## Read evidence, not mentions
 
