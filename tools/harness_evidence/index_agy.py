@@ -169,6 +169,7 @@ UNWATCHED = {
                          "tool_calls[].args.questions": "dimension"},
 }
 _CONVENTION = {
+    "response.phase": "agy_response_phase",
     "flush_response": "agy_step_response", "identity.session": "agy_brain_directory",
     "identity.index_session": "agy_brain_directory", "identity.entrypoint": "agy_entrypoint",
     "response.id": "agy_step_response", "message.origin": "agy_wrappers", "calls[].id": "agy_call_position",
@@ -184,6 +185,7 @@ _CONVENTION = {
 _SUMMARY_FIELDS = {"identity.parent": "parent_conversation_id", "identity.subagent": "parent_conversation_id",
                    "identity.cwd": "workspace_uris"}
 _ABSENT = {
+    "context": "not_recorded", "execution": "not_recorded",
     "identity.agent": "not_recorded", "identity.version": "not_recorded", "response.effort": "not_recorded",
     "response.usage.cache_write": "not_recorded",
     "response.usage.thinking": "not_recorded", "calls[].background": "known_after_call",
@@ -196,6 +198,7 @@ ABSENT = _ABSENT  # Published in the capabilities index block (spec rev 2 §7).
 ORIGIN_KINDS = {"USER_EXPLICIT": {"class": "user_typed", "basis": "native"}}
 _SUMMARY = [f"{agy_summaries.TABLE}.{column}" for column in ("parent_conversation_id",)]
 PROVENANCE = {
+    "context": [], "execution": [], "response.phase": [],
     "native_kind": ["type"], "eligible": ["created_at", "step_index"], "flush_response": ["type"],
     "calls[].block": ["tool_calls"], "identity.session": [], "identity.index_session": [],
     "identity.agent": [], "identity.parent": _SUMMARY, "identity.subagent": _SUMMARY,
@@ -466,6 +469,8 @@ def extract(lines, state, *, place, text: bool):
         count_record(state, conversation, day, kind, kind in KNOWN_KINDS, step, WATCHED)
         event = {"object": "index_event", **position, "native_kind": kind, "identity": dict(identity),
                  "at_ms": at_ms, "eligible": eligible, "response": None, "flush_response": False,
+                 "context": None, "execution": {"runs": [], "commands": [], "call_updates": [],
+                                                  "writes": [], "operations": [], "diagnostics": {}},
                  "message": None, "calls": [], "results": [], "injections": [], "notifications": [],
                  "compaction": None, "interruption": None, "fork_boundary": None, "turn_end": None}
         source = step.get("source")
@@ -499,7 +504,8 @@ def extract(lines, state, *, place, text: bool):
             applied(state, conversation, day, "usage", {name: step.get(name) is not None for name in _USAGE})
             event["flush_response"] = True
             event["response"] = {"id": f"{conversation}:{index}", "model": step.get("model") if kind == "PLANNER_RESPONSE" else None,
-                                 "effort": None, "usage": usage, "usage_present": present, "native": native}
+                                 "effort": None, "usage": usage, "usage_present": present, "native": native,
+                                 "phase": "fragment"}
             if kind == "CHECKPOINT":
                 event["compaction"] = {"summary": True, "basis": "native", "rule": "agy_checkpoint"}
                 event["message"] = _message("system", content, _origin(content, str(source)))

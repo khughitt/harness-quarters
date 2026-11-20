@@ -1,0 +1,113 @@
+{
+  "source": {
+    "repository": "obs",
+    "commit": "1e0afad1a18a610c5f8f54a4805a029f0530536a",
+    "path": "tests/harness/test_codex.py",
+    "symbols": [
+      "META",
+      "CTX",
+      "USER",
+      "AGENTS",
+      "CALL",
+      "OUT",
+      "ASSIST",
+      "record",
+      "count",
+      "rec"
+    ]
+  },
+  "provenance": "synthetic",
+  "version": "unknown",
+  "reader_records": [
+    {
+      "line": 1,
+      "role": "metadata",
+      "text": "{\"timestamp\":\"2026-09-04T09:38:28.000Z\",\"type\":\"session_meta\",\"payload\":{\"id\":\"c1\",\"cwd\":\"/checkout\",\"originator\":\"codex-tui\",\"thread_source\":\"user\",\"base_instructions\":{\"text\":\"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\"}}}"
+    },
+    {
+      "line": 2,
+      "role": "metadata",
+      "text": "{\"timestamp\":\"2026-09-04T09:38:28.000Z\",\"type\":\"turn_context\",\"payload\":{\"model\":\"gpt-5.6-sol\",\"effort\":\"high\",\"cwd\":\"/checkout\"}}"
+    },
+    {
+      "line": 3,
+      "role": "user_channel_unattributed",
+      "text": "please do x"
+    },
+    {
+      "line": 4,
+      "role": "injected",
+      "text": "# AGENTS.md instructions\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "line": 5,
+      "role": "tool_call",
+      "text": "just test"
+    },
+    {
+      "line": 6,
+      "role": "tool_output",
+      "text": "oooooooooooooooooooooooooooooo"
+    },
+    {
+      "line": 7,
+      "role": "assistant",
+      "text": "done?"
+    },
+    {
+      "line": 8,
+      "role": "metadata",
+      "text": "{\"timestamp\":\"2026-09-04T09:38:28.000Z\",\"type\":\"token_usage_record\",\"payload\":{\"response_id\":\"resp_1\",\"usage\":{\"input_tokens\":20196,\"cached_input_tokens\":11904,\"cache_write_input_tokens\":0,\"output_tokens\":395,\"reasoning_output_tokens\":149}}}"
+    },
+    {
+      "line": 9,
+      "role": "unknown",
+      "text": "{\"timestamp\":\"2026-09-04T09:38:45.000Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":100,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":5,\"reasoning_output_tokens\":1,\"total_tokens\":105},\"last_token_usage\":{\"input_tokens\":100,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":5,\"reasoning_output_tokens\":1,\"total_tokens\":105},\"model_context_window\":258400}}}"
+    },
+    {
+      "line": 10,
+      "role": "metadata",
+      "text": "{\"timestamp\":\"2026-09-04T09:38:28.000Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\"}}"
+    },
+    {
+      "line": 11,
+      "role": "unknown",
+      "text": "{\"timestamp\":\"2026-09-04T09:38:28.000Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"brand_new_event\"}}"
+    }
+  ],
+  "native_facts": {
+    "response": {
+      "id": "resp_1",
+      "model": "gpt-5.6-sol",
+      "effort": "high",
+      "input_uncached": 8292,
+      "context_total": 20196,
+      "cache_read": 11904,
+      "output": 395,
+      "thinking": 149
+    },
+    "messages": {
+      "prompt_joined_bytes": 11,
+      "assistant_block_sum_bytes": 5
+    },
+    "call": {
+      "id": "call_1",
+      "native_name": "shell",
+      "input_bytes": 9
+    },
+    "selected_usage_populations": 1
+  },
+  "context_control": {
+    "source": "tests/harness/test_adapter_coverage.py:META_FULL/CTX_BOTH/CTX_FALLBACK; tests/harness/test_codex.py:CodexAdapterTests.test_injections_tool_calls_and_aggregates",
+    "provenance": "synthetic",
+    "version": "0.156.1",
+    "parent": "p",
+    "subagent": true,
+    "efforts": [
+      "high",
+      "low"
+    ],
+    "base_bytes": 1,
+    "compaction_bytes": 10
+  }
+}

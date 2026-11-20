@@ -95,6 +95,13 @@ def project(obj: dict) -> tuple[dict, list]:
     """Remove the post-base additions; return the removed values for the null check."""
     obj, removed = copy.deepcopy(obj), []
     if obj["object"] == "file_start":
+        from test_harness_evidence_index import old_claude_defaults, pre_oracle_defaults
+        old_claude_defaults(pre_oracle_defaults(obj["provenance_defaults"]))
+        for field in ("context", "execution", "response.phase"):
+            obj["provenance_defaults"].pop(field)
+    if obj["object"] == "file_end":
+        assert obj.pop("metadata") is None
+    if obj["object"] == "file_start":
         for key in ADDED_FILE_START_FIELDS:
             removed.append(obj.pop(key))
         for field in ADDED_PROVENANCE:
@@ -103,6 +110,13 @@ def project(obj: dict) -> tuple[dict, list]:
             assert obj["provenance_defaults"][field]["native_paths"] == current, field
             obj["provenance_defaults"][field]["native_paths"] = base
     if obj["object"] == "index_event":
+        from test_harness_evidence_index import check_claude_additions
+        check_claude_additions(obj)
+        obj.pop("context")
+        obj.pop("execution")
+        if obj["response"] is not None:
+            obj["response"].pop("phase")
+        assert not {"context", "execution", "response.phase"} & obj["provenance"].keys()
         for result in obj.get("results") or []:
             for key in ADDED_RESULT_FIELDS:
                 removed.append(result.pop(key))
@@ -162,6 +176,11 @@ def claude_capability_blocks():
     claude = json.loads(CAPABILITIES.read_text(encoding="utf-8"))["harnesses"]["claude-code"]
     for field, entry in ADDED_CAPABILITY_FIELDS.items():
         assert claude["fields"].pop(field) == entry, field
+    for field in ("context", "execution", "response.phase"):
+        assert claude["fields"].pop(field) == {"coverage_keys": [], "provenance": ["type"]}
+    assert claude.pop("discovery") == {"default_roots": [".claude/projects", ".claude-work/projects"]}
+    for version in ("unknown", "2.1.281"):
+        claude["versions"][version]["fields_seen"]["synthetic"].remove("response.phase")
     for field, (current, base) in CHANGED_PROVENANCE.items():
         assert claude["fields"][field]["provenance"] == sorted(current), field
         claude["fields"][field]["provenance"] = sorted(base)
@@ -242,11 +261,12 @@ def test_normalized_stream_holds_no_checkout_or_home_path():
             assert checkout not in value and home not in value, (sample["path"], value)
 
 
-def test_registry_refuses_a_harness_without_an_adapter():
+def test_registry_refuses_a_harness_without_an_adapter(monkeypatch):
     import pytest
     from harness_evidence import index_adapters
     from harness_evidence._protocol import ProtocolError
-    assert sorted(index_adapters.ADAPTERS) == ["agy", "claude-code", "pi"]
+    assert sorted(index_adapters.ADAPTERS) == ["agy", "claude-code", "codex", "pi"]
+    monkeypatch.delitem(index_adapters.ADAPTERS, "codex")
     home = CATALOGUE.parent / "home"
     codex = home / ".codex/sessions/2026/10/08"
     path = next(codex.glob("rollout-*.jsonl"))
@@ -280,3 +300,27 @@ if __name__ == "__main__":
         sys.exit(f"a normalization rule matched nothing: {normalize.matched}")
     DIGESTS.write_text(json.dumps(value, sort_keys=True, indent=1) + "\n", encoding="utf-8")
     print(f"{len(value['completing'])} completing, {len(value['failing'])} failing -> {DIGESTS}")
+
+
+def test_registered_adapters_import_inside_an_isolated_package(tmp_path):
+    import subprocess
+    from test_harness_evidence_index import environment
+    code = """import importlib, importlib.util, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+name = '_pinned_test_decoder'
+spec = importlib.util.spec_from_file_location(name, root / '__init__.py',
+                                             submodule_search_locations=[str(root)])
+package = importlib.util.module_from_spec(spec)
+sys.modules[name] = package
+spec.loader.exec_module(package)
+importlib.import_module(name + '.index_stream')
+adapters = importlib.import_module(name + '.index_adapters').ADAPTERS
+assert set(adapters) == {'agy', 'claude-code', 'codex', 'pi'}
+assert 'harness_evidence' not in sys.modules
+assert all(module.__name__.startswith(name + '.') for module in adapters.values())
+"""
+    result = subprocess.run([sys.executable, '-I', '-c', code, str(TOOLS / 'harness_evidence')],
+                            cwd=tmp_path, env=environment(tmp_path), capture_output=True,
+                            text=True, timeout=30)
+    assert result.returncode == 0, result.stderr

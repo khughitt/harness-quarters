@@ -49,6 +49,9 @@ IDLE_NOTICE = "Compacted while idle, before the prompt cache expired"
 
 # Native sources are declarations, not a consumer's metric catalogue.
 PROVENANCE = {
+    "context": ["type"],
+    "execution": ["type"],
+    "response.phase": ["type"],
     "native_kind": ["type"],
     "eligible": ["timestamp", "sessionId"],
     "flush_response": ["type", "requestId", "message.id"],
@@ -597,7 +600,7 @@ def _message(record, kind):
 
 
 _CONVENTION_PROOFS = frozenset({
-    "message.origin", "flush_response", "identity.index_session", "identity.parent",
+    "context", "execution", "response.phase", "message.origin", "flush_response", "identity.index_session", "identity.parent",
     "identity.subagent", "calls[].kind", "calls[].paths", "calls[].paths_complete",
     "results[].child_session", "results[].truncation", "notifications",
 })
@@ -812,6 +815,9 @@ def extract(lines, state, *, place: Place, text: bool):
             "identity": identity,
             "at_ms": at_ms,
             "eligible": eligible,
+            "context": None,
+            "execution": {"runs": [], "commands": [], "call_updates": [], "writes": [],
+                          "operations": [], "diagnostics": {}},
             "response": None,
             "flush_response": flush,
             "message": _message(record, kind) if eligible else None,
@@ -874,6 +880,7 @@ def extract(lines, state, *, place: Place, text: bool):
                     "rule": "fork_context_ref",
                 }
                 event["response"] = {
+                    "phase": "fragment",
                     "id": request_id,
                     "model": message.get("model"),
                     "effort": record.get("effort"),

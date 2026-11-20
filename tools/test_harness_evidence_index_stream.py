@@ -11,7 +11,8 @@ from harness_evidence import DECODER_VERSION
 from harness_evidence import index_claude, index_events, index_stream, stream
 from test_harness_evidence_index import (CONTROLS, FIXTURES, TOOLS, environment, expand_proofs,
                                         PROVENANCE_ORACLE, oracle_hash, oracle_rows, oracle_error,
-                                        oracle_native_case, pre_oracle_defaults, POST_ORACLE_FIXTURES)
+                                        oracle_native_case, old_claude_defaults, pre_oracle_defaults,
+                                        POST_ORACLE_FIXTURES)
 
 ENVELOPE = {"schema": "harness-evidence/1", "decoder": {"version": DECODER_VERSION, "revision": "a" * 40}}
 
@@ -723,7 +724,7 @@ def normalize_oracle_wire(values):
 
 @pytest.mark.parametrize("route", ["import", "command"])
 def test_direct_provenance_changes_expand_to_frozen_full_oracle(tmp_path, route):
-    assert pre_oracle_defaults(index_events.provenance_defaults()) == PROVENANCE_ORACLE["declarations"]
+    assert old_claude_defaults(pre_oracle_defaults(index_events.provenance_defaults())) == PROVENANCE_ORACLE["declarations"]
     # Store fixtures for agy and Pi postdate the frozen oracle.
     assert set(PROVENANCE_ORACLE["fixtures"]) == {
         str(p.relative_to(FIXTURES)) for p in FIXTURES.rglob("*.jsonl")
@@ -786,7 +787,7 @@ def test_direct_provenance_changes_expand_to_frozen_full_oracle(tmp_path, route)
                     native.pop("next_offset")
                 assert oracle_hash(native) == old["native_state"], (case, old["through_line"])
             assert rows[0]["side_inputs"] is None
-            assert pre_oracle_defaults(rows[0]["provenance_defaults"]) == PROVENANCE_ORACLE["declarations"]
+            assert old_claude_defaults(pre_oracle_defaults(rows[0]["provenance_defaults"])) == PROVENANCE_ORACLE["declarations"]
             assert oracle_rows([v for v in rows if v["object"] not in
                                 {"file_start", "file_end", "request_end"}],
                                rows[0]["provenance_defaults"]) == old["rows"]

@@ -8,7 +8,7 @@ import subprocess
 import tarfile
 import tomllib
 
-from harness_evidence import DECODER_VERSION
+from harness_evidence import DECODER_VERSION, homes, index_agy, index_pi
 from harness_evidence_testing import FIXTURES, path_of
 
 TOOLS = Path(__file__).resolve().parent
@@ -43,6 +43,7 @@ def fixture_repo(tmp_path):
                     ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copy2(TOOLS / "harness-evidence", root / "tools/harness-evidence")
     shutil.copy2(TOOLS / "hq", root / "tools/hq")
+    shutil.copytree(TOOLS / "fixtures/harness-evidence", root / "tools/fixtures/harness-evidence")
     shutil.copytree(FIXTURES, root / "tools/fixtures/session-logs")
     (root / ".gitignore").write_text("__pycache__/\n")
     env = environment(tmp_path)
@@ -115,27 +116,48 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
     artifact = json.loads(ARTIFACT.read_bytes())
     catalogue = (FIXTURES / "CATALOGUE.toml").read_bytes()
     samples = tomllib.loads(catalogue.decode())["sample"]
+    index_root = TOOLS / "fixtures/harness-evidence"
+    index_samples = tomllib.loads((index_root / "CATALOGUE.toml").read_text())["sample"]
     assert set(artifact) == {"schema", "decoder_version", "built_from", "evidence_rule", "harnesses"}
     assert artifact["built_from"] == {
         "catalogue_sha256": hashlib.sha256(catalogue).hexdigest(),
+        "index_catalogue_sha256": hashlib.sha256((TOOLS / "fixtures/harness-evidence/CATALOGUE.toml").read_bytes()).hexdigest(),
+        "index_samples": {s["path"]: hashlib.sha256((index_root / s["path"]).read_bytes()).hexdigest() for s in index_samples},
         "samples": {s["path"]: hashlib.sha256((FIXTURES / s["path"]).read_bytes()).hexdigest()
                     for s in samples},
     }
     assert len(samples) == 244
-    assert sorted(artifact["harnesses"]) == ["agy", "claude-code", "codex", "pi"]
+    assert set(artifact["harnesses"]) == set(homes.SLUG.values())
+    default_roots = {
+        "claude-code": [".claude/projects", ".claude-work/projects"],
+        "codex": [".codex/sessions", ".codex/archived_sessions",
+                  ".codex-work/sessions", ".codex-work/archived_sessions"],
+        "agy": [".gemini/antigravity-cli/brain"],
+        "pi": [".pi/agent/sessions"],
+    }
     for slug, harness in artifact["harnesses"].items():
-        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header"} | (
-            {"index"} if slug == "claude-code" else {"index", "side_inputs"} if slug in ("agy", "pi") else set())
+        assert harness.get("discovery") == {"default_roots": default_roots[slug]}, slug
+        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions",
+                                "header", "index", "discovery"} | (
+            {"side_inputs"} if slug in ("agy", "pi") else set())
         assert harness["exceptions"] == []
-        assert harness["header"] == ({"implemented": True, "line_limit": 50} if slug in ("claude-code", "agy", "pi")
-                                      else {"implemented": False})
+        assert harness["header"] == {"implemented": True, "line_limit": 50}
         if slug == "codex":
-            assert all(f["coverage_keys"] == [] for f in harness["fields"].values())
+            assert harness["fields"]["response.usage.input_uncached"]["coverage_keys"] == [
+                "applied:usage/input:input_tokens", "applied:usage/input:cached_input_tokens"]
+            assert harness["index"]["features"]["stateful_execution"] is True
         elif slug == "agy":  # Index declarations only: agy has no reader decode.
+            assert harness["side_inputs"] == index_agy.SIDE_INPUTS
+            assert set(harness["side_inputs"]) == {"agy_conversation_summaries"}
             assert harness["record_kinds"] == [] and harness["labels"] == {}
             assert harness["fields"]["results[].exit_code"]["coverage_keys"] == ["applied:exit_line/input:exit_code"]
             assert harness["index"]["mode"] == "incremental" and harness["index"]["resume"]
         elif slug == "pi":
+            assert harness["side_inputs"] == index_pi.SIDE_INPUTS
+            assert set(harness["side_inputs"]) == {"pi_parent_sessions"}
+            observed = harness["versions"]["unknown"]
+            assert observed["observed"] == ["pi/sanitized-observed.jsonl"]
+            assert "response.usage.output" in observed["fields_seen"]["observed"]
             assert harness["index"]["absent"]["response.usage.thinking"] == "not_recorded"
             assert harness["index"]["absent"]["response.usage.cache_write"] == "not_recorded"
             assert harness["index"]["mode"] == "incremental" and harness["index"]["resume"]
@@ -148,11 +170,14 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
         for version, value in harness["versions"].items():
             assert set(value) == {"synthetic", "observed", "fields_seen"}
             for provenance in ("synthetic", "observed"):
-                assert value[provenance] == sorted(s["path"] for s in samples
-                    if s["harness"] == slug and s["version"] == version and s["provenance"] == provenance)
+                expected = [s["path"] for s in samples
+                            if s["harness"] == slug and s["version"] == version and s["provenance"] == provenance]
+                expected += ["index:" + s["path"] for s in index_samples
+                             if s["harness"] == slug and s["version"] == version and s["provenance"] == provenance]
+                assert value[provenance] == sorted(expected)
                 if not value[provenance]:
                     assert value["fields_seen"][provenance] == []
-    assert set(artifact["harnesses"]["codex"]["versions"]) == {"0.163.0", "0.164.0", "unknown"}
+    assert set(artifact["harnesses"]["codex"]["versions"]) == {"0.156.1", "0.163.0", "0.164.0", "unknown"}
     assert ARTIFACT.read_text() == json.dumps(artifact, sort_keys=True, indent=1) + "\n"
 
 
@@ -182,21 +207,29 @@ def test_every_declared_native_path_occurs_in_its_harness_samples():
                     continue
                 if isinstance(value, dict):
                     native.append(value)
+        index_root = TOOLS / "fixtures/harness-evidence"
+        for sample in tomllib.loads((index_root / "CATALOGUE.toml").read_text())["sample"]:
+            if sample["harness"] == slug:
+                native += [json.loads(line) for line in (index_root / sample["path"]).read_bytes().splitlines()]
         for field, paths in fields.items():
+            if (slug, field) == ("codex", "filename_identity.index_thread"):
+                assert paths == []  # A filename convention, never native record evidence.
+                continue
             if not paths:  # A declared absence, or a convention from the path, reads no native field.
                 from harness_evidence.index_adapters import ADAPTERS
                 proof = ADAPTERS[slug].provenance_defaults()[field]
                 assert proof["rule"].startswith("absent:") or proof["basis"] == "convention", (slug, field)
             for path in paths:
-                if (slug, field, path) == ("claude-code", "header.cwd", "payload.cwd"):
+                if (slug, field, path) in (("claude-code", "header.cwd", "payload.cwd"),
+                                           ("codex", "header.cwd", "cwd")):
                     # An old selector-policy branch, not a Claude emission claim.
                     # Its unchanged Codex sample bytes exercise a Claude-placed header.
                     from harness_evidence import header
-                    sample = FIXTURES / path_of("XA")
+                    sample = FIXTURES / (path_of("XA") if slug == "claude-code" else "index/sizes.jsonl")
                     info = sample.stat()
                     request = {"id": 1, "files": [{"path": str(sample), "size": info.st_size,
                                "identity": {"device": info.st_dev, "inode": info.st_ino}}],
-                               "roots": [{"harness": "claude-code", "path": str(FIXTURES)}]}
+                               "roots": [{"harness": slug, "path": str(FIXTURES)}]}
                     out, err = io.StringIO(), io.StringIO()
                     assert header.run(io.StringIO(json.dumps(request) + "\n"), out, err,
                                       {"schema": "harness-evidence/1", "decoder": {"revision": "test"}}) == 0
@@ -294,6 +327,8 @@ def test_sidecars_and_uncatalogued_siblings_do_not_affect_build(tmp_path, monkey
     assert build_in(root, env) == before
     catalogue = FIXTURES / "CATALOGUE.toml"
     allowed = {catalogue, *(FIXTURES / s["path"] for s in tomllib.loads(catalogue.read_text())["sample"])}
+    index_catalogue = TOOLS / "fixtures/harness-evidence/CATALOGUE.toml"
+    allowed.update({index_catalogue, *(index_catalogue.parent / s["path"] for s in tomllib.loads(index_catalogue.read_text())["sample"])})
     read_bytes = Path.read_bytes
 
     def catalogued_bytes(path):
@@ -305,7 +340,7 @@ def test_sidecars_and_uncatalogued_siblings_do_not_affect_build(tmp_path, monkey
 
     monkeypatch.setattr(Path, "read_bytes", catalogued_bytes)
     monkeypatch.setattr(Path, "glob", no_discovery)
-    assert build(catalogue) == json.loads(before)
+    assert build(catalogue, index_catalogue=index_catalogue) == json.loads(before)
 
 
 def test_nontext_content_does_not_establish_text_or_marker_fields(tmp_path):
@@ -381,3 +416,53 @@ def test_missing_artifact_fails_instead_of_building_from_fixtures(tmp_path):
     result = command(root, env, "capabilities", "--json")
     assert result.returncode == 2 and "capabilities" in result.stderr
     assert result.stdout == ""
+
+
+def test_execution_support_is_distinct_from_synthetic_versioned_evidence():
+    from harness_evidence.capabilities import build
+    evidence = build(FIXTURES / "CATALOGUE.toml",
+                     index_catalogue=TOOLS / "fixtures/harness-evidence/CATALOGUE.toml")
+    for version in evidence["harnesses"]["claude-code"]["versions"].values():
+        assert "execution" not in version["fields_seen"]["synthetic"]
+    codex = evidence["harnesses"]["codex"]
+    assert codex["index"]["features"]["stateful_execution"] is True
+    assert "execution.runs" in codex["versions"]["unknown"]["fields_seen"]["synthetic"]
+    assert all(not v["fields_seen"]["observed"] for v in codex["versions"].values())
+
+
+def test_codex_question_and_execution_poll_kind_declarations():
+    kinds = json.loads(ARTIFACT.read_text())['harnesses']['codex']['index']['tool_kinds']
+    assert {name:kinds.get(name) for name in ('request_user_input','exec','wait','write_stdin','wait_agent')} == {
+        'request_user_input':'question','exec':'script','wait':'poll','write_stdin':'poll','wait_agent':'other'}
+
+
+def test_codex_selection_and_metric_dependencies_are_declared():
+    view = json.loads(ARTIFACT.read_text())['harnesses']
+    assert view['codex']['header'] == {'implemented':True, 'line_limit':50}
+    assert view['codex']['discovery']['default_roots'] == [
+        '.codex/sessions', '.codex/archived_sessions', '.codex-work/sessions', '.codex-work/archived_sessions']
+    assert view['agy']['discovery']['default_roots'] == ['.gemini/antigravity-cli/brain']
+    fields = view['codex']['fields']
+    expected = {'results[].bytes':['applied:tool_output/input:output'],
+                'results[].call_id':['applied:tool_output/input:call_id'],
+                'results[].error':['applied:tool_output/input:output'],
+                'execution.call_updates[].error':['applied:command_item/input:exit_code'],
+                'calls[].skills':['applied:tool_call/input:value']}
+    for field, keys in expected.items():
+        assert fields[field]['coverage_keys'] == keys
+    assert fields['filename_identity.index_thread']['provenance'] == []
+
+
+def test_execution_origins_follow_native_envelope_grammar():
+    from harness_evidence import index_codex_runs
+    declared = json.loads(ARTIFACT.read_text())['harnesses']['codex']['index']
+    assert declared['execution_origin_tools'] == ['exec', 'exec_command', 'shell_command']
+    assert declared['tool_kinds']['exec'] == 'script'
+    assert declared['tool_kinds']['shell'] == 'shell'
+    # This declaration describes origins, not polling/resumption or every shell tool.
+    for name in ('exec', 'exec_command', 'shell_command', 'shell', 'wait', 'write_stdin'):
+        state = {}
+        value = 'tools.exec_command({"cmd":"true"})' if name == 'exec' else '{}'
+        index_codex_runs.on_call(state, 's', 'call', name, value, 1)
+        origin = state['run_calls'].get('call', {}).get('kind') in ('exec', 'command')
+        assert origin == (name in declared['execution_origin_tools'])

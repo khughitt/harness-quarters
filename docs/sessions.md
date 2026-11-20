@@ -199,16 +199,14 @@ replay, while request ids and decoder revision changes alone do not.
 Records themselves retain native numeric block order, including when a line has
 ten or more blocks.
 
-## Cheap Claude, agy and Pi headers
+## Cheap transcript headers
 
 `tools/harness-evidence header` accepts one JSON request per stdin line with
 `id`, `files` and explicit `roots`. Files use the same logical `path`, optional
-`read_path`, fixed `size` and `identity:{device,inode}` as index decoding. Claude,
-agy or Pi roots must contain every logical path; Codex headers are explicitly
-unsupported ("no index adapter for codex"). No default roots or guessed harness are
-used. The capability view marks Claude, agy and Pi headers implemented (50 lines) and
-Codex headers unimplemented; this declares implementation, not evidence that a
-harness version emits a field.
+`read_path`, fixed `size` and `identity:{device,inode}` as index decoding. An
+explicit Claude, Codex, agy or Pi root must contain each logical path. The
+capability view reports header support with a general 50-line bound. Each adapter
+applies its own selection rule within that bound.
 
 An agy header is `{session, start_ms, cwd, parent, subagent}`: `session` is the
 conversation id from the brain directory (basis convention), `start_ms` the first
@@ -224,7 +222,7 @@ invalid native types carry non-ok source statuses and error details, never a
 successful empty header. Consumers validate the complete ordered batch before
 using any selection result.
 
-Selection preserves the old first-50-physical-line policy, including LF, CRLF and
+Claude and Codex selection preserves the old first-50-physical-line policy, including LF, CRLF and
 CR newlines, replacement of invalid UTF-8 and skipping malformed JSON lines.
 The first truthy top-level CWD stops the scan immediately; `session_meta` also
 stops at its payload CWD even when false or absent. Valid unterminated final JSON
@@ -237,9 +235,10 @@ reader. It has no resumable checkpoint or index extraction side effects.
 
 ## Native index extraction
 
-The opt-in `extract: "index"` request emits Claude, agy and Pi native evidence. Each
-harness has an index adapter, looked up by the file's harness (`no index adapter for
-<harness>` otherwise); Codex has none yet. Include each file's `identity: {"device": ..., "inode": ...}`, keep
+The opt-in `extract: "index"` request selects Claude, Codex, agy or Pi native
+evidence through the adapter registered for the declared harness and place.
+Codex supplies terminal usage and stateful native execution facts. Include each
+file's `identity: {"device": ..., "inode": ...}`, keep
 `cross_file` and `raw` false, and omit `context`. Pass a saved index `state` whole:
 `next_line`, `next_offset` and `digest` describe the complete raw prefix, while
 `index` is opaque. The held descriptor must match the supplied identity and fixed
@@ -290,6 +289,64 @@ sizes. Joined user text preserves empty placeholders for missing text keys. Nati
 the exact nonempty native file/notebook path; `paths` separately carries lexical
 normalization against cwd, and `paths_complete` records missing or rejected inputs.
 
+Codex version 19 emits terminal usage responses (`response.phase:"terminal"`),
+independent messages, direct call inputs and context updates. Context observations
+can be untimed. Claude response fragments carry `phase:"fragment"`, `context:null`
+and empty `execution` collections and diagnostic counters. Codex terminal
+`usage_present` has all seven normalized usage keys. Missing direct counters remain
+null; input-minus-cached arithmetic defaults absent operands to zero and still
+rejects explicit null operands. A later record-usage source after count usage
+requests a seeded restart. Discarded count usage contributes no applied population.
+Native counters stay unchanged in `response.native`. Codex function results carry
+`exit_code: null` (`absent:not_decoded`), as Claude's do; a command's exit stays on its
+execution facts.
+
+Codex patch header paths stay in `patch_paths`; lexical candidate `paths` normalize
+separately. Direct shell calls expose ordered `commands` and directories. Commands
+are strings or null; string lists join with spaces, and other malformed values fail.
+The original adapter's accepted empty command object normalizes to empty text with
+the named convention `codex_empty_command_object`, retaining the original input and
+byte size. Code-mode calls have kind `script`, including scripts containing patch
+operations; direct patch calls have kind `patch`. Native request_user_input has
+kind `question` for the consumer's Codex count-only policy. Only execution wait and
+write_stdin have kind `poll`; wait_agent remains `other`, preserving its eligibility
+for the original recent-call cache. Ordered `operations` distinguish
+launches and polls, with null for scripts that cannot be paired and an empty list
+for plain scripts without operations. Commands, input text and operation commands
+require `text:true`. Skill names carry heuristic provenance. Native collaboration
+calls use kind `dispatch` and `prompt` from a nonempty native `message` string;
+a native `prompt` key alone supplies no candidate message.
+
+`execution` publishes run intervals, command outcomes, call updates, write outcomes,
+operation statuses and cumulative diagnostics. Stable native ids and operation indices
+allow later facts to replace provisional facts without replaying physical events.
+Poll results retain their own status; an awaited command's failure updates its
+originating run. Pending checkpoints keep association summaries and the original
+256-entry recent bounds where applicable, never command, input or output text.
+Pending identity maps and past launches retain the source algorithm's uncapped
+semantics so late evidence can still join. Shell roles, task ids, review judgments
+and lifecycle interpretation remain consumer policy.
+
+Every terminal response includes the current context snapshot: remembered context
+window for record usage, that token-count record's local window (possibly null) for
+count usage. The default context-window proof has `source:context_window_snapshot`
+and rule `codex_context_context_window`; a non-null token-count observation overrides
+these with `context_window_observation` and `codex_recorded_context_window`.
+Consumers use the checked sparse source to apply their recent-turn replacement once.
+An inherited turn-context snapshot, null count info or a missing/null window does not
+trigger replacement.
+
+Codex `file_end.metadata` has `identity`, `usage_source`, `run_diagnostics` and
+`command_diagnostics`. Identity includes thread id, ancestors and conflicts. Maps
+remain null until initialized; usage source is `none`, `count` or `record`. Restart
+and unavailable sources publish null metadata. These are cumulative facts scoped
+by the held file and decoder revision, with leaf native paths and named cumulative
+rules in profile provenance defaults. They are committed only after validated file
+and request terminals; a late decode fault never publishes partial terminal state.
+Claude, agy and Pi publish null metadata. The index-only catalogue
+and original-case inventory live under `tools/fixtures/harness-evidence/`; they do
+not add reader-role requirements to the ordinary reader catalogue.
+
 Question prompts, result answers and native duration metadata retain their finite
 JSON values. Consumers apply their hashing/matching/scoring rules at the original
 use site; a native decode success can still precede a consumer-policy failure.
@@ -297,7 +354,7 @@ Native duration metadata describes presence and is separate from timestamp delta
 The conformance corpus records native and consumer outcomes separately for these
 cases, including old partial row/session/coverage evidence on consumer failure.
 
-`response.usage_present` contains `output` and `thinking` booleans for native key
+For Claude fragments, `response.usage_present` contains `output` and `thinking` booleans for native key
 presence, including explicit null. Consumers preserving old storage defaults use 0
 only when the flag is false and copy a present `usage.output` or `usage.thinking`
 unchanged. These two fields preserve opaque native JSON storage values, including
@@ -354,7 +411,35 @@ A Claude compaction appears on up to three events that share `compaction.id`, th
 records no reason, even when its trigger is `auto`. Other informational notices are
 not compactions. agy checkpoints keep `{summary, basis, rule}`.
 
+Codex events, and only Codex events, carry the evidence a consumer needs to classify a
+compaction; the decoder does not classify it:
+
+- `identity.own` (basis `convention`): the event's session is the file's first
+  `session_meta` id, computed after that record's own identity, so the first
+  `session_meta` is own and inherited parent sessions are not.
+- `turn`: `{id, start:true}` on `event_msg` `task_started` and `turn_started`,
+  `{id, start:false}` on `turn_context`, null otherwise; `id` is the native `turn_id`.
+  `turn_started` stays an unknown record kind in `record_counts`.
+- `occupancy`: `{input_tokens, context_window}` on every `token_count` with `info`,
+  from `info.last_token_usage.input_tokens` and `info.model_context_window`, whatever the
+  usage source and whether or not the window is null.
+- A `compacted` record's `compaction` adds `id` (native `compaction_response_id`, a
+  string or null; another type stops the decode request with a `TypeError`), `trigger`
+  and `reason` (null, `absent:not_recorded`) and `usage_record`: null unless
+  `latest_token_usage_record` is an object, else `{turn_id, response_id, input_tokens,
+  model}` from that record and `resume_metadata.previous_turn_settings.model`. A
+  `resume_metadata`, `previous_turn_settings` or usage `usage` that is present but not
+  an object also stops the request.
+
+Turn ids, token counts and windows pass through unrepaired, as JSON scalars. These reads
+are unwatched dimensions, so `field_presence` and `record_counts` are unchanged.
+
 ### agy index events
+
+The agy index profile shares Claude's complete provenance field set. Its shared
+context is null and its execution collections are empty, declared unrecorded;
+ordinary step responses carry the convention phase `fragment`. These constants
+add no native extraction, execution associations or coverage counts.
 
 The index capability `harnesses.agy.index.origin_kinds` classifies native user-channel
 origins: `USER_EXPLICIT` maps to `{class: "user_typed", basis: "native"}`. All other
@@ -420,8 +505,9 @@ not absent.
 Discovery includes `~/.pi/agent/sessions`. Give `--root pi=PATH` (or a
 `{harness: "pi", path: PATH}` request root) for a different or isolated store.
 Explicit roots replace the defaults. Pi-durable stores and the transcript reader
-profile are outside this adapter. The Pi header reads the first complete v3
-session header and reports its recorded session ID, start timestamp and cwd.
+profile are outside this adapter. The Pi header uses only the first physical
+line, which must be complete and contain a v3 session record. It reports the
+recorded session ID, start timestamp and cwd.
 
 The index walks physical entries, including abandoned branches. The normalized
 response ID combines the owning session and native entry ID. For forked history,
@@ -435,6 +521,9 @@ Discovery and index frames publish the `pi_parent_sessions` side-input
 fingerprint. A changed ancestor snapshot invalidates resume even when the
 child bytes stay fixed. Partial tails are provisional and a changed source
 prefix restarts under the shared protocol.
+
+Pi index events omit `context` and `execution`. Pi responses omit `phase`, and
+the shared `file_end` envelope carries `metadata: null`.
 
 Assistant usage, separate usage entries, compactions and branch summaries
 contribute recorded usage. The decoder prefers a recorded served model and uses

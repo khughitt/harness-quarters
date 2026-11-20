@@ -61,7 +61,9 @@ decoder's version and revision. Both read only the package's committed
 Rebuild it explicitly with `tools/harness-evidence capabilities --build` in an hq
 checkout after changing decoder behavior, declarations, or catalogued samples.
 The artifact hashes `tools/fixtures/session-logs/CATALOGUE.toml` and every listed
-sample. Builds read no metadata sidecars or uncatalogued sibling transcripts.
+sample, plus the separate index-only catalogue and its samples under
+`tools/fixtures/harness-evidence/`. Index-only controls establish native index
+facts without requiring reader role labels. Builds read no metadata sidecars or uncatalogued sibling transcripts.
 
 The `fields` map names decoded paths (`header.*` and `links[].*` for session
 evidence); each `provenance` list names native JSON paths, where `[]` visits array
@@ -69,16 +71,32 @@ items. `fields_seen` requires a decoded value and native source evidence, exclud
 nulls, empty evidence containers, and defaults with no source. Explicit false and
 zero values can be evidence. Record kinds and role-label bases are listed separately.
 Synthetic samples establish decoder conformance; observed samples or probes establish
-emission. The current catalogue is entirely synthetic, and its known modeled format
-versions do not establish observed emission. An unspecified or unlisted version is
-untested; an absent field is unobserved. Native index field provenance and coverage declarations are published separately
-from reader declarations; their presence does not establish observed harness emission.
+emission. The catalogue includes synthetic fixtures and the sanitized observed Pi
+sample `pi/sanitized-observed.jsonl`, whose harness version is unknown. Synthetic
+fixtures establish no emission claims for their modeled versions. An unspecified or
+unlisted version is untested, and an absent field is unobserved. Native index field
+provenance and coverage declarations are published separately from reader declarations.
 The agy block has no reader fields (agy has no reader decode): its `fields` are its
 index declarations, its `index.absent` names each field agy declares absent with the
 reason, and `side_inputs.agy_conversation_summaries` declares the summaries database
 the agy path facts read (path relative to the agy home, table, key, columns, open mode
 and fingerprint rule). A consumer that caches decoded agy files must treat that
-fingerprint as part of each file's identity.
+fingerprint as part of each file's identity. Pi's
+`side_inputs.pi_parent_sessions` declares the ancestry fingerprint over complete-line
+ancestor snapshots and their resolution status.
+
+All four harnesses publish `header` support with a general fifty-physical-line
+bound. Claude and Codex CWD selection stops at the first truthy top-level CWD or
+session metadata record, including an empty metadata CWD. Optional identity from
+that scan does not replace the ordinary reader's independent identity window. agy
+takes the first timezone-aware `created_at` within the bound and reads CWD from
+the summaries database. Pi's v3 header uses the first physical line and requires
+it to be complete. `discovery.default_roots` lists home-relative store locations for
+Claude Code, Codex, agy and Pi, including Pi's `.pi/agent/sessions`. Consumers can
+apply their overrides before enumeration. Codex filename identity includes the
+ordinary thread/segment claim and
+`index_thread`, the stricter lowercase rollout claim used by index readiness;
+these convention facts remain available even when source bytes are missing.
 
 ## Fact schema and lookup
 
@@ -165,3 +183,9 @@ do not authorize that spend. MCP protocol revisions require
 checking the pinned client construction too; the probe server's acceptance alone
 does not establish the requested revision. Changes to the external analyst
 runtime/tool epoch need their owning project's requalification independently.
+
+For a stateful execution profile, `index.execution_origin_tools` names native call
+identities that originate execution envelopes. It is derived from the same grammar
+constants used by the run parser. Poll/resume tools and generic shell-like tools are
+not origins merely because of their kind; `tool_kinds` keeps that separate fact.
+Consumers choose their measurement population from these declarations.

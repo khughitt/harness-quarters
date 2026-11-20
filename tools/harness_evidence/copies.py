@@ -8,8 +8,8 @@ import itertools
 from pathlib import PurePosixPath
 import re
 
-from harness_evidence.lines import Place, ref
-from harness_evidence.records import FileRead, pair_calls
+from .lines import Place, ref
+from .records import FileRead, pair_calls
 
 _KNOWN = frozenset({"resume_history", "duplicate_file"})
 _UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"

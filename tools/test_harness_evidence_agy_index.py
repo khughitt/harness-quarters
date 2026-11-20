@@ -92,6 +92,8 @@ def test_every_step_is_one_event_with_shared_position_and_identity(store):
                                      "subagent": False, "cwd": "/w/alpha", "entrypoint": "agy", "version": None}
         assert event["eligible"] and event["at_ms"] is not None
         assert event["turn_end"] is None and event["fork_boundary"] is None
+        # Codex's turn, occupancy and compaction usage-record facts are absent from agy events.
+        assert not {"turn", "occupancy"} & event.keys() and event["compaction"] is None
         offset += len(raw)
 
 
@@ -117,6 +119,7 @@ def test_planner_steps_are_complete_responses_with_agy_usage(store):
         "id": f"{H}:1", "model": "gemini-3-pro-high", "effort": None,
         "usage": {"input_uncached": 120, "cache_read": 4000, "cache_write": None, "output": 55,
                   "thinking": None, "context_total": 4120, "uncached_total": 120},
+        "phase": "fragment",
         "usage_present": {"output": True, "thinking": False},  # presence flags are booleans
         "native": {"input_tokens": 120, "cache_read_tokens": 4000, "output_tokens": 55,
                    "thinking_text_bytes": len("Plan: list, read, edit.")}}
@@ -583,6 +586,59 @@ def test_an_ineligible_planner_step_closes_the_earlier_calls(store):
     events_ = extracted(store, [first, generic, second, late])
     assert events_[1]["results"][0]["call_id"] == f"{H}:1:0"
     assert events_[3]["results"] == []  # the ineligible planner's calls are unknown; nothing is paired
+
+
+def test_shared_index_additions_are_constant_and_declared(stores):
+    from harness_evidence.index_adapters import ADAPTERS
+    defaults = ADAPTERS["agy"].provenance_defaults()
+    for field in ("context", "execution"):
+        assert defaults[field] == {"native_paths": [], "coverage_keys": [],
+                                   "basis": "native", "rule": "absent:not_recorded"}
+    assert defaults["response.phase"] == {"native_paths": [], "coverage_keys": [],
+                                          "basis": "convention", "rule": "agy_response_phase"}
+    for group, conversation in SAMPLES:
+        for event in events(decode(stores[group], conversation)):
+            assert event["context"] is None
+            assert event["execution"] == {"runs": [], "commands": [], "call_updates": [],
+                                          "writes": [], "operations": [], "diagnostics": {}}
+            if event["response"] is not None:
+                assert event["response"]["phase"] == "fragment"
+            assert not {"context", "execution", "response.phase"} & event["provenance"].keys()
+
+
+def test_shared_additions_preserve_original_native_coverage(stores):
+    # Captured from the exact index_agy.py at 57f5690c before shared constants were added.
+    expected = {
+        "a9000000-0000-4000-8000-0000000000a1": "e29f562bb2e2491cf44bcc94e194dababd7d08af2e4440b904996d9b0b4aacba",
+        "a9000000-0000-4000-8000-0000000000b1": "29ae50861632bb71c66c53c906a930152cb296ca9980a11544f4851434871dc8",
+        "a9000000-0000-4000-8000-0000000000c1": "0da31e88697d74a964f4be5b98b492b046ae6166295ce874f506f2dd36413e58",
+        "b9000000-0000-4000-8000-000000000001": "513deda388119c7b4a149c59921306e3df912be718441e059c74fe579ad4bc58",
+        "b9000000-0000-4000-8000-000000000002": "dfcfaa71e4663f239fd4c4d43ee4049f4edcc8365b3ca05818a9ced03b06cc37",
+        "b9000000-0000-4000-8000-000000000003": "0d99b7830b498a449526da0ff27cf0e29a0d2c75c0618030093a8d714c2360f6",
+        "b9000000-0000-4000-8000-000000000004": "ca0259629661b55bbc77b21bb5523b4e7ee482417595b437feb7c65f18681c21"
+    }
+    for group, conversation in SAMPLES:
+        coverage = next(v for v in decode(stores[group], conversation) if v["object"] == "coverage")
+        native = {key: coverage[key] for key in ("records", "fields", "malformed", "partial_tail")}
+        digest = hashlib.sha256(json.dumps(native, sort_keys=True, separators=(",", ":"),
+                                           ensure_ascii=True).encode()).hexdigest()
+        assert digest == expected[conversation]
+
+
+def test_shared_additions_preserve_original_agy_capability_block():
+    from harness_evidence import capabilities
+    agy = json.loads(capabilities.ARTIFACT.read_text())["harnesses"]["agy"]
+    for field in ("context", "execution", "response.phase"):
+        assert agy["fields"].pop(field) == {"coverage_keys": [], "provenance": []}
+    for field in ("context", "execution"):
+        assert agy["index"]["absent"].pop(field) == "not_recorded"
+    from harness_evidence import index_agy
+    assert agy["index"].pop("origin_kinds") == index_agy.ORIGIN_KINDS  # main e8f16150's checked addition
+    assert agy.pop("discovery") == {"default_roots": [".gemini/antigravity-cli/brain"]}
+    # Entire immutable main57f5690c agy capability block, without only checked additions.
+    digest = hashlib.sha256(json.dumps(agy, sort_keys=True, separators=(",", ":"),
+                                       ensure_ascii=True).encode()).hexdigest()
+    assert digest == "6814b8cb5ede33ebe0069b8a7c8d66882c9467a863c03be6cd57af30e0f9a16b"
 
 
 def test_user_channel_origin_classification_is_published_and_unknown_kinds_stay_unclassified(store):

@@ -123,7 +123,7 @@ def test_header_wrong_identity_and_missing_terminal_fail(tmp_path):
     status, rows, err = run(wrong, roots=roots)
     assert status == 2 and "identity" in err and not rows
     status, rows, err = run(source(path), roots=[{"harness": "codex", "path": str(tmp_path)}])
-    assert status == 2 and "no index adapter for codex" in err and not rows
+    assert status == 0 and not err and rows[0]["header"]["cwd"] == "/w/project"
     from harness_evidence import header
     for request in [{"id": 1, "files": [source(path)]},
                     {"id": 1, "files": [source(path), source(path)], "roots": roots},
@@ -237,3 +237,33 @@ def test_discovered_directory_fails_header_and_both_decode_profiles(tmp_path, ar
         assert values[-1]["object"] == "request_end" and values[-1]["files"] == 1
         if profile == "index":
             assert end["state"] is None and end["restart"] is None
+
+
+def test_codex_header_keeps_project_window_and_precedence(tmp_path):
+    roots = [{"harness": "codex", "path": str(tmp_path)}]
+    meta = b'{"type":"session_meta","timestamp":"2026-11-11T23:59:00Z","payload":{"id":"own","cwd":"/native","cli_version":"0.test"}}\n'
+    cases = [(b'bad\n' * 49 + meta, '/native', 'own'),
+             (b'bad\n' * 50 + meta, None, None),
+             (b'{"cwd":"/first"}\n' + meta, '/first', None),
+             (b'{"type":"session_meta","payload":{}}\n' + meta, None, None),
+             (b'{"cwd":"/top","type":"session_meta","payload":{"id":"own","cwd":"/payload"}}\n', '/top', 'own')]
+    for n, (data, cwd, session) in enumerate(cases):
+        path = tmp_path / f'{n}.jsonl'
+        path.write_bytes(data)
+        status, rows, err = run(source(path), roots=roots)
+        assert status == 0 and not err
+        assert rows[0]['status'] == 'ok'
+        assert rows[0]['header']['cwd'] == cwd == old_peek_cwd(path)
+        assert rows[0]['header']['session'] == session
+    physical = tmp_path / 'copy'
+    physical.write_bytes(meta)
+    logical = tmp_path / 'missing.jsonl'
+    descriptor = source(physical, logical=logical)
+    status, rows, err = run(descriptor, roots=roots)
+    assert status == 0 and not err
+    assert rows[0]['header'] == {'session':'own', 'cwd':'/native', 'start_ms':1794441540000}
+    assert rows[0]['provenance']['session']['native_paths'] == ['payload.id']
+    assert rows[0]['provenance']['session']['ref'].endswith('missing.jsonl#L1')
+    physical.unlink()
+    status, rows, err = run(descriptor, roots=roots)
+    assert status == 0 and not err and rows[0]['status'] == 'vanished'

@@ -133,7 +133,7 @@ def _file(source, number, roots, request, envelope):
         yield {**base, "object": "coverage", "key": "coverage", "records": [], "fields": [],
                "malformed": 0, "partial_tail": False}
         yield {**base, "object": "file_end", "key": "end", "count": 1, "offset": 0,
-               "state": None, "restart": None,
+               "state": None, "restart": None, "metadata": None,
                "status": "vanished" if isinstance(error, FileNotFoundError) else "unreadable"}
         return
     with handle:
@@ -184,9 +184,10 @@ def _file(source, number, roots, request, envelope):
             restart = {"reason": signal.reason,
                        "seed": _checkpoint(seed, hashlib.sha256(b"").hexdigest(), binding, seed=True)}
         offset = state["next_offset"]
+        metadata = adapter.metadata(state) if not restart and hasattr(adapter, "metadata") else None
         checkpoint = None if restart else _checkpoint(state, digest.hexdigest(), binding)
         yield {**base, "object": "file_end", "key": "end", "status": "ok", "restart": restart,
-               "offset": offset, "state": checkpoint, "count": count}
+               "offset": offset, "state": checkpoint, "count": count, "metadata": metadata}
 
 
 def objects(request: dict, envelope: dict):

@@ -836,6 +836,26 @@ def oracle_hash(value):
                                      ensure_ascii=True, allow_nan=False).encode()).hexdigest()
 
 
+ADDITIVE_CLAUDE_FIELDS = {"context", "execution", "response.phase"}
+
+
+def old_claude_defaults(defaults):
+    # Check each new declaration before projecting onto the immutable old oracle.
+    assert set(defaults) == set(PROVENANCE_ORACLE["declarations"]) | ADDITIVE_CLAUDE_FIELDS
+    for field in ADDITIVE_CLAUDE_FIELDS:
+        assert defaults[field] == {"native_paths": ["type"], "coverage_keys": [],
+                                   "basis": "convention", "rule": "claude_" + field.replace(".", "_")}
+    return {field: proof for field, proof in defaults.items() if field not in ADDITIVE_CLAUDE_FIELDS}
+
+
+def check_claude_additions(event):
+    assert event["context"] is None
+    assert event["execution"] == {"runs": [], "commands": [], "call_updates": [],
+                                  "writes": [], "operations": [], "diagnostics": {}}
+    if event["response"] is not None:
+        assert event["response"]["phase"] == "fragment"
+
+
 # Shared stream additions made after the frozen oracle (spec rev 2 §4.4). Claude emits
 # `results[].exit_code` as null and declares it absent, so the oracle compares without it.
 POST_ORACLE_DECLARATIONS = {"results[].exit_code": {
@@ -883,7 +903,15 @@ def oracle_rows(rows, defaults):
     for value in rows:
         ordinary = pre_oracle_row(value)
         if ordinary["object"] == "index_event":
+            check_claude_additions(ordinary)
             proof = expand_proofs(ordinary, defaults)
+            for field in ADDITIVE_CLAUDE_FIELDS:
+                assert proof[field] == {**defaults[field], "ref": ordinary["ref"], "revision": ordinary["decoder"]["revision"]}
+                proof.pop(field)
+            ordinary.pop("context")
+            ordinary.pop("execution")
+            if ordinary["response"] is not None:
+                ordinary["response"].pop("phase")
             ordinary.pop("provenance")
         else:
             proof = None
@@ -911,7 +939,7 @@ def oracle_native_case(case):
     path = FIXTURES / case["fixture"]
     assert hashlib.sha256(path.read_bytes()).hexdigest() == PROVENANCE_ORACLE["fixtures"][case["fixture"]]
     defaults = index_events.provenance_defaults()
-    assert pre_oracle_defaults(defaults) == PROVENANCE_ORACLE["declarations"]
+    assert old_claude_defaults(pre_oracle_defaults(defaults)) == PROVENANCE_ORACLE["declarations"]
     place = discover.place_of(Path(case["logical"]), discover.roots(
         explicit=[("claude-code", Path("/oracle/.claude/projects"))]))
     state = {}
@@ -978,6 +1006,9 @@ def test_claude_compaction_reasons_pair_boundary_summary_and_idle_notice(tmp_pat
     assert next(row for row in rows if row["line"] == 18)["compaction"] is None
     proof = next(row for row in rows if row["line"] == 8)["provenance"]["compaction"]
     assert proof["native_paths"] == COMPACTION_PATHS and proof["basis"] == "native"
+    # Codex's turn, occupancy, own-session and usage-record facts are absent from Claude events.
+    assert not any({"turn", "occupancy"} & row.keys() or "own" in row["identity"]
+                   or "usage_record" in (row["compaction"] or {}) for row in rows)
 
 
 @pytest.mark.parametrize("cut", range(1, 22))

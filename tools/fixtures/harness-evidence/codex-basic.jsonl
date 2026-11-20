@@ -1,0 +1,11 @@
+{"timestamp": "2026-09-04T09:38:28.000Z", "type": "session_meta", "payload": {"id": "c1", "cwd": "/checkout", "originator": "codex-tui", "thread_source": "user", "base_instructions": {"text": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"}}}
+{"timestamp": "2026-09-04T09:38:28.000Z", "type": "turn_context", "payload": {"model": "gpt-5.6-sol", "effort": "high", "cwd": "/checkout"}}
+{"timestamp": "2026-09-04T09:38:28.000Z", "type": "response_item", "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "please do x"}]}}
+{"timestamp": "2026-09-04T09:38:28.000Z", "type": "response_item", "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "# AGENTS.md instructions\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}}
+{"timestamp": "2026-09-04T09:38:28.000Z", "type": "response_item", "payload": {"type": "custom_tool_call", "call_id": "call_1", "name": "shell", "input": "just test"}}
+{"timestamp": "2026-09-04T09:38:28.000Z", "type": "response_item", "payload": {"type": "custom_tool_call_output", "call_id": "call_1", "output": "oooooooooooooooooooooooooooooo"}}
+{"timestamp": "2026-09-04T09:38:28.000Z", "type": "response_item", "payload": {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "done?"}]}}
+{"timestamp": "2026-09-04T09:38:28.000Z", "type": "token_usage_record", "payload": {"response_id": "resp_1", "usage": {"input_tokens": 20196, "cached_input_tokens": 11904, "cache_write_input_tokens": 0, "output_tokens": 395, "reasoning_output_tokens": 149}}}
+{"timestamp": "2026-09-04T09:38:45.000Z", "type": "event_msg", "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 0, "cache_write_input_tokens": 0, "output_tokens": 5, "reasoning_output_tokens": 1, "total_tokens": 105}, "last_token_usage": {"input_tokens": 100, "cached_input_tokens": 0, "cache_write_input_tokens": 0, "output_tokens": 5, "reasoning_output_tokens": 1, "total_tokens": 105}, "model_context_window": 258400}}}
+{"timestamp": "2026-09-04T09:38:28.000Z", "type": "event_msg", "payload": {"type": "task_started"}}
+{"timestamp": "2026-09-04T09:38:28.000Z", "type": "event_msg", "payload": {"type": "brand_new_event"}}

@@ -134,9 +134,9 @@ class PlaceTest(unittest.TestCase):
 
 def test_filename_identity_reads_thread_and_segment():
     assert api().filename_identity("codex", Path(f"rollout-2026-10-01T09-00-00-{THREAD}_{SEGMENT}.jsonl")) == {
-        "thread": THREAD, "segment": SEGMENT, "basis": "convention"}
+        "thread": THREAD, "segment": SEGMENT, "basis": "convention", "index_thread": THREAD}
     assert api().filename_identity("codex", Path(f"rollout-2026-10-01T09-00-00-{THREAD}.jsonl")) == {
-        "thread": THREAD, "segment": None, "basis": "convention"}
+        "thread": THREAD, "segment": None, "basis": "convention", "index_thread": THREAD}
 
 
 @pytest.mark.parametrize("harness, name", [
@@ -323,7 +323,18 @@ def test_discover_exposes_known_and_dangling_aliases_without_counting_files(tmp_
          "filename_identity": None, "filename_lookup": None},
         {"path": str(alias), "place": {"harness": "codex", "home": "codex",
          "profile": "personal", "store": "live", "relpath": f"sessions/{alias.name}"},
-         "filename_identity": {"thread": THREAD, "segment": SEGMENT, "basis": "convention"}}]
+         "filename_identity": {"thread": THREAD, "segment": SEGMENT, "basis": "convention", "index_thread": THREAD}}]
+
+
+def test_explicit_archived_sessions_root_preserves_claude_and_pi_store_labels(tmp_path):
+    roots = api().roots(explicit=[
+        ("claude-code", tmp_path / ".claude" / "archived_sessions"),
+        ("pi", tmp_path / ".pi" / "agent" / "archived_sessions"),
+    ])
+    assert [(root.harness, root.store) for root in roots] == [
+        ("claude-code", "archived"),
+        ("pi", "live"),
+    ]
 
 
 @pytest.mark.parametrize("value", ["codex", "codex=", "=sessions", "other=sessions"])
@@ -449,3 +460,13 @@ def test_matching_directory_preserves_old_population_and_open_error(tmp_path, st
     selected = next(row for row in rows if row.get("path") == str(target))
     assert selected["state"] == "listed" and selected["inode"] == target.stat().st_ino
     assert rows[-1]["files"] == 2
+
+
+def test_index_filename_claim_preserves_strict_original_names():
+    for name, expected in [(f'rollout-time-{THREAD}.jsonl', THREAD),
+                           (f'rollout-time-{THREAD}_{SEGMENT}.jsonl', THREAD),
+                           (f'rollout-{THREAD}.jsonl', None),
+                           (f'rollout-time-{THREAD.upper()}.jsonl', None)]:
+        claim = api().filename_identity('codex', Path(name))
+        assert claim['index_thread'] == expected
+        assert claim['thread'] == (THREAD.upper() if name == f'rollout-time-{THREAD.upper()}.jsonl' else THREAD)

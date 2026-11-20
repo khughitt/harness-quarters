@@ -9,13 +9,15 @@ from . import homes
 from .lines import Place, ref
 
 NAMING_RULE = ("home: the root's parent directory name without its leading dot; store: "
-               "archived for an archived_sessions root, else live; profile: work when the "
+               "archived for a non-Pi archived_sessions root, else live; profile: work when the "
                "home name ends in -work, else personal")
 _UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 # The thread a rollout's stem names (group 1): its first UUID, also in a Codex 0.165+
 # continuation segment (`rollout-<ts>-<thread>_<segment>`, segment in group 2), whose
 # session_meta records the thread.
 ROLLOUT_ID = re.compile(rf"-({_UUID})(?:_({_UUID}))?$")
+_INDEX_UUID = _UUID.replace("a-fA-F", "a-f")
+INDEX_ROLLOUT = re.compile(rf"^rollout-.*-({_INDEX_UUID})(?:_{_INDEX_UUID})?\.jsonl$")
 ERROR_SAMPLE = 3
 
 
@@ -48,7 +50,7 @@ def roots(user_home: Path | None = None,
         # agy and Pi refs name the harness rather than the home directory.
         home = harness if harness in ("agy", "pi") else name[1:] if name.startswith(".") else name
         found.append(Root(harness, home, "work" if home.endswith("-work") else "personal",
-                          "archived" if harness == "codex" and path.name == "archived_sessions" else "live", path))
+                          "archived" if harness != "pi" and path.name == "archived_sessions" else "live", path))
     return found
 
 
@@ -192,7 +194,9 @@ def filename_identity(harness: str, path: Path) -> dict | None:
     match = ROLLOUT_ID.search(path.stem)
     if match is None:
         return None
-    return {"thread": match.group(1), "segment": match.group(2), "basis": "convention"}
+    indexed = INDEX_ROLLOUT.fullmatch(path.name)
+    return {"thread": match.group(1), "segment": match.group(2), "basis": "convention",
+            "index_thread": indexed.group(1) if indexed else None}
 
 
 def copy_label(harness: str, path: Path) -> dict | None:

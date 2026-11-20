@@ -448,10 +448,10 @@ def test_default_roots_include_the_agy_home(tmp_path, store):
     assert len(agy) == 1 and agy[0]["path"] == str(store / "brain") and agy[0]["files"] == 4
 
 
-def test_capabilities_declare_the_side_input_and_the_agy_header():
+def test_capabilities_declare_the_side_input_and_the_agy_header(tmp_path):
     proc = subprocess.run([sys.executable, str(TOOLS / "harness-evidence"), "capabilities", "--json"],
                           capture_output=True, text=True, timeout=60,
-                          env={"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": "/nonexistent"})
+                          env=environment(tmp_path))
     assert proc.returncode == 0, proc.stderr
     agy = json.loads(proc.stdout)["harnesses"]["agy"]
     assert agy["header"] == {"implemented": True, "line_limit": 50}

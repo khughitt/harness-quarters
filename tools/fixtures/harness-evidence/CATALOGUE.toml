@@ -1,0 +1,35 @@
+# Index-only controls; ordinary reader catalogue scope stays unchanged.
+[[sample]]
+path = "codex-basic.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+source = "obs 1e0afad1a18a610c5f8f54a4805a029f0530536a tests/harness/test_codex.py"
+control = "codex-controls.json"
+
+[[sample]]
+path = "codex-context.jsonl"
+harness = "codex"
+version = "0.156.1"
+provenance = "synthetic"
+profile = "index"
+source = "obs 1e0afad1a18a610c5f8f54a4805a029f0530536a tests/harness/test_adapter_coverage.py META_FULL/CTX_BOTH/CTX_FALLBACK; tests/harness/test_codex.py CodexAdapterTests.test_injections_tool_calls_and_aggregates"
+control = "codex-controls.json"
+
+[[sample]]
+path = "codex-execution.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+source = "obs 1e0afad1a18a610c5f8f54a4805a029f0530536a tests/harness/test_codex.py; tests/evidence/test_codex_runs.py; tests/evidence/test_codex_outcomes.py"
+control = "codex-conformance.json"
+
+[[sample]]
+path = "codex-compaction.jsonl"
+harness = "codex"
+version = "0.164.0"
+provenance = "synthetic"
+profile = "index"
+source = "obs 7a2804cec979543182b402f2f97efd96c513f0bc tests/harness/test_codex.py IdentityTests compaction cases"
