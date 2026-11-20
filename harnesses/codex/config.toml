@@ -67,7 +67,6 @@ set = { TASKS_FORMAT = "json", TASKS_AGENT = "codex", PYTEST_XDIST_AUTO_NUM_WORK
 [features]
 shell_snapshot = true
 js_repl = true
-multi_agent = true
 
 # The default of 4 (root + 3 children) refuses a spawn once 3 children are
 # running; finished children are evicted, running ones never are.
