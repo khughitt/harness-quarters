@@ -1,19 +1,35 @@
 {
-  "schema": 1,
+  "schema": 2,
   "subscribers": [
     {
       "name": "ops-guard",
       "role": "guard",
-      "harnesses": ["claude-code", "codex", "agy"],
-      "kinds": ["before-tool"],
-      "tools": ["Bash"],
-      "argv": ["/usr/bin/python3", "@HOME@/d/ops/hooks/relay-guard"],
+      "harnesses": [
+        "claude-code",
+        "codex",
+        "agy"
+      ],
+      "kinds": [
+        "before-tool"
+      ],
+      "tools": [
+        "Bash"
+      ],
+      "argv": [
+        "env",
+        "/usr/bin/python3",
+        "@HOME@/d/ops/hooks/relay-guard"
+      ],
       "timeoutMs": 30000
     },
     {
       "name": "familiar",
       "role": "observer",
-      "harnesses": ["claude-code", "codex"],
+      "registry": "snapshot",
+      "harnesses": [
+        "claude-code",
+        "codex"
+      ],
       "kinds": [
         "session-start",
         "prompt",
@@ -26,13 +42,46 @@
         "turn-error",
         "reconcile"
       ],
-      "argv": ["@HOME@/d/familiar/bin/familiar", "observe"],
+      "privateFields": [
+        {
+          "nativeEvent": "Stop",
+          "fields": [
+            "backgroundTasks"
+          ]
+        }
+      ],
+      "argv": [
+        "env",
+        "@HOME@/d/familiar/bin/familiar",
+        "observe"
+      ],
+      "timeoutMs": 2000
+    },
+    {
+      "name": "familiar-codex-workers",
+      "role": "observer",
+      "registry": "snapshot",
+      "harnesses": [
+        "codex"
+      ],
+      "kinds": [
+        "child-start",
+        "child-stop"
+      ],
+      "argv": [
+        "env",
+        "@HOME@/d/familiar/bin/familiar",
+        "observe"
+      ],
       "timeoutMs": 2000
     },
     {
       "name": "familiar-opencode",
       "role": "observer",
-      "harnesses": ["opencode"],
+      "registry": "snapshot",
+      "harnesses": [
+        "opencode"
+      ],
       "kinds": [
         "session-start",
         "activity",
@@ -41,31 +90,47 @@
         "turn-error",
         "session-end"
       ],
-      "argv": ["@HOME@/d/familiar/bin/familiar", "observe"],
+      "argv": [
+        "env",
+        "@HOME@/d/familiar/bin/familiar",
+        "observe"
+      ],
       "timeoutMs": 1000
     },
     {
       "name": "familiar-teardown",
       "role": "observer",
-      "harnesses": ["claude-code"],
-      "kinds": ["session-end"],
-      "argv": ["@HOME@/d/familiar/bin/familiar", "observe"],
+      "registry": "snapshot",
+      "harnesses": [
+        "claude-code"
+      ],
+      "kinds": [
+        "session-end"
+      ],
+      "argv": [
+        "env",
+        "@HOME@/d/familiar/bin/familiar",
+        "observe"
+      ],
       "timeoutMs": 400
-    },
-    {
-      "name": "familiar-teardown-codex",
-      "role": "observer",
-      "harnesses": ["codex"],
-      "kinds": ["session-end"],
-      "argv": ["@HOME@/d/familiar/bin/familiar", "observe"],
-      "timeoutMs": 267
     },
     {
       "name": "familiar-agy",
       "role": "observer",
-      "harnesses": ["agy"],
-      "kinds": ["session-start", "before-tool", "turn-end"],
-      "argv": ["@HOME@/d/familiar/bin/familiar", "observe"],
+      "registry": "snapshot",
+      "harnesses": [
+        "agy"
+      ],
+      "kinds": [
+        "session-start",
+        "before-tool",
+        "turn-end"
+      ],
+      "argv": [
+        "env",
+        "@HOME@/d/familiar/bin/familiar",
+        "observe"
+      ],
       "timeoutMs": 2000
     }
   ]

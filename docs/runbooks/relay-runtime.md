@@ -18,9 +18,27 @@ this checkout selects the merged pin at once, and its launcher exits 127 until t
 version is installed there. Other hosts cannot see this host's worktrees, so run
 `just relay-install` in the main checkout on each of them as soon as the merge syncs.
 
-On a new host, `just relay-subscribers` renders `relay/subscribers.template.json` into
-`~/.config/relay/subscribers.json`, the file every relay hook passes with
-`--subscribers`; it refuses to replace different content unless run with `FORCE=1`.
+On each host, `just relay-subscribers` renders `relay/subscribers.template.json` for the
+pinned version into `~/.config/relay/<version>/relay/subscribers.json`, the file every relay
+hook of that version passes with `--subscribers`; it refuses to replace different content
+unless run with `FORCE=1`. Each version keeps its own config base, so the prior relay's
+file stays runnable for rollback (relay 0.5.0 refuses the schema-1 file v0.3.0 reads at
+`~/.config/relay/subscribers.json`, and v0.3.0 refuses schema 2). `relay reap` reads only
+`$XDG_CONFIG_HOME/relay/subscribers.json`, so reap with `just relay-reap`, which points it
+at the pinned version's base.
+
+Schema 2 resolves each subscriber's `argv[0]` on `PATH` and passes later arguments
+literally. The template names `env` there, followed by the same absolute interpreter and
+checkout paths the schema-1 file used, so a session whose `PATH` starts inside a
+repository (an activated in-repo `.venv`) still runs the guard rather than failing it
+`EXECUTABLE_FORBIDDEN`.
+
+Hook images name an absolute runtime and subscriber file, and every host that shares this
+checkout switches when an image change merges. Before merging images that name a new
+version, run `just relay-install` and `just relay-subscribers` in the main checkout on every
+such host: a missing subscriber file fails relay's config load, and Claude Code and Codex
+prompts and tool calls then fail closed. Land the template and recipe ahead of the images
+so each host can render first.
 
 For an isolated rehearsal, set `RELAY_INSTALL_ROOT` to a private scratch directory
 for both `just relay-install` and the worktree's explicit `relay/bin/relay` path.
