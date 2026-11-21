@@ -8,7 +8,7 @@
       },
       {
         "type": "command",
-        "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness agy --outer-ms 60000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionStart",
+        "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js' hook --harness agy --outer-ms 60000 --subscribers '/home/keith/.config/relay/v0.5.0/relay/subscribers.json' SessionStart",
         "timeout": 60
       }
     ],
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness agy --outer-ms 60000 --subscribers '/home/keith/.config/relay/subscribers.json' PreToolUse",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js' hook --harness agy --outer-ms 60000 --subscribers '/home/keith/.config/relay/v0.5.0/relay/subscribers.json' PreToolUse",
             "timeout": 60
           }
         ]
@@ -44,7 +44,7 @@
       },
       {
         "type": "command",
-        "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness agy --outer-ms 60000 --subscribers '/home/keith/.config/relay/subscribers.json' Stop",
+        "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js' hook --harness agy --outer-ms 60000 --subscribers '/home/keith/.config/relay/v0.5.0/relay/subscribers.json' Stop",
         "timeout": 60
       }
     ]

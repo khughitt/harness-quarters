@@ -96,11 +96,11 @@ def test_hooks_json_declares_session_start_pre_tool_use_and_stop():
         assert len(argv) == 10
         assert argv[0] == "/usr/bin/node"
         assert Path(argv[1]).is_absolute()
-        assert argv[1].endswith("/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js")
+        assert argv[1].endswith("/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js")
         assert argv[2:7] == ["hook", "--harness", "agy", "--outer-ms", "60000"]
         assert argv[7] == "--subscribers"
         assert Path(argv[8]).is_absolute()
-        assert argv[8].endswith("/.config/relay/subscribers.json")
+        assert argv[8].endswith("/.config/relay/v0.5.0/relay/subscribers.json")
         assert argv[9] == expected_event
 
     session_start = hq["SessionStart"]
@@ -274,23 +274,25 @@ def test_pre_tool_use_emits_empty_stdout_noop_and_rejects_extra_args(tmp_path):
     assert "usage: harnesses/agy/hook PreToolUse" in extra.stderr
 
 
-def test_relay_v030_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard(tmp_path):
+def test_relay_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard(tmp_path):
     xdg = os.environ.get("XDG_CONFIG_HOME")
     reg_path = (Path(xdg) if xdg else Path.home() / ".config") / "tasks" / "projects.toml"
     if not reg_path.is_file():
         pytest.skip("no tasks project registry on this machine")
     projects = tomllib.loads(reg_path.read_text()).get("projects", {})
     ops_root = projects.get("ops")
-    relay_root = projects.get("relay")
     if not ops_root or not (Path(ops_root).expanduser() / "hooks" / "relay-guard").is_file():
         pytest.skip("ops checkout not registered on this machine")
-    if not relay_root or not (Path(relay_root).expanduser() / "bin" / "relay.js").is_file():
-        pytest.skip("relay checkout not registered on this machine")
-    relay_js = Path(relay_root).expanduser() / "bin" / "relay.js"
+    # The installed runtime the hook images name, not a development checkout.
+    relay_js = Path.home() / ".local/share/relay/v0.5.0/node_modules/relay/bin/relay.js"
+    if not relay_js.is_file():
+        pytest.skip("relay v0.5.0 is not installed on this machine")
 
     home = tmp_path / "home"
-    (home / "d" / "familiar" / "bin").mkdir(parents=True)
+    home.mkdir()
+    (home / "d").mkdir()
     (home / "d" / "ops").symlink_to(Path(ops_root).expanduser())
+    (home / "d" / "familiar" / "bin").mkdir(parents=True)
     familiar_log = tmp_path / "familiar-events.jsonl"
     write_script(
         home / "d" / "familiar" / "bin" / "familiar",
@@ -303,9 +305,8 @@ with Path({str(familiar_log)!r}).open("a") as f:
 """,
     )
 
-    subscribers = home / ".config" / "relay" / "subscribers.json"
-    subscribers.parent.mkdir(parents=True)
-    subscribers.parent.chmod(0o700)
+    subscribers = home / ".config" / "relay" / "v0.5.0" / "relay" / "subscribers.json"
+    subscribers.parent.mkdir(parents=True, mode=0o700)
     rendered = (ROOT / "relay" / "subscribers.template.json").read_text().replace("@HOME@", str(home))
     subscribers.write_text(rendered)
     subscribers.chmod(0o600)
@@ -431,6 +432,7 @@ sys.exit(res.returncode)
     assert snapshot["agents"][f"agy:{CONV_ID}"]["state"] == "done"
 
     observed = [json.loads(line) for line in familiar_log.read_text().splitlines()]
+    assert {row["schema"] for row in observed} == {2}
     observed_kinds = [(row["subscriber"], row["event"]["kind"], row["event"]["harness"]) for row in observed]
     assert observed_kinds == [
         ("familiar-agy", "session-start", "agy"),
@@ -438,7 +440,7 @@ sys.exit(res.returncode)
         ("familiar-agy", "before-tool", "agy"),
         ("familiar-agy", "turn-end", "agy"),
     ]
-    assert [row["event"]["tool"]["name"] for row in observed if row["event"]["kind"] == "before-tool"] == [
+    assert [row["event"]["tool"]["name"]["value"] for row in observed if row["event"]["kind"] == "before-tool"] == [
         "Bash",
         "read_file",
     ]

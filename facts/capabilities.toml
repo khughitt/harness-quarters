@@ -1202,7 +1202,7 @@ note = "Probed under codex exec in top-level and multi-agent v2 child turns: the
 
 [facts.model-env-var.harness.claude-code]
 status = "unknown"
-note = "Not probed: Claude Code shell commands receive TASKS_MODEL and TASKS_AGENT from the claude-provenance SessionStart and PostModelSwitch hook via CLAUDE_ENV_FILE (hq-d5a56c); whether Claude Code exports a native model variable without a hook was not probed."
+note = "Not probed: Claude Code shell commands receive TASKS_MODEL and TASKS_AGENT from relay's built-in Claude provenance on its SessionStart and PostModelSwitch routes via CLAUDE_ENV_FILE (hq-663049; formerly ops claude-provenance, hq-d5a56c); whether Claude Code exports a native model variable without a hook was not probed."
 
 
 [facts.thread-id-rollout-model]
@@ -1219,5 +1219,5 @@ note = "Probed under codex exec in 2 top-level turns (before and after exec resu
 
 [facts.thread-id-rollout-model.harness.claude-code]
 status = "unknown"
-note = "Not probed: Claude Code shell commands receive TASKS_MODEL and TASKS_AGENT from the claude-provenance SessionStart and PostModelSwitch hook via CLAUDE_ENV_FILE (hq-d5a56c); resolving a session's or subagent's model from its transcript by thread id from inside a shell command was not probed."
+note = "Not probed: Claude Code shell commands receive TASKS_MODEL and TASKS_AGENT from relay's built-in Claude provenance on its SessionStart and PostModelSwitch routes via CLAUDE_ENV_FILE (hq-663049; formerly ops claude-provenance, hq-d5a56c); resolving a session's or subagent's model from its transcript by thread id from inside a shell command was not probed."
 

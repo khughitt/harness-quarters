@@ -8,7 +8,7 @@ directory containing hooks.json) for hq-owned state and hooks not yet covered by
   workspacePaths[0], and wraps their combined text in agy's injectSteps.systemMessage
   envelope.
 - PreToolUse: heals any detached `~/.gemini/antigravity-cli/settings.json` regular file
-  and emits empty stdout (agy's no-op, preserving agy's permission flow while relay v0.3.0
+  and emits empty stdout (agy's no-op, preserving agy's permission flow while relay v0.5.0
   dispatches before-tool events to ops-guard and familiar-agy).
 - Stop: enforces a one-shot live task claim check for agy:<conversationId> (allowing
   in-flight waking children when controller-wake is probed true and fullyIdle is false)

@@ -67,9 +67,12 @@ undo an upgrade. Keep the store intact and use a release that understands it.
 
 The standalone pin does not rewrite installed hooks: those use absolute runtime
 paths, and each harness's hook images move under their own approval. Claude Code's
-(`harnesses/claude/settings.json`), Codex's (`harnesses/codex/hooks.json`, `harnesses/codex/work/hooks.json`) and
-Antigravity CLI's (`harnesses/agy/hooks.json`) all still name v0.3.0 while the CLI pin selects v0.5.0, so every relayed runtime accepts
-snapshots and subscriber configs naming `agy`. In `harnesses/agy/hooks.json`, each relay handler
+(`harnesses/claude/settings.json`), Codex's (`harnesses/codex/hooks.json`,
+`harnesses/codex/work/hooks.json`) and Antigravity CLI's (`harnesses/agy/hooks.json`) all
+name v0.5.0 and its subscriber file. They move together: one host runs one subscriber
+schema. Claude Code's SessionStart and PostModelSwitch relay routes carry relay's
+built-in task provenance (`TASKS_AGENT`/`TASKS_MODEL`), which replaced ops
+`hooks/claude-provenance`; never wire both. In `harnesses/agy/hooks.json`, each relay handler
 raises `"timeout": 60` paired with `--outer-ms 60000` so `ops-guard` (30 s) and
 `familiar-agy` (2 s) fit inside relay's 37 s subscriber budget. `tools/test_relay_wiring.py`
 holds each file's version. Keep every installation a hook image names.
@@ -81,27 +84,15 @@ sessions hosted there could share its handle and retire each other's rows
 (shared-daemon retirement limitation). Look for a running `codex app-server` before a rollout and after it
 check that no registry row carries a daemon's pid.
 
-To move Codex's hooks to the pinned release, install it into the stable root first,
-then plan with its own installer on copies:
-
-```zsh
-/usr/bin/node "$HOME/.local/share/relay/<version>/node_modules/relay/bin/relay.js" install --harness codex --json --node /usr/bin/node --subscribers "$HOME/.config/relay/subscribers.json" --evidence FILE --target COPY
-```
-
-`<version>` keeps the `v` prefix (the pin's tag, such as `v0.5.0`), and `FILE` is the
-resolved ops records path `<ops-records>/docs/runbooks/relay-guard-evidence-codex.json`
-below. Probe evidence is private ops records, not a file under the ops code checkout.
-On each executing host, `tasks where <ops-code-checkout> --json` must resolve the
-ops project and its absolute `project.records` directory outside that checkout.
-Missing or invalid resolution or evidence refuses readiness; no code-root fallback
-exists.
-
-COPY is an absolute path ending in `/hooks.json` (any other name fails as `relay
-operation failed`). Without `--apply` nothing is written; confirm the planned
-`after` text differs from the current image only in the runtime directory. A
-rehearsal before installation may plan from a scratch runtime and replace its path
-with the expanded absolute stable path; the stable plan must then reproduce those
-bytes.
+From relay 0.5.0, `relay install` writes a dispatch binding only for a route its
+`--qualification` record proves, and no route is qualified yet. Until one is, hq edits the
+images itself: a version move changes only the runtime directory and subscriber file in
+each relay command (plus any route the move adds or retires, named in its task), and
+`tools/test_relay_wiring.py`, `tools/test_relay_subscribers.py` and `tools/test_agy_hooks.py`
+pin the result against the installed runtime. Before merging, install and render on every
+host (above), record the prior pairs with the new relay's
+`relay pairs --harness <harness> --target <settings>`, and freeze the rollback: revert the
+image commit, which restores the prior runtime and subscriber paths, both still in place.
 
 Land the images with no Codex process running. Close every session, run
 `codex app-server daemon stop` for the personal home (`CODEX_HOME` unset) and

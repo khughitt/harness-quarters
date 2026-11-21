@@ -7,14 +7,14 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ['harnesses/claude/settings.json', 'harnesses/codex/hooks.json', 'harnesses/codex/work/hooks.json', 'harnesses/agy/hooks.json']
-# Hook upgrades have a separate approval gate from the CLI pin, per harness; routing agy
-# through relay v0.3.0 moves every relayed harness to v0.3.0 so snapshots and subscribers
-# naming agy are accepted across Claude Code, Codex, and agy.
+# Hook upgrades have a separate approval gate from the CLI pin, per harness. The v0.5.0
+# cutover (hq-663049) moved every relayed harness together: schema-2 subscriber files are
+# refused by v0.3.0 and schema-1 files by v0.5.0, so one host runs one subscriber schema.
 HOOK_VERSIONS = {
-    FILES[0]: 'v0.3.0',
-    FILES[1]: 'v0.3.0',
-    FILES[2]: 'v0.3.0',
-    FILES[3]: 'v0.3.0',
+    FILES[0]: 'v0.5.0',
+    FILES[1]: 'v0.5.0',
+    FILES[2]: 'v0.5.0',
+    FILES[3]: 'v0.5.0',
 }
 
 
@@ -30,7 +30,8 @@ def parse_relay_command(command, version):
     assert argv[5] == '--outer-ms'
     assert argv[7] == '--subscribers'
     assert Path(argv[8]).is_absolute()
-    assert argv[8].endswith('/.config/relay/subscribers.json')
+    # Each relay version reads its own subscriber file, so the prior pair stays runnable.
+    assert argv[8].endswith(f'/.config/relay/{version}/relay/subscribers.json')
     return argv[4], int(argv[6]), argv[9]
 
 
@@ -69,6 +70,7 @@ def relay_entries(file):
 def test_claude_relay_events():
     assert relay_entries(FILES[0]) == [
         ('SessionStart', 'startup|resume', 'claude-code', 600000, 'SessionStart', 600),
+        ('PostModelSwitch', None, 'claude-code', 60000, 'PostModelSwitch', 60),
         ('UserPromptSubmit', None, 'claude-code', 600000, 'UserPromptSubmit', 600),
         ('PreToolUse', '*', 'claude-code', 600000, 'PreToolUse', 600),
         ('Notification', 'idle_prompt', 'claude-code', 600000, 'Notification:idle_prompt', 600),
@@ -119,10 +121,10 @@ def test_native_entries_kept_in_order(file):
             native.setdefault(event, []).append(hook['command'])
     if file == FILES[0]:
         assert native == {
+            # relay's built-in provenance replaced ops claude-provenance on SessionStart
+            # and PostModelSwitch; running both would export the stamps twice.
             'SessionStart': ['~/d/ops/hooks/claude-sessionstart',
-                             '~/d/ops/hooks/claude-provenance',
                              '~/d/lore/hooks/claude-profile', '~/d/ops/hooks/capture-notice'],
-            'PostModelSwitch': ['~/d/ops/hooks/claude-provenance'],
             'Stop': ['~/d/ops/hooks/claim-guard --harness claude-code',
                      '~/.local/bin/harness-state-refresh'],
             'PostToolUse': ['~/d/ops/hooks/claude-posttooluse'],
