@@ -4,8 +4,8 @@ Type: guide; document types 1. Install, upgrade and recover the pinned standalon
 runtime and hook images. See [home links](../home-links.md) for launcher ownership
 and [capabilities](../harness-capabilities.md) for native/adapter/policy boundaries.
 
-`relay/package.json` selects v0.3.0; `relay/package-lock.json` fixes its commit to
-`ed0cb9573a3b147f68923b7ad6f5b152419c147d`. The declared home launcher resolves to
+`relay/package.json` selects v0.5.0; `relay/package-lock.json` fixes its commit to
+`1f1c28da62e7867caf3acaddf16ba13079a37e85`. The declared home launcher resolves to
 `relay/bin/relay`, which reads that pin and runs the versioned installation under
 `$HOME/.local/share/relay/`. Node and npm come from `/usr/bin`.
 
@@ -50,7 +50,7 @@ undo an upgrade. Keep the store intact and use a release that understands it.
 The standalone pin does not rewrite installed hooks: those use absolute runtime
 paths, and each harness's hook images move under their own approval. Claude Code's
 (`harnesses/claude/settings.json`), Codex's (`harnesses/codex/hooks.json`, `harnesses/codex/work/hooks.json`) and
-Antigravity CLI's (`harnesses/agy/hooks.json`) all name v0.3.0, so every relayed runtime accepts
+Antigravity CLI's (`harnesses/agy/hooks.json`) all still name v0.3.0 while the CLI pin selects v0.5.0, so every relayed runtime accepts
 snapshots and subscriber configs naming `agy`. In `harnesses/agy/hooks.json`, each relay handler
 raises `"timeout": 60` paired with `--outer-ms 60000` so `ops-guard` (30 s) and
 `familiar-agy` (2 s) fit inside relay's 37 s subscriber budget. `tools/test_relay_wiring.py`
@@ -70,7 +70,7 @@ then plan with its own installer on copies:
 /usr/bin/node "$HOME/.local/share/relay/<version>/node_modules/relay/bin/relay.js" install --harness codex --json --node /usr/bin/node --subscribers "$HOME/.config/relay/subscribers.json" --evidence FILE --target COPY
 ```
 
-`<version>` keeps the `v` prefix (the pin's tag, such as `v0.3.0`), and `FILE` is the
+`<version>` keeps the `v` prefix (the pin's tag, such as `v0.5.0`), and `FILE` is the
 resolved ops records path `<ops-records>/docs/runbooks/relay-guard-evidence-codex.json`
 below. Probe evidence is private ops records, not a file under the ops code checkout.
 On each executing host, `tasks where <ops-code-checkout> --json` must resolve the
