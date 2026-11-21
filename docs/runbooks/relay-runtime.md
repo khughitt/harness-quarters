@@ -109,9 +109,11 @@ Codex then asks to re-trust each changed hook. Review it in each home from a
 edits trust hashes. The personal home's new `[hooks.state]` hashes land in tracked
 `harnesses/codex/config.toml`; commit that change after the review. The work home's
 land in untracked local/codex/config.work.toml. A rollback stops Codex the same way
-and reverts the pin-and-images commit (or runs `git revert -m 1 <merge>`, noting that a
+and reverts the images commit (or runs `git revert -m 1 <merge>`, noting that a
 whole-merge revert also reverts any runbook and task-record changes in the merge),
-which returns both the images and the CLI pin to their previous versions; Codex then
+which returns the images to their previous runtime and subscriber file. The CLI pin moves
+in its own commit and stays where it is, so `just relay-subscribers` and `just relay-reap`
+keep serving the pinned version; Codex then
 asks again, and the same review writes the old hashes back in both homes. Commit the
 personal home's restored `[hooks.state]` hashes in `harnesses/codex/config.toml` too.
 Restore no trust from a copy: the work file holds other live settings.
