@@ -317,8 +317,10 @@ def test_preflight_checks_wrapped_guard_and_observer(tmp_path, deployed_host):
         assert any(f.code == "missing-command" and str(path) in f.message for f in findings)
 
 
-def test_preflight_checks_native_agy_session_start_delegates(tmp_path):
+def test_preflight_checks_native_agy_session_start_delegates(tmp_path, monkeypatch):
     from hook_routes.preflight import run
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("RELAY_INSTALL_ROOT", str(tmp_path / "standalone"))
     table = load(TABLE)
     agy = table.homes["agy"]
     binding = next(b for b in agy.bindings if b.event == "SessionStart" and b.lines[0].kind == "native")
@@ -355,3 +357,20 @@ def test_reconciliation_uses_standalone_runtime(tmp_path, deployed_host, monkeyp
     monkeypatch.setenv("RELAY_INSTALL_ROOT", str(tmp_path / "absent-standalone"))
     findings = run(deployed_host, home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)
     assert [(f.code, f.where) for f in findings] == [("runtime", "reconcile")]
+
+
+def test_reconciliation_uses_launchers_account_home_fallback(tmp_path, deployed_host, monkeypatch):
+    import pwd
+    from types import SimpleNamespace
+    from hook_routes.preflight import run
+
+    account = tmp_path / "account"
+    install = Path(".local/share/relay")
+    (account / install).parent.mkdir(parents=True)
+    (tmp_path / install).rename(account / install)
+    table = deployed_host
+    pin = table.runtimes["v0.5.0"]
+    table.runtimes["v0.5.0"] = replace(pin, script=str(account / pin.script.removeprefix("~/")))
+    monkeypatch.delenv("RELAY_INSTALL_ROOT", raising=False)
+    monkeypatch.setattr(pwd, "getpwuid", lambda uid: SimpleNamespace(pw_dir=str(account)))
+    assert not run(table, home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)

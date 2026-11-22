@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import pwd
 import subprocess
 
 __all__ = ["call", "package_for", "standalone_package", "budget_payload"]
@@ -43,8 +44,18 @@ def standalone_package(root, home):
     commit = entry["resolved"].rpartition("#")[2]
     if version != f"v{entry['version']}" or not commit:
         raise ValueError(f"{pin}: standalone relay package and lock disagree")
-    install = Path(os.environ.get("RELAY_INSTALL_ROOT") or home / ".local/share/relay")
-    return _package(install / version / "node_modules/relay/bin/relay.js", version, commit)
+    relative = Path(version) / "node_modules/relay/bin/relay.js"
+    if override := os.environ.get("RELAY_INSTALL_ROOT"):
+        script = Path(override) / relative
+    else:
+        installed = Path(".local/share/relay") / relative
+        script = home / installed
+        if not script.is_file():
+            # relay/bin/relay also tries the passwd home for an overridden HOME.
+            alternate = Path(pwd.getpwuid(os.getuid()).pw_dir) / installed
+            if alternate.is_file():
+                script = alternate
+    return _package(script, version, commit)
 
 
 def budget_payload(home, binding, line, data, *, tool=None):
