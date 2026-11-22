@@ -101,6 +101,7 @@ def repo(tmp_path, monkeypatch):
                  "tools/codex-instructions", *sorted(probes)):
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(CHECKOUT / name, root / name)
+    (root / "tools/hook-routes").write_text("import sys\nassert sys.argv[1:] == ['check']\n")
     for name, text in TRACKED.items():
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text(text)

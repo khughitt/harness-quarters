@@ -1,0 +1,222 @@
+# Ordered bindings for the checked-in hook settings.
+reconciliation_file = "shared-v0.5.0"
+
+[runtimes."v0.5.0"]
+command = "/usr/bin/node"
+script = "~/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js"
+commit = "1f1c28da62e7867caf3acaddf16ba13079a37e85"
+
+[states.claude-sessionstart]
+state = "native"
+owner = "hq-a83688"
+reason = "Keeps the halt, stale-instructions and index notices until their owner commands can run."
+
+[states.claude-profile]
+state = "native"
+owner = "hq-a83688"
+reason = "Keeps the profile notice until its owner command can run."
+
+[states.capture-notice]
+state = "native"
+owner = "hq-a83688"
+reason = "Keeps the capture notice until its owner command can run."
+
+[states.claim-guard]
+state = "native"
+owner = "hq-a83688"
+reason = "Keeps claim enforcement until the owner route is proved equivalent."
+
+[states.claude-posttooluse]
+state = "native"
+owner = "ops-1eb25b"
+reason = "The relay amendment retains native PostToolUse and PostToolUseFailure for the test counter."
+
+[states.agy-healing]
+state = "native"
+owner = "hq"
+reason = "Detached agy settings healing stays outside the bridge extraction."
+
+[states.turn-pause]
+state = "native"
+owner = "hq"
+reason = "Keep one counter across native PostToolUse, compaction and events without relay installer bindings."
+
+[states.harness-state-refresh]
+state = "native"
+owner = "hq"
+reason = "Keep the PATH link until the Claude and Codex Stop routes qualify."
+
+[states.agy-harness-state-refresh]
+state = "native"
+owner = "hq"
+reason = "agy healing stays outside the bridge."
+
+[states.relay-hooks]
+state = "existing"
+owner = "relay-d487c1"
+grant = "hq-663049"
+
+[states.relay-provenance]
+state = "existing"
+owner = "relay-d487c1"
+grant = "hq-663049"
+
+[states.familiar]
+state = "existing"
+owner = "relay-d487c1"
+grant = "hq-663049"
+
+[states.ops-guard]
+state = "existing"
+owner = "ops-47f5dc"
+grant = "hq-663049"
+
+[subscribers.ops-guard]
+policy = "ops-guard"
+role = "guard"
+argv = ["env", "/usr/bin/python3", "~/d/ops/hooks/relay-guard"]
+timeoutMs = 30000
+
+[subscribers.familiar]
+policy = "familiar"
+role = "observer"
+registry = "snapshot"
+privateFields = [{ nativeEvent = "Stop", fields = ["backgroundTasks"] }]
+argv = ["env", "~/d/familiar/bin/familiar", "observe"]
+timeoutMs = 2000
+
+[subscribers.familiar-codex-workers]
+policy = "familiar"
+role = "observer"
+registry = "snapshot"
+argv = ["env", "~/d/familiar/bin/familiar", "observe"]
+timeoutMs = 2000
+
+[subscribers.familiar-opencode]
+policy = "familiar"
+role = "observer"
+registry = "snapshot"
+argv = ["env", "~/d/familiar/bin/familiar", "observe"]
+timeoutMs = 1000
+
+[subscribers.familiar-teardown]
+policy = "familiar"
+role = "observer"
+registry = "snapshot"
+argv = ["env", "~/d/familiar/bin/familiar", "observe"]
+timeoutMs = 400
+
+[subscribers.familiar-agy]
+policy = "familiar"
+role = "observer"
+registry = "snapshot"
+argv = ["env", "~/d/familiar/bin/familiar", "observe"]
+timeoutMs = 2000
+
+[subscriber_files."shared-v0.5.0"]
+path = "~/.config/relay/v0.5.0/relay/subscribers.json"
+output = "relay/subscribers.template.json"
+subscribers = [
+  { name = "ops-guard", harnesses = ["claude-code", "codex", "agy"], kinds = ["before-tool"], tools = ["Bash"] },
+  { name = "familiar", harnesses = ["claude-code", "codex"], kinds = ["session-start", "prompt", "before-tool", "activity", "idle", "needs-input", "needs-approval", "turn-end", "turn-error", "reconcile"] },
+  { name = "familiar-codex-workers", harnesses = ["codex"], kinds = ["child-start", "child-stop"] },
+  { name = "familiar-opencode", harnesses = ["opencode"], kinds = ["session-start", "activity", "idle", "needs-approval", "turn-error", "session-end"] },
+  { name = "familiar-teardown", harnesses = ["claude-code"], kinds = ["session-end"] },
+  { name = "familiar-agy", harnesses = ["agy"], kinds = ["session-start", "before-tool", "turn-end"] },
+]
+
+[homes.claude]
+harness = "claude-code"
+path = "harnesses/claude/settings.json"
+bindings = [
+  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["claude-sessionstart"], command = "~/d/ops/hooks/claude-sessionstart" }] },
+  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["claude-profile"], command = "~/d/lore/hooks/claude-profile" }] },
+  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["capture-notice"], command = "~/d/ops/hooks/capture-notice" }] },
+  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["relay-provenance"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "PostModelSwitch", lines = [{ policies = ["relay-provenance"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 60000, timeout = 60 }] },
+  { event = "UserPromptSubmit", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "UserPromptSubmit", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code UserPromptSubmit", timeout = 5 }] },
+  { event = "PreToolUse", matcher = "*", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "PreToolUse", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code PreToolUse", timeout = 5 }] },
+  { event = "Notification", matcher = "idle_prompt", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600, relay_event = "Notification:idle_prompt" }] },
+  { event = "Notification", matcher = "permission_prompt", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600, relay_event = "Notification:permission_prompt" }] },
+  { event = "Stop", lines = [{ policies = ["claim-guard"], command = "~/d/ops/hooks/claim-guard --harness claude-code" }] },
+  { event = "Stop", lines = [{ policies = ["harness-state-refresh"], command = "~/.local/bin/harness-state-refresh" }] },
+  { event = "Stop", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "Stop", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code Stop", timeout = 5 }] },
+  { event = "StopFailure", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "SessionEnd", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 60000, timeout = 60 }] },
+  { event = "SessionEnd", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code SessionEnd", timeout = 5 }] },
+  { event = "PostToolUse", matcher = "Bash", lines = [{ policies = ["claude-posttooluse"], command = "~/d/ops/hooks/claude-posttooluse" }] },
+  { event = "PostToolUse", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code PostToolUse", timeout = 5 }] },
+  { event = "PostToolUseFailure", matcher = "Bash", lines = [{ policies = ["claude-posttooluse"], command = "~/d/ops/hooks/claude-posttooluse" }] },
+  { event = "PostToolUseFailure", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code PostToolUseFailure", timeout = 5 }] },
+  { event = "SubagentStop", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code SubagentStop", timeout = 5 }] },
+  { event = "PreCompact", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code PreCompact", timeout = 5 }] },
+  { event = "PostCompact", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code PostCompact", timeout = 5 }] },
+  { event = "SubagentStart", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code SubagentStart", timeout = 5 }] },
+]
+
+[homes.codex]
+harness = "codex"
+path = "harnesses/codex/hooks.json"
+bindings = [
+  { event = "SessionStart", lines = [{ policies = ["claude-profile"], command = "~/d/lore/hooks/claude-profile" }] },
+  { event = "SessionStart", lines = [{ policies = ["capture-notice"], command = "~/d/ops/hooks/capture-notice" }] },
+  { event = "SessionStart", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "UserPromptSubmit", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "UserPromptSubmit", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex UserPromptSubmit", timeout = 5 }] },
+  { event = "PreToolUse", matcher = "*", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "PreToolUse", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex PreToolUse", timeout = 5 }] },
+  { event = "PermissionRequest", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "SubagentStop", lines = [{ policies = ["claim-guard"], command = "~/d/ops/hooks/claim-guard --harness codex" }] },
+  { event = "SubagentStop", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "SubagentStop", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex SubagentStop", timeout = 5 }] },
+  { event = "Stop", lines = [{ policies = ["claim-guard"], command = "~/d/ops/hooks/claim-guard --harness codex" }] },
+  { event = "Stop", lines = [{ policies = ["harness-state-refresh"], command = "~/.local/bin/harness-state-refresh" }] },
+  { event = "Stop", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "Stop", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex Stop", timeout = 5 }] },
+  { event = "SubagentStart", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "SubagentStart", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex SubagentStart", timeout = 5 }] },
+  { event = "SessionEnd", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 3000, timeout = 3 }] },
+  { event = "SessionEnd", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex SessionEnd", timeout = 3 }] },
+  { event = "PostToolUse", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex PostToolUse", timeout = 5 }] },
+]
+
+[homes.codex-work]
+harness = "codex"
+path = "harnesses/codex/work/hooks.json"
+bindings = [
+  { event = "SessionStart", lines = [{ policies = ["claude-profile"], command = "~/d/lore/hooks/claude-profile" }] },
+  { event = "SessionStart", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "UserPromptSubmit", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "UserPromptSubmit", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex UserPromptSubmit", timeout = 5 }] },
+  { event = "PreToolUse", matcher = "*", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "PreToolUse", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex PreToolUse", timeout = 5 }] },
+  { event = "PermissionRequest", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "SubagentStop", lines = [{ policies = ["claim-guard"], command = "~/d/ops/hooks/claim-guard --harness codex" }] },
+  { event = "SubagentStop", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "SubagentStop", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex SubagentStop", timeout = 5 }] },
+  { event = "Stop", lines = [{ policies = ["claim-guard"], command = "~/d/ops/hooks/claim-guard --harness codex" }] },
+  { event = "Stop", lines = [{ policies = ["harness-state-refresh"], command = "~/.local/bin/harness-state-refresh" }] },
+  { event = "Stop", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "Stop", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex Stop", timeout = 5 }] },
+  { event = "SubagentStart", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
+  { event = "SubagentStart", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex SubagentStart", timeout = 5 }] },
+  { event = "SessionEnd", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 3000, timeout = 3 }] },
+  { event = "SessionEnd", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex SessionEnd", timeout = 3 }] },
+  { event = "PostToolUse", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness codex PostToolUse", timeout = 5 }] },
+]
+
+[homes.agy]
+harness = "agy"
+path = "harnesses/agy/hooks.json"
+bindings = [
+  { event = "SessionStart", lines = [{ policies = ["agy-healing", "claude-profile", "capture-notice"], command = "~/d/hq/harnesses/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice" }] },
+  { event = "SessionStart", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 60000, timeout = 60 }] },
+  { event = "PreToolUse", matcher = "run_command", lines = [{ policies = ["agy-healing"], command = "~/d/hq/harnesses/agy/hook PreToolUse" }] },
+  { event = "PreToolUse", matcher = "*", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 60000, timeout = 60 }] },
+  { event = "Stop", lines = [{ policies = ["agy-healing", "claim-guard"], command = "~/d/hq/harnesses/agy/hook Stop" }] },
+  { event = "Stop", lines = [{ policies = ["agy-harness-state-refresh"], command = "~/.local/bin/harness-state-refresh" }] },
+  { event = "Stop", lines = [{ policies = ["relay-hooks"], runtime = "v0.5.0", subscriber_file = "shared-v0.5.0", outer_ms = 60000, timeout = 60 }] },
+]

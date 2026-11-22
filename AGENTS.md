@@ -47,8 +47,8 @@ regions with `tools/ops-docs check`, and last exports the staged tree once for t
 and `.gitattributes` as staged, refuses a staged harness config blob that still holds what
 the filter strips (fix with `git add --renormalize <path>`), and refuses when the
 repository's filter config is not what `just setup` writes (`clean`, `required = true`,
-`smudge = cat`; read from the shared config in a linked worktree too). The default mode
-also runs the staged Codex developer-instructions check (docs/home-links.md). A record
+`smudge = cat`; shared across worktrees). The default mode also runs the staged Codex
+developer-instructions and [hook routes](docs/hook-routes.md) checks. A record
 commit that the hygiene checks refuse means a finding somewhere in the working tree, not
 in the task record (for an attach commit, its own attached file in the records directory
 can be the finding). A new attachment that carries host values follows the attachment
@@ -56,9 +56,8 @@ fallback in lore `skills/references/retained-item-records.md`: keep the raw byte
 WORK_ROOT and attach a portable derivative. Never widen `.ops-check.toml` for an
 attachment. `just docs` regenerates the identity and family regions.
 
-The hook's explicit `--ci` mode retains staged-local-state refusal, docs validation
-and both staged checks over one export, omitting ops-check and the Codex check. Full local
-checks remain mandatory in the default hook, `check-hygiene` and both pre-push routes.
+`--ci` keeps the portable checks in [test execution](docs/test-execution.md).
+Full local checks run in the default hook, `check-hygiene` and both pre-push routes.
 
 From main, `just link` previews home changes and `just link-check` checks convergence.
 `just mods` validates and tests the Claude Code mods when the Claude CLI is available.
@@ -77,6 +76,7 @@ The generated global Projects block is checked by lore.
 - `external/ponytail/`: external integration defaults; `defaultMode` stays `"off"`.
   Installed plugin caches remain harness-managed. `local/` keeps untracked host state.
   Reusable cutovers follow [the cutover guide](docs/rename-cutover.md).
+- `harnesses/hook-routes.toml` and `tools/hook_routes/` declare and render the tracked hook wiring and relay subscriber template.
 - `harnesses.toml`: the declared harnesses (`[harnesses.<name>]`) and, for each tracked
   live config, its `[harnesses.<name>.live_state]`: path, filter glob, the keys and tables
   the clean filter strips, and the pick units `live-picks` saves. `.gitattributes` routes

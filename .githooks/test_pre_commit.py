@@ -52,6 +52,8 @@ def world(tmp_path):
     facts.write_text("#!/usr/bin/env python3\nimport sys\nassert sys.argv[1:] == ['check']\n")
     codex = repo / "tools" / "codex-instructions"              # the staged Codex check passes
     codex.write_text("#!/usr/bin/env python3\nimport sys\nassert sys.argv[1] == 'check'\n")
+    routes = repo / "tools" / "hook-routes"
+    routes.write_text(DOCS_OK)
     shutil.copyfile(OPS_CHECK, repo / "tools" / "ops-check")
     (repo / "tools" / "ops-check").chmod(0o755)
     # The staged manifest check: the real checker over a manifest with no live-state
@@ -64,7 +66,7 @@ def world(tmp_path):
     sh(repo, env, "git", "config", "filter.harness-state.required", "true")
     sh(repo, env, "git", "config", "filter.harness-state.smudge", "cat")
     sh(repo, env, "git", "add", "AGENTS.md", "tools/harness-facts", "tools/codex-instructions",
-       "tools/ops-check",
+       "tools/ops-check", "tools/hook-routes",
        ".githooks/harness_state.py", "harnesses.toml", ".gitattributes")
     sh(repo, env, "git", "commit", "-q", "-m", "init")
     return repo, env, tmp_path
@@ -277,3 +279,16 @@ def test_pre_commit_runs_from_linked_worktree_and_enforces_shared_filter_config(
     result = run_hook(worktree, env)
     assert result.returncode == 1
     assert "filter.harness-state.clean" in result.stderr and "just setup" in result.stderr
+
+
+def test_hook_routes_drift_is_checked_in_the_staged_tree(world):
+    repo, env, _ = world
+    checker = repo / "tools" / "hook-routes"
+    checker.write_text("import sys\nsys.exit('hook routes drifted')\n")
+    sh(repo, env, "git", "add", "tools/hook-routes")
+    checker.write_text("import sys\nsys.exit(0)\n")
+
+    result = run_hook(repo, env)
+    assert result.returncode == 1
+    assert "hook routes drifted" in result.stderr
+    assert run_hook(repo, env, "--ci").returncode == 0

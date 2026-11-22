@@ -11,6 +11,8 @@ layout_allowed = [
   "harnesses/codex/work/hooks.json",
   "harnesses/agy/hooks.json",
   "harnesses/agy/settings.json",
+  # Route source for the exact native commands and subscriber argv used today.
+  "harnesses/hook-routes.toml",
   # Exact deployed hook strings are the contract these wiring tests protect.
   "tools/test_capture_notice_wiring.py",
   "tools/test_claim_guard_wiring.py",

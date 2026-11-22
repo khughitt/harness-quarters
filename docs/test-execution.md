@@ -43,9 +43,11 @@ Full local pre-commit hygiene remains mandatory.
 The default pre-commit hook refuses staged local/ state, runs ops-check and
 ops-docs check against the working tree, then exports the staged tree once for
 harness-facts and harness_state.py validation. The staged manifest, attributes,
-cleaned config blobs and repository filter configuration are all checked.
+cleaned config blobs and repository filter configuration are all checked. The
+same export checks the staged Codex developer instructions and hook routes.
 
-The explicit --ci mode omits only ops-check. It keeps staged-local-state refusal,
+The explicit --ci mode omits ops-check, the lore-dependent Codex check and the
+HOME-dependent hook-routes check. It keeps staged-local-state refusal,
 guide identity validation and both staged checks over that same exporter. It
 needs no private sibling checkout or tasks registry. Cross-project references,
 layout, conflicts, scratch and vendored-copy hygiene remain full local checks;
