@@ -86,7 +86,7 @@ def test_homes_are_the_store_adapters_homes(tmp_path):
     for adapter in harness_stores.ADAPTERS:
         assert adapter.homes(tmp_path) == homes.homes(tmp_path, adapter.alias)
     assert harness_stores.Home is homes.Home
-    assert homes.homes(tmp_path) == harness_stores.homes(tmp_path) + homes.homes(tmp_path, "pi")
+    assert homes.homes(tmp_path) == harness_stores.homes(tmp_path)
 
 
 @pytest.mark.parametrize("harness, expected", [
