@@ -18,14 +18,19 @@ this checkout selects the merged pin at once, and its launcher exits 127 until t
 version is installed there. Other hosts cannot see this host's worktrees, so run
 `just relay-install` in the main checkout on each of them as soon as the merge syncs.
 
-On each host, `just relay-subscribers` renders `relay/subscribers.template.json` for the
-pinned version into `~/.config/relay/<version>/relay/subscribers.json`, the file every relay
-hook of that version passes with `--subscribers`; it refuses to replace different content
-unless run with `FORCE=1`. Each version keeps its own config base, so the prior relay's
-file stays runnable for rollback (relay 0.5.0 refuses the schema-1 file v0.3.0 reads at
-`~/.config/relay/subscribers.json`, and v0.3.0 refuses schema 2). `relay reap` reads only
-`$XDG_CONFIG_HOME/relay/subscribers.json`, so reap with `just relay-reap`, which points it
-at the pinned version's base.
+On each host, `just relay-subscribers` runs `tools/hook-routes deploy live`.
+It installs each subscriber file named by the live route table and its reconciliation
+file. Today's base is `~/.config/relay/v0.5.0`. Different bytes at an existing
+destination cause a refusal. The v0.3.0 schema-1 rollback file stays at
+`~/.config/relay/subscribers.json`. Run `just relay-reap` for reconciliation.
+It points `XDG_CONFIG_HOME` at the live table's `reconciliation_file` base.
+
+Before a qualified cutover, render `tools/hook-routes render next --out DIR`
+in its reviewed worktree. With deployment authorized, run
+`tools/hook-routes deploy next DIR` followed by `tools/hook-routes preflight --next DIR`
+on each host that shares the settings. Preflight checks the bytes installed there
+and the harness version against the record. Keep earlier installations and files
+until rollback is released. See [hook routes](../hook-routes.md).
 
 Schema 2 resolves each subscriber's `argv[0]` on `PATH` and passes later arguments
 literally. The template names `env` there, followed by the same absolute interpreter and
@@ -69,8 +74,7 @@ The standalone pin does not rewrite installed hooks: those use absolute runtime
 paths, and each harness's hook images move under their own approval. Claude Code's
 (`harnesses/claude/settings.json`), Codex's (`harnesses/codex/hooks.json`,
 `harnesses/codex/work/hooks.json`) and Antigravity CLI's (`harnesses/agy/hooks.json`) all
-name v0.5.0 and its subscriber file. They move together: one host runs one subscriber
-schema. Claude Code's SessionStart and PostModelSwitch relay routes carry relay's
+name v0.5.0 and its subscriber file. Each binding selects its own runtime and subscriber file. Claude Code's SessionStart and PostModelSwitch relay routes carry relay's
 built-in task provenance (`TASKS_AGENT`/`TASKS_MODEL`), which replaced ops
 `hooks/claude-provenance`; never wire both. In `harnesses/agy/hooks.json`, each relay handler
 raises `"timeout": 60` paired with `--outer-ms 60000` so `ops-guard` (30 s) and
@@ -85,8 +89,8 @@ sessions hosted there could share its handle and retire each other's rows
 check that no registry row carries a daemon's pid.
 
 From relay 0.5.0, `relay install` writes a dispatch binding only for a route its
-`--qualification` record proves, and no route is qualified yet. Until one is, hq edits the
-images itself: a version move changes only the runtime directory and subscriber file in
+`--qualification` record proves, and no route is qualified yet. Until one is, hq renders the
+images from its route table: a version move changes only the runtime directory and subscriber file in
 each relay command (plus any route the move adds or retires, named in its task), and
 `tools/test_relay_wiring.py`, `tools/test_relay_subscribers.py` and `tools/test_agy_hooks.py`
 pin the result against the installed runtime. Before merging, install and render on every
@@ -112,8 +116,7 @@ land in untracked local/codex/config.work.toml. A rollback stops Codex the same 
 and reverts the images commit (or runs `git revert -m 1 <merge>`, noting that a
 whole-merge revert also reverts any runbook and task-record changes in the merge),
 which returns the images to their previous runtime and subscriber file. The CLI pin moves
-in its own commit and stays where it is, so `just relay-subscribers` and `just relay-reap`
-keep serving the pinned version; Codex then
+in its own commit and stays where it is, and the restored table selects its previous subscriber and reconciliation files; Codex then
 asks again, and the same review writes the old hashes back in both homes. Commit the
 personal home's restored `[hooks.state]` hashes in `harnesses/codex/config.toml` too.
 Restore no trust from a copy: the work file holds other live settings.

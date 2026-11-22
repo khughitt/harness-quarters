@@ -7,7 +7,8 @@ from pathlib import Path
 from .rules import validate
 from .table import Finding, SubscriberFile, Table, expand_path, load_candidate
 
-__all__ = ["render_live", "render_next", "render_candidate", "splice_claude_hooks", "check_live"]
+__all__ = ["render_live", "render_next", "render_candidate", "splice_claude_hooks", "check_live",
+           "subscriber_bytes", "subscriber_address"]
 
 
 def _space(text, index):
@@ -99,7 +100,7 @@ def _hooks(table, settings, home):
     return events
 
 
-def _subscriber_file(table, source, home=None):
+def subscriber_bytes(table, source, home=None):
     subscribers = []
     for entry in source.subscribers:
         name = entry.name
@@ -122,6 +123,12 @@ def _subscriber_file(table, source, home=None):
     return _json_file({"schema": 2, "subscribers": subscribers})
 
 
+def subscriber_address(source, data, home):
+    if isinstance(source, SubscriberFile):
+        return Path(expand_path(source.path, home)).relative_to(home / ".config/relay").as_posix()
+    return f"{source.runtime}-{sha256(data).hexdigest()[:12]}/relay/subscribers.json"
+
+
 def _settings(table, home):
     files = {}
     for settings in table.homes.values():
@@ -141,7 +148,7 @@ def _settings(table, home):
 def render_live(table: Table, home: Path) -> dict[str, bytes]:
     files = _settings(table, home)
     for source in table.subscriber_files.values():
-        files[source.output] = _subscriber_file(table, source)
+        files[source.output] = subscriber_bytes(table, source)
     return files
 
 
@@ -162,8 +169,8 @@ def _render_target(table, home, *, records):
     files = {}
     for name in sorted(source_names):
         source = table.target_files[name]
-        data = _subscriber_file(table, source, home)
-        address = f"{source.runtime}-{sha256(data).hexdigest()[:12]}/relay/subscribers.json"
+        data = subscriber_bytes(table, source, home)
+        address = subscriber_address(source, data, home)
         if address in files and files[address] != data:
             raise ValueError(f"digest address collision: {address}")
         targets[name] = SubscriberFile(f"~/.config/relay/{address}", address, source.subscribers)
@@ -173,7 +180,7 @@ def _render_target(table, home, *, records):
         for name, settings in table.homes.items()
     }
     effective = replace(table, homes=homes, subscriber_files=table.subscriber_files | targets)
-    live_templates = {source.output: _subscriber_file(table, source) for source in table.subscriber_files.values()}
+    live_templates = {source.output: subscriber_bytes(table, source) for source in table.subscriber_files.values()}
     settings = _settings(effective, home)
     if files.keys() & (live_templates.keys() | settings.keys()):
         raise ValueError("candidate output would replace a tracked output")

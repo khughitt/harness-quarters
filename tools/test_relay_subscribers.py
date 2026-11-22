@@ -1,17 +1,13 @@
 """Tracked subscribers and the private, non-destructive host install recipe."""
 import json
 import os
-import shlex
 import stat
 import subprocess
 from pathlib import Path
 
-import pytest
 
 CHECKOUT = Path(__file__).resolve().parent.parent
 TEMPLATE = CHECKOUT / "relay" / "subscribers.template.json"
-HOOK_FILES = ["harnesses/claude/settings.json", "harnesses/codex/hooks.json",
-              "harnesses/codex/work/hooks.json", "harnesses/agy/hooks.json"]
 PIN_VERSION = json.loads((CHECKOUT / "relay" / "package.json").read_text())[
     "dependencies"]["relay"].split("#")[1]
 
@@ -117,69 +113,23 @@ def test_recipe_refuses_a_different_file(tmp_path):
     assert "refusing to overwrite" in result.stderr
     assert dest.read_text() == "existing subscriber config\n"
     result = install(tmp_path, force=True)
+    assert result.returncode != 0
+    assert dest.read_text() == "existing subscriber config\n"
+
+
+def test_reap_executes_with_the_live_reconciliation_base(tmp_path):
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    (tmp_path / "justfile").write_bytes((CHECKOUT / "justfile").read_bytes())
+    cli = tools / "hook-routes"
+    cli.write_text("#!/bin/sh\n[ \"$1\" = reconcile-base ] || exit 9\necho \"$HOME/selected\"\n")
+    cli.chmod(0o700)
+    relay = tmp_path / "relay/bin/relay"
+    relay.parent.mkdir(parents=True)
+    relay.write_text("#!/bin/sh\n[ \"$1\" = reap ] || exit 9\necho \"$XDG_CONFIG_HOME\"\n")
+    relay.chmod(0o700)
+    result = subprocess.run(["/usr/bin/just", "relay-reap"], cwd=tmp_path,
+                            env={"HOME": str(tmp_path), "PATH": os.defpath},
+                            capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    assert dest.read_text() == TEMPLATE.read_text().replace("@HOME@", str(tmp_path))
-
-
-def wired_relay_commands():
-    """(harness, native event, outer ms) for every relay command a tracked hook image runs."""
-    wired = set()
-    for name in HOOK_FILES:
-        for line in (CHECKOUT / name).read_text().splitlines():
-            if "relay.js' hook " not in line:
-                continue
-            argv = shlex.split(json.loads("{" + line.strip().rstrip(",") + "}")["command"])
-            wired.add((argv[4], argv[9], int(argv[6])))
-    return sorted(wired)
-
-
-def test_template_fits_every_wired_relay_budget(tmp_path):
-    """The installed pinned relay accepts the template for every event the images wire."""
-    relay = Path.home() / ".local" / "share" / "relay" / PIN_VERSION / "node_modules" / "relay"
-    if not (relay / "src" / "subscribers.js").is_file():
-        pytest.skip(f"relay {PIN_VERSION} is not installed on this machine")
-    wired = wired_relay_commands()
-    assert len(wired) >= 15
-
-    script = """
-import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
-
-const [relayRoot, templatePath, wiredJson] = process.argv.slice(2);
-const load = (rel) => import(pathToFileURL(`${relayRoot}/src/${rel}`).href);
-const { validateSubscribers, budgetFor, checkBudget } = await load('subscribers.js');
-const { adapterFor, hookEventOf } = await load('adapters/index.js');
-const rendered = JSON.parse(readFileSync(templatePath, 'utf8').replaceAll('@HOME@', '/h'));
-const config = validateSubscribers(rendered);
-for (const [harness, nativeEvent, outerMs] of JSON.parse(wiredJson)) {
-  const { kind } = hookEventOf(adapterFor(harness), nativeEvent);
-  checkBudget(config, budgetFor({ harness, nativeEvent, outerMs }), { harness, kind, nativeEvent });
-}
-"""
-    res = subprocess.run(
-        ["/usr/bin/node", "--input-type=module", "-", str(relay), str(TEMPLATE), json.dumps(wired)],
-        cwd=CHECKOUT,
-        env={"PATH": os.defpath, "HOME": str(tmp_path)},
-        input=script,
-        capture_output=True,
-        text=True,
-    )
-    assert res.returncode == 0, res.stderr
-
-
-def test_recipes_refuse_a_pin_without_a_version_tag(tmp_path):
-    checkout = tmp_path / "hq"
-    (checkout / "relay").mkdir(parents=True)
-    (checkout / "justfile").write_bytes((CHECKOUT / "justfile").read_bytes())
-    (checkout / "relay" / "subscribers.template.json").write_bytes(TEMPLATE.read_bytes())
-    (checkout / "relay" / "package.json").write_text(
-        json.dumps({"dependencies": {"relay": "git+https://github.com/khughitt/relay.git"}}))
-    for recipe in ("relay-subscribers", "relay-reap"):
-        result = subprocess.run(
-            ["/usr/bin/just", recipe], cwd=checkout,
-            env={"PATH": os.defpath, "HOME": str(tmp_path)},
-            capture_output=True, text=True,
-        )
-        assert result.returncode != 0
-        assert "relay pin has no vX.Y.Z tag" in result.stderr
-    assert not (tmp_path / ".config").exists()
+    assert result.stdout.strip() == str(tmp_path / "selected")

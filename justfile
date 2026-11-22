@@ -85,38 +85,16 @@ relay-install:
     cp relay/package.json relay/package-lock.json "$dest/"
     "${RELAY_NPM:-/usr/bin/npm}" ci --prefix "$dest" --ignore-scripts --allow-git=root --no-fund --no-audit
 
-# Each relay version keeps its own config base (~/.config/relay/<version>, laid out as an
-# XDG_CONFIG_HOME) so the prior relay's file stays for rollback and relay-reap can point
-# relay's default-path reader at it.
-#
-# Render the pinned relay's subscriber config; FORCE=1 replaces different content.
+# Install the route table's live subscriber files without overwriting different bytes.
 relay-subscribers:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    umask 077
-    version=$(/usr/bin/node -p "require('./relay/package.json').dependencies.relay.split('#')[1] ?? ''")
-    [[ $version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "relay pin has no vX.Y.Z tag: '$version'" >&2; exit 1; }
-    rendered=$(mktemp)
-    trap 'rm -f "$rendered"' EXIT
-    sed "s|@HOME@|$HOME|g" relay/subscribers.template.json > "$rendered"
-    base="$HOME/.config/relay/$version"
-    dest="$base/relay/subscribers.json"
-    if [[ -e "$dest" ]] && ! cmp -s "$rendered" "$dest" && [[ "${FORCE:-0}" != 1 ]]; then
-        echo "refusing to overwrite $dest with different content; rerun with FORCE=1" >&2
-        exit 1
-    fi
-    install -d -m 700 "$HOME/.config/relay" "$base" "$base/relay"
-    install -m 600 "$rendered" "$dest"
+    tools/hook-routes deploy live
 
-# `relay reap` reads only $XDG_CONFIG_HOME/relay/subscribers.json.
-#
-# Reap relay's registry with the pinned relay and its subscriber config.
+# Reconcile against the base selected by the same table as the live hook files.
 relay-reap:
     #!/usr/bin/env bash
     set -euo pipefail
-    version=$(/usr/bin/node -p "require('./relay/package.json').dependencies.relay.split('#')[1] ?? ''")
-    [[ $version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "relay pin has no vX.Y.Z tag: '$version'" >&2; exit 1; }
-    XDG_CONFIG_HOME="$HOME/.config/relay/$version" relay/bin/relay reap
+    base="$(tools/hook-routes reconcile-base)"
+    XDG_CONFIG_HOME="$base" relay/bin/relay reap
 
 # Validate and test each Claude Code mod under harnesses/claude/mods (needs the claude CLI).
 mods:

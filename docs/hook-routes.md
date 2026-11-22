@@ -100,3 +100,38 @@ The candidate render checks the route structure and writes `manifest.json` with
   changed, shifted and removed command positions using the deployed home links
   declared in `links.toml`, with the event in `snake_case` and zero-based group
   and hook indexes.
+
+## Qualification and host checks
+
+For each `relay` state and target, `check` reads the records named in
+`harnesses/qualification/` and calls the binding's installed relay package. It
+checks the package's bin, version and locked commit, the digest-addressed path
+and SHA-256 of the rendered subscriber bytes, and the binding's selector
+coverage against relay's adapter. Relay validates the complete subscriber file,
+budget, roles, record and proof for the exact event. Each cited version needs
+passing records for both `interactive` and `non-interactive` on the platform.
+Static checks use the versions in the records. Host version probes run in
+`preflight` and in the default `status` report for qualified routes.
+
+- `tools/hook-routes deploy live` installs the subscriber files used by live
+  bindings and reconciliation. The existing deployment uses its version-only
+  directory. Files have mode 0600 and relay config directories have mode 0700.
+  Repeating the deployment keeps identical files and refuses different content.
+- `tools/hook-routes deploy next DIR` checks the review directory from
+  `render next` against the effective target for this home and installs its
+  new digest-addressed subscriber files. The live legacy base stays available
+  for rollback.
+- `tools/hook-routes preflight [--next DIR]` resolves the commands, checks the
+  installed runtimes and budgets, and reads the deployed subscriber bytes.
+  With `--next` it also checks the review directory. A qualified binding needs
+  records covering this host's installed harness version and both session modes.
+  A version with carried latency evidence still needs relay's qualification
+  record with its fresh exact-version proof. Preflight exits 1 on a finding.
+- `tools/hook-routes reconcile-base` prints the live reconciliation file's XDG
+  config base. `just relay-reap` uses it. Reverting a cutover restores the
+  previous reconciliation selection with the hook settings.
+
+The bridge can call `relay_runtime.call(package, "project", payload)` with
+`harness`, `event`, raw native JSON text in `raw`, `invokingCwd`, `subscriber`
+and `registry`. The result is relay's subscriber envelope. The `parse-guard`
+operation takes reply text in `output` and returns relay's parsed guard reply.

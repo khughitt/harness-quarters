@@ -3,9 +3,13 @@ import argparse
 from dataclasses import asdict
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import sys
 
+from .deploy import deploy, live_files, reconcile_base, review_files
+from .preflight import installed_versions, run as preflight
+from .qualification import qualification_findings
 from .references import changed_codex_entries, donor_references
 from .render import check_live, render_candidate, render_live, render_next
 from .rules import route_status, validate
@@ -67,8 +71,13 @@ def _status(args, table):
         for entry in changed_codex_entries(table.root, args.base, render_live(table, Path.home())):
             print(entry)
     else:
-        for route in route_status(table):
+        routes = route_status(table)
+        for route in routes:
             print(json.dumps(asdict(route)))
+        if any(state and state.kind == "relay" for r in routes for state in (r.state, r.next)):
+            versions = installed_versions(os.environ.get("PATH", os.defpath))
+            for finding in qualification_findings(table, versions=versions):
+                print(json.dumps(asdict(finding)))
     return 0
 
 
@@ -85,6 +94,12 @@ def main(argv):
         variant.add_argument("--out", type=Path, required=True)
         variant.add_argument("--home", type=Path, default=argparse.SUPPRESS)
     commands.add_parser("check", help="check tracked hook wiring against the table")
+    deploy_cmd = commands.add_parser("deploy", help="install live or reviewed target subscriber files")
+    deploy_modes = deploy_cmd.add_subparsers(dest="variant", required=True)
+    deploy_modes.add_parser("live")
+    deploy_modes.add_parser("next").add_argument("directory", type=Path)
+    commands.add_parser("reconcile-base", help="show the live relay reconciliation config base")
+    commands.add_parser("preflight", help="check the installed host").add_argument("--next", type=Path)
     status = commands.add_parser("status", help="show route states, donor references or changed Codex trust keys")
     modes = status.add_mutually_exclusive_group()
     modes.add_argument("--donor", metavar="PATH")
@@ -100,7 +115,22 @@ def main(argv):
         table = load(path)
         if args.command == "check":
             findings = validate(table)
-            return _report(findings or check_live(table, Path.home()))
+            return _report(findings or qualification_findings(table) + check_live(table, Path.home()))
+        if args.command == "reconcile-base":
+            print(reconcile_base(table, Path.home()))
+            return 0
+        if args.command == "deploy":
+            findings = validate(table)
+            if findings:
+                return _report(findings)
+            home = Path.home()
+            files = live_files(table, home) if args.variant == "live" else review_files(table, home, args.directory)
+            for path in deploy(files, home):
+                print(path)
+            return 0
+        if args.command == "preflight":
+            return _report(preflight(table, home=Path.home(), path_env=os.environ.get("PATH", os.defpath),
+                                     next_dir=args.next))
         if args.command == "status":
             return _status(args, table)
         return _render(args, table)

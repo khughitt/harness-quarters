@@ -1,0 +1,143 @@
+"""Exercise the public API of the pinned relay installation."""
+from dataclasses import replace
+from hashlib import sha256
+import json
+from pathlib import Path
+import sys
+
+import pytest
+
+from hook_routes.table import Binding, Line, RouteState, Subscriber, load
+
+CHECKOUT = Path(__file__).resolve().parents[1]
+TABLE = CHECKOUT / "harnesses/hook-routes.toml"
+PACKAGE = Path.home() / ".local/share/relay/v0.5.0/node_modules/relay"
+MODES = ("interactive", "non-interactive")
+
+
+@pytest.fixture
+def runtime(tmp_path, monkeypatch):
+    if not (PACKAGE / "package.json").is_file():
+        pytest.skip("relay v0.5.0 is not installed")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    return PACKAGE
+
+
+def qualified_table(tmp_path, runtime):
+    table = load(TABLE)
+    pin = "v0.5.0"
+    table.runtimes[pin] = replace(table.runtimes[pin], script=str(runtime / "bin/relay.js"))
+    selection = table.subscriber_files[table.reconciliation_file].subscribers[0]
+    entries = tuple(replace(selection, name=name, kinds=["session-start"], tools=None,
+                            harnesses=["claude-code"], nativeEvents=["SessionStart"])
+                    for name in ("profile", "observer"))
+    source = replace(table.subscriber_files[table.reconciliation_file], subscribers=entries)
+    records = tuple(f"{mode}.json" for mode in MODES)
+    line = Line(("profile", "observer"), runtime=pin, subscriber_file="file", outer_ms=600000,
+                timeout=600, relay_kind="session-start")
+    binding = Binding("SessionStart", None, (line,))
+    home = replace(table.homes["claude"], bindings=(binding,))
+    table = replace(table, root=tmp_path, reconciliation_file="file", homes={"claude": home},
+                    states={"profile": RouteState("relay", records=records),
+                            "observer": RouteState("existing", owner="owner-123abc", grant="prior")},
+                    subscribers={"profile": Subscriber("profile", "notice", ("true",), 500),
+                                 "observer": Subscriber("observer", "observer", ("true",), 500, "occurrence")},
+                    subscriber_files={"file": source})
+    from hook_routes.render import subscriber_bytes
+    digest = sha256(subscriber_bytes(table, source, tmp_path)).hexdigest()
+    table.subscriber_files["file"] = replace(source, path=f"~/.config/relay/{pin}-{digest[:12]}/relay/subscribers.json")
+    record_dir = tmp_path / "harnesses/qualification"
+    record_dir.mkdir(parents=True)
+    fixture = json.loads((runtime / "package.json").read_text())["exports"]["./fixtures/hook-qualification.json"]
+    record = json.loads((runtime / fixture).read_text())
+    row = record["rows"][0]
+    for key, value in row.items():
+        if isinstance(value, dict) and value["status"] != "not-applicable":
+            row[key] = {"status": "passed", "evidence": ["test fixture"]}
+    row["latency"]["evidence"] = ["host=a outerMs=600000", "host=b outerMs=600000"]
+    row["contextLimit"] = 10000
+    record.update(harness="claude-code", platform=sys.platform, version="1.2.3",
+                  relayCommit=table.runtimes[pin].commit, configDigest=digest,
+                  rows=[row, dict(row, role="observer")])
+    for mode, filename in zip(MODES, records):
+        (record_dir / filename).write_text(json.dumps(dict(record, sessionMode=mode)))
+    return table, binding, record_dir
+
+
+def test_helper_refuses_unexported_path(runtime):
+    from hook_routes.relay_runtime import call
+    with pytest.raises(ValueError, match="unsupported operation"):
+        call(runtime, "./src/index.js", {})
+
+
+def test_budget_admits_today_bindings(runtime, tmp_path):
+    from hook_routes.relay_runtime import call
+    from hook_routes.render import subscriber_bytes
+    table = load(TABLE)
+    bindings = set()
+    for _, home, _, binding in table.bindings():
+        for line in binding.lines:
+            if line.kind == "relay":
+                bindings.add((home.harness, line.relay_event or binding.event, line.outer_ms, line.relay_kind))
+    assert len(bindings) >= 15
+    config = json.loads(subscriber_bytes(table, table.subscriber_files[table.reconciliation_file], tmp_path))
+    for harness, event, outer_ms, kind in bindings:
+        result = call(runtime, "budget", dict(config=config, harness=harness, event=event, outerMs=outer_ms))
+        assert result["kind"] == kind
+
+
+def test_qualify_accepts_matching_record(tmp_path, runtime):
+    from hook_routes.qualification import check_binding
+    table, binding, directory = qualified_table(tmp_path, runtime)
+    assert check_binding(table, binding, directory) == []
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("relayCommit", "e" * 40), ("configDigest", "f" * 64), ("sessionMode", "interactive"),
+    ("version", "3.2.1"), ("platform", "other")],
+    ids=["commit_mismatch", "digest_mismatch", "single_session_mode", "mixed_versions", "platform"])
+def test_qualify_refuses_identity_mismatch(tmp_path, runtime, field, value):
+    from hook_routes.qualification import check_binding
+    table, binding, directory = qualified_table(tmp_path, runtime)
+    path = directory / "non-interactive.json"
+    record = json.loads(path.read_text())
+    path.write_text(json.dumps(dict(record, **{field: value})))
+    expected = {"relayCommit": "relayCommit", "configDigest": "configDigest", "platform": "platform",
+                "sessionMode": "non-interactive", "version": "missing qualification"}[field]
+    assert expected in str(check_binding(table, binding, directory))
+
+
+def test_qualify_refuses_missing_observer_row(tmp_path, runtime):
+    from hook_routes.qualification import check_binding
+    table, binding, directory = qualified_table(tmp_path, runtime)
+    path = directory / "interactive.json"
+    record = json.loads(path.read_text())
+    path.write_text(json.dumps(dict(record, rows=record["rows"][:1])))
+    assert "no qualification row (claude-code,SessionStart,observer,600000)" in str(check_binding(table, binding, directory))
+
+
+def test_qualify_refuses_false_selector_coverage(tmp_path, runtime):
+    from hook_routes.qualification import check_binding
+    table, binding, directory = qualified_table(tmp_path, runtime)
+    changed = replace(binding, lines=(replace(binding.lines[0], relay_kind="idle"),))
+    table = replace(table, homes={"claude": replace(table.homes["claude"], bindings=(changed,))})
+    assert "session-start" in str(check_binding(table, changed, directory))
+
+
+def test_project_agy_stop_carries_termination_facts(runtime):
+    from hook_routes.relay_runtime import call
+    result = call(runtime, "project", dict(harness="agy", event="Stop", invokingCwd="/work",
+                  raw='{"terminationReason":"ERROR","executionNum":1,"fullyIdle":false}',
+                  subscriber={"role": "guard", "name": "claim"}, registry={"status": "not-requested"}))
+    facts = result["event"]["facts"]
+    assert [facts[key]["value"] for key in ("terminationReason", "executionNum", "fullyIdle")] == ["ERROR", 1, False]
+    assert call(runtime, "parse-guard", {"output": '{"decision":"deny","reason":"held"}'}) == {
+        "decision": "deny", "reason": "held"}
+
+
+def test_qualify_refuses_legacy_address(tmp_path, runtime):
+    from hook_routes.qualification import check_binding
+    table, binding, directory = qualified_table(tmp_path, runtime)
+    table.subscriber_files["file"] = replace(table.subscriber_files["file"],
+                                            path="~/.config/relay/v0.5.0/relay/subscribers.json")
+    assert "digest-addressed" in str(check_binding(table, binding, directory))

@@ -7,12 +7,12 @@ import shlex
 
 from .table import Finding, RouteState, Table
 
-__all__ = ["PolicyRoute", "route_status", "validate"]
+__all__ = ["PolicyRoute", "RELAY_BUILTINS", "fixed_tool", "route_status", "selected_entries", "validate"]
 
 _NOTIFICATION_MATCHERS = {"idle_prompt", "permission_prompt"}
 _HOME_PREFIXES = ("~/", "@HOME@/", "$HOME/", "${HOME}/")
 _AGY_BRIDGE = "d/hq/harnesses/agy/hook"
-_RELAY_BUILTINS = {"relay-hooks", "relay-provenance"}
+RELAY_BUILTINS = {"relay-hooks", "relay-provenance"}
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,7 @@ def _repository_paths(token, render_home):
     return {candidate for candidate in candidates if candidate.startswith("d/")}
 
 
-def _fixed_tool(home, binding):
+def fixed_tool(home, binding):
     if (home.harness in ("claude-code", "codex")
             and binding.event in ("PreToolUse", "PostToolUse", "PostToolUseFailure")
             and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", binding.matcher or "")):
@@ -55,7 +55,7 @@ def _fixed_tool(home, binding):
 
 
 def _admitted(entry, home, binding, line):
-    tool = _fixed_tool(home, binding)
+    tool = fixed_tool(home, binding)
     return (
         (entry.harnesses is None or home.harness in entry.harnesses)
         and (entry.nativeEvents is None or (line.relay_event or binding.event) in entry.nativeEvents)
@@ -64,7 +64,7 @@ def _admitted(entry, home, binding, line):
     )
 
 
-def _selected_entries(table, files, home, binding, line):
+def selected_entries(table, files, home, binding, line):
     if line.subscriber_file is None:
         return ()
     return tuple(
@@ -117,7 +117,7 @@ def route_status(table: Table) -> list[PolicyRoute]:
     def collect(target):
         routes = {}
         for name, home, _, binding, line, files in _configuration(table, target=target):
-            entries = _selected_entries(table, files, home, binding, line)
+            entries = selected_entries(table, files, home, binding, line)
             for policy in _declared_policies(table, line, entries):
                 key = (policy, name, binding.event, binding.matcher)
                 routes[key] = (table.policy_state(policy, line), binding.next is not None)
@@ -168,7 +168,7 @@ def _check_subscriber_paths(table, render_home, *, target):
         if source is None:
             continue
         used.add(source)
-        entries = _selected_entries(table, files, home, binding, line)
+        entries = selected_entries(table, files, home, binding, line)
         for policy in _declared_policies(table, line, entries):
             key = source, policy
             authorities[key] = authorities.get(key, True) and _owns_repository_path(table.policy_state(policy, line))
@@ -191,7 +191,7 @@ def _check_configuration(table, render_home, *, target, records):
     paths = {}
     mode = "next" if target else "state"
     for name, home, index, binding, line, files in _configuration(table, target=target):
-        entries = _selected_entries(table, files, home, binding, line)
+        entries = selected_entries(table, files, home, binding, line)
         subscriber_policies = {table.subscribers[entry.name].policy for entry in entries}
         for policy in _declared_policies(table, line, entries):
             where = f"{_where(name, binding, index)}:{policy}:{mode}"
@@ -199,7 +199,7 @@ def _check_configuration(table, render_home, *, target, records):
             problem = _state_problem(state, line.kind, records=records)
             if problem is not None:
                 findings.append(Finding("route-state", where, problem))
-            elif line.kind == "relay" and policy not in _RELAY_BUILTINS and policy not in subscriber_policies:
+            elif line.kind == "relay" and policy not in RELAY_BUILTINS and policy not in subscriber_policies:
                 findings.append(Finding("route-selection", where, "relay route needs a subscriber on this binding"))
             # A grandfathered path is permitted only if it has a named owner.
             if state is not None and state.kind not in ("native", "existing"):
@@ -288,7 +288,7 @@ def _check_cutover_coverage(table, removals):
     target_entries = {}
     for name, home, _, binding, line, files in _configuration(table, target=True):
         key = _coverage_key(name, binding)
-        entries = _selected_entries(table, files, home, binding, line)
+        entries = selected_entries(table, files, home, binding, line)
         target_policies.setdefault(key, set()).update(_declared_policies(table, line, entries))
         target_entries.setdefault(key, []).extend((line, entry) for entry in entries)
 
@@ -297,16 +297,16 @@ def _check_cutover_coverage(table, removals):
             continue
         key = _coverage_key(name, binding)
         where = _where(name, binding, index)
-        entries = _selected_entries(table, files, home, binding, line)
+        entries = selected_entries(table, files, home, binding, line)
         for policy in _declared_policies(table, line, entries):
             if policy in target_policies.get(key, ()):
                 continue
             retired = {entry.name for entry in entries if table.subscribers[entry.name].policy == policy}
-            if retired and retired <= removals and policy not in _RELAY_BUILTINS:
+            if retired and retired <= removals and policy not in RELAY_BUILTINS:
                 continue
             yield Finding("missing-route", f"{where}:{policy}:next", "live policy needs a target path on this binding's event and matcher")
 
-        tool = _fixed_tool(home, binding)
+        tool = fixed_tool(home, binding)
         for entry in entries:
             if entry.name in removals:
                 continue
