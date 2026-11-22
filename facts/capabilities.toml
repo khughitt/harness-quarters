@@ -281,6 +281,7 @@ note = "OpenCode plugin hooks were not probed; its server form route answers ter
 
 [facts.answer-defer-managed]
 type = "boolean"
+probe = "harnesses/pi/probes/recovery-probe.mjs"
 description = "In a managed session launched headless, the harness can stop at a question and a later resume delivers the answer to the same tool call."
 
 [facts.answer-defer-managed.harness.agy]
@@ -369,6 +370,7 @@ note = "The Agent SDK canUseTool route was not probed; the headless route probed
 
 [facts.answer-async-question]
 type = "boolean"
+probe = "harnesses/pi/probes/recovery-probe.mjs"
 description = "A question asked without blocking can be answered from outside the terminal: the turn ends at the question, and the answer reaches the model as a new turn."
 
 [facts.answer-async-question.harness.agy]
@@ -450,6 +452,7 @@ note = "The primary host's Claude personal smoke f169ae86 (transcript permission
 
 [facts.mcp-stdio]
 type = "boolean"
+probe = "harnesses/pi/probes/recovery-probe.mjs"
 description = "In a headless run, the harness connects to a local MCP server over stdio from its own configuration, and the model calls one of the server's tools. Shown only for the protocol revisions mcp-stdio-revisions names."
 
 [facts.mcp-stdio.harness.agy]
@@ -522,6 +525,7 @@ note = "SDK over sqlite storage. A whenBusy steer submitted while a tool ran was
 
 [facts.idempotent-submission]
 type = "boolean"
+probe = "harnesses/pi/probes/recovery-probe.mjs"
 description = "Submitting an input again under the same request id returns the existing submission instead of running it a second time."
 
 [facts.idempotent-submission.harness.pi]
@@ -582,6 +586,7 @@ note = "The process was SIGKILLed 0.5 s into a 30 s tool call. On reopen the too
 
 [facts.mid-generation-resumes-after-kill]
 type = "boolean"
+probe = "harnesses/pi/probes/recovery-probe.mjs"
 description = "After the process is SIGKILLed while a model response is still streaming, reopening the session persists any flushed partial response as aborted and automatically replays a fresh model request for the same submission."
 
 [facts.mid-generation-resumes-after-kill.harness.pi]
