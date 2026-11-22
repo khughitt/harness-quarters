@@ -58,7 +58,7 @@ route a live home, launcher or service into it.
 
 Read observations through tools/harness-facts; an unknown entry is no capability
 promise. The pi CLI and durable SDK are separate runtimes. Current session-store
-adapters are Claude Code, Codex and agy. Support planned for other stores must not
+adapters are Claude Code, Codex, agy and the pi CLI. Support planned for other stores must not
 be inferred from an installed launcher or a design document.
 
 Current code and live activation are separate facts. Replica support and a timer

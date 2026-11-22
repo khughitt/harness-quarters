@@ -24,9 +24,11 @@ reader, refusal channel, durable runtime or automatic controller wake.
 Crush is not currently declared in harnesses.toml. Pi CLI and pi-durable are
 separate fact columns: an SDK recovery guarantee never applies to the CLI merely
 because they share a package version. Current session adapters cover Claude,
-Codex and agy; parity for other stores is intended work. Agy transcripts lack
-workspace/title/parent metadata and stable call IDs; summaries and positional
-pairing are required. Its archive is not a complete capture of every private file.
+Codex, agy and the pi CLI (not pi-durable); parity for other stores is intended
+work. Agy transcripts lack workspace/title/parent metadata and stable call IDs;
+summaries and positional pairing are required. Its archive is not a complete
+capture of every private file. A pi session file carries its own cwd, but nothing
+in it marks a headless run, and the pi archive misses spilled bash output.
 
 Relay's adapter docs define normalized events, refusal/context support and budgets.
 Installed wiring lives in harness settings/hooks and relay/subscribers.template.json.
