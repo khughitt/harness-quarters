@@ -75,6 +75,7 @@ its contract is `docs/sessions.md` in hq.
 | Claude Code | `~/.claude/projects/<cwd-slug>/<session-uuid>.jsonl` | one JSONL file per session; a subagent transcript is a file whose records are all `isSidechain` | `--resume` forks a new uuid that copies the old records (same `uuid`s and tool ids, `sessionId` rewritten): two files, one conversation |
 | Codex | `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl` | one rollout per session; `session_meta` first | no session on this host has a second rollout |
 | agy | `~/.gemini/antigravity-cli/brain/<conversation-id>/.system_generated/logs/transcript_full.jsonl` | one step per line, one file per conversation; a subagent is a conversation of its own | titles, workspaces and parents live in `~/.gemini/antigravity-cli/conversation_summaries.db`; episodes never reads it |
+| pi | `~/.pi/agent/sessions/<cwd-slug>/<timestamp>_<session-uuid>.jsonl` | one JSONL file per session, the `session` header first; every branch of the session tree is in the one file | no index beside the files; `--fork` writes a new file whose header names the old one in `parentSession` and copies its entries with their ids. `--session-dir` or `PI_CODING_AGENT_SESSION_DIR` puts sessions elsewhere |
 | opencode | `~/.local/share/opencode/opencode.db` (sqlite; `opencode-local.db` beside it) | rows, not files | store only; tooling arrives with obs-175b10 |
 | Crush | `~/.crush/crush.db` and `<project>/.crush/crush.db` (sqlite) | rows, per project | store only; as above |
 
@@ -136,6 +137,26 @@ it ends on a `PLANNER_RESPONSE` with text and no tool calls (also after starting
 background command), wait when the last planner step's unanswered calls are only
 `ask_question`, unknown on an `ERROR_MESSAGE` or any other unanswered tail.
 
+pi — one entry per line, `{"type","id","parentId","timestamp",…}` after the header:
+
+    {"type":"session","version":3,"id":"<uuidv7>","timestamp":"2026-11-01T09:16:40.000Z","cwd":"/work/x"}
+    {"type":"model_change","id":"<8 hex>","parentId":null,"provider":"…","modelId":"…"}     # also thinking_level_change
+    {"type":"message","id":"…","parentId":"…","message":{"role":"user","content":[{"type":"text","text":"Let's take ai-6c8245"}]}}
+    {"type":"message","id":"…","parentId":"…","message":{"role":"assistant","content":[
+       {"type":"thinking","thinking":"…"},{"type":"toolCall","id":"call_…","name":"bash","arguments":{"command":"tasks start ai-6c8245"}}],
+       "provider":"…","model":"…","usage":{…},"stopReason":"toolUse"}}
+    {"type":"message","id":"…","parentId":"…","message":{"role":"toolResult","toolCallId":"call_…","toolName":"bash",
+       "content":[{"type":"text","text":"{\"id\":\"ai-6c8245\",\"warnings\":[]}"}],"isError":false}}
+
+Also `session_info` (a name), `label`, `compaction`, `branch_summary`,
+`custom`, `custom_message` and `usage` entries. Entries form a tree through
+`parentId`, appended in the order written: when the person moves to another
+branch, the next entry's `parentId` is not the entry before it. A response's
+`stopReason` is one of `stop`, `toolUse`, `length`, `error`, `aborted` (the
+person interrupted), `pending` and `deferred`. Call ids come from the provider and need not be unique across
+responses; session-episodes names a call `<entry id>:<call id>`. pi writes no
+turn-end record; a turn ends at the next human message.
+
 ## Human or injected
 
 Not the human, in Claude Code: `isMeta`, `isCompactSummary`, `isSidechain`,
@@ -158,6 +179,13 @@ text inside `<USER_REQUEST>…</USER_REQUEST>`: the `<ADDITIONAL_METADATA>` and
 background-task wake-ups). A conversation with no `USER_EXPLICIT` input is a
 subagent's.
 
+In pi, the human is a `message` entry with `role: "user"`. Not the human: the
+`system` role (the prompt sections pi records when they change), `bashExecution`
+(a `!` command the person ran outside the conversation), `custom` and
+`custom_message` entries (extensions), and `compaction` and `branch_summary`
+entries (pi's summaries). The header does not say whether a run was interactive:
+`pi -p` and `--mode rpc` write the same header and entries.
+
 ## Finding the session behind a thing
 
 - **A task id.** First use `session-logs search --task ID` as above. Since
@@ -171,10 +199,14 @@ subagent's.
   For agy, read the `PLANNER_RESPONSE` steps and search
   `tool_calls[].args.CommandLine` of the `run_command` calls; the conversation id
   is the directory under `~/.gemini/antigravity-cli/brain/`.
+  For pi, search the `toolCall` blocks of `assistant` messages whose `name` is
+  `bash` for `arguments.command`; the session id is the header's `id`, also the
+  end of the file name.
 - **A worktree.** `cwd` on any timed Claude record; `session_meta.cwd` in Codex;
   in agy, the `workspace_uris` of the conversation's row in
   `~/.gemini/antigravity-cli/conversation_summaries.db` (`hq sessions --harness agy`
-  lists them), or the paths in its `run_command` calls.
+  lists them), or the paths in its `run_command` calls; in pi, the header's `cwd`
+  (`hq sessions --harness pi --here` lists them).
 - **A commit.** A tool call whose command contains `git commit`, then the sha
   in its result.
 
@@ -197,10 +229,10 @@ The output feeds obs Task 4 (`obs baseline --input episodes.jsonl`). One pass:
    The JSON summary on stderr is the run's provenance: files per harness,
    exclusions, unconfirmed starts by reason, turn outcomes, label sources,
    `note_missing`, `origin_unknown`, `retired`. Keep it with the file. It
-   reads Claude Code and Codex; `--harness claude-code|codex|agy`, repeated,
+   reads Claude Code and Codex; `--harness claude-code|codex|agy|pi`, repeated,
    names the stores instead, and until the flow-trial-1 readout (2027-02-16)
-   agy is read only when `--harness agy` is given, so the default run and its
-   summary stay as they were. Every file in the selected stores is seen, and `skipped` counts the ones not parsed
+   agy and pi are read only when `--harness` names them, so the default run and
+   its summary stay as they were. Every file in the selected stores is seen, and `skipped` counts the ones not parsed
    because they cannot hold an anchor (a subagent rollout by its first line,
    a file older than `--since` by mtime, a file without `tasks … start|park|
    done|drop` in its text; about 2 minutes for 23 GB on this host);
@@ -208,8 +240,8 @@ The output feeds obs Task 4 (`obs baseline --input episodes.jsonl`). One pass:
    also skips older files;
    `--window-minutes N` sets the window (default 10); `--labels` / `--anchors`
    name the sidecars when they are not beside `--out`; `SESSION_LOGS_CLAUDE`,
-   `SESSION_LOGS_CODEX` and `SESSION_LOGS_AGY` (the agy home, holding `brain/`)
-   point at other store roots. The default roots come from hq's
+   `SESSION_LOGS_CODEX`, `SESSION_LOGS_AGY` (the agy home, holding `brain/`) and
+   `SESSION_LOGS_PI` (pi's `sessions/` directory) point at other store roots. The default roots come from hq's
    `tools/harness_stores`, which the script finds from its own real path; a copy
    outside an hq checkout stops with an error naming that path.
 2. Hand over `episodes.jsonl` and the summary now: the consumer reports

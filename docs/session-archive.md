@@ -24,7 +24,13 @@ Invalid types, missing keys, missing disk/marker and linked source roots refuse
 rather than creating a substitute archive. Optional never-captured absent roots
 are skipped explicitly; a required or previously captured source missing now is
 an error. Agy capture includes the summaries database and two transcript JSONL
-files, not all generation databases or spilled step outputs.
+files, not all generation databases or spilled step outputs. Pi capture (source
+`pi`, optional, never pruned) takes the `*.jsonl` files directly inside each
+directory under ~/.pi/agent/sessions, the files pi lists; a symlinked cwd directory
+is not followed. pi appends to a session file and rewrites one only to migrate an
+older format on open, which the archive keeps as a diverged version. It does not
+capture bash output pi spilled to a temporary file when it truncated a result, or
+sessions pi wrote outside the default store.
 
 ## Capture exchange
 

@@ -1094,6 +1094,14 @@ date = 2026-11-01
 evidence = "hq-57d68e"
 note = "The session_meta source (cli, exec and others) separates interactive from headless runs, per records@261a2e0bd94ebd1871ccaa9b15d5014ba8484375:hq/docs/notes/2026-10-15-session-discovery-contract.md. A live sample on this host shows source cli."
 
+[facts.session-metadata-marks-headless.harness.pi]
+status = "probed"
+value = false
+version = "1.1.0"
+date = 2026-11-22
+evidence = "hq-963ea4"
+note = "Nothing in a pi session file names the run's mode. The pinned source builds the session header in one place (SessionManager.newSession: type, version, id, timestamp, cwd and an optional parentSession) for interactive, print and RPC runs alike, and only optional entries (labels, session names, bug reports) come from the interactive mode alone. All 278 headless print and RPC session files on this host carry exactly those header fields. hq sessions therefore lists every pi session; no interactive pi session was run to compare."
+
 
 [facts.transcript-self-describing]
 type = "boolean"
@@ -1122,6 +1130,14 @@ date = 2026-11-01
 evidence = "hq-57d68e"
 note = "The session_meta record at the head of a Codex rollout carries cwd. Read from a live sample on this host."
 
+[facts.transcript-self-describing.harness.pi]
+status = "probed"
+value = true
+version = "1.1.0"
+date = 2026-11-22
+evidence = "hq-963ea4"
+note = "The session header on the first line of a pi session file carries cwd, written by SessionManager.newSession in the pinned source; all 278 pi session files on this host have it. hq sessions reads it from there, as pi has no index beside the files."
+
 
 [facts.session-archive-complete]
 type = "boolean"
@@ -1141,6 +1157,14 @@ note = "The archive spec does not state completeness for Claude Code, and it was
 [facts.session-archive-complete.harness.codex]
 status = "unknown"
 note = "The archive spec does not state completeness for Codex, and it was not checked."
+
+[facts.session-archive-complete.harness.pi]
+status = "probed"
+value = false
+version = "1.1.0"
+date = 2026-11-22
+evidence = "hq-963ea4"
+note = "Captured: every session file in the default store, which holds the whole session tree with models, thinking levels, usage and every branch; pi resumes from that file alone. Not captured: bash output pi spilled to a temporary file when it truncated a tool result (the result names the file as full_output_path), sessions written outside the default store (--session-dir, PI_CODING_AGENT_SESSION_DIR or a sessionDir setting), and session files in a symlinked cwd directory."
 
 
 [facts.tui-notifications-allowlist]
