@@ -179,7 +179,12 @@ text inside `<USER_REQUEST>…</USER_REQUEST>`: the `<ADDITIONAL_METADATA>` and
 background-task wake-ups). A conversation with no `USER_EXPLICIT` input is a
 subagent's.
 
-In pi, the human is a `message` entry with `role: "user"`. Not the human: the
+In pi, the human is a `message` entry with `role: "user"`, with two exceptions
+the file cannot mark. A `/skill:NAME args` command is stored expanded: the skill
+file inside `<skill name="…" location="…">…</skill>`, then a blank line and the
+args; only the command and its args are the person's (session-episodes reads it
+as `/skill:NAME args`). A prompt template is stored expanded too, and an extension
+can send a user-role message that nothing tells apart from the person's. Not the human: the
 `system` role (the prompt sections pi records when they change), `bashExecution`
 (a `!` command the person ran outside the conversation), `custom` and
 `custom_message` entries (extensions), and `compaction` and `branch_summary`

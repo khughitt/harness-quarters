@@ -1100,7 +1100,7 @@ value = false
 version = "1.1.0"
 date = 2026-11-22
 evidence = "hq-963ea4"
-note = "Nothing in a pi session file names the run's mode. The pinned source builds the session header in one place (SessionManager.newSession: type, version, id, timestamp, cwd and an optional parentSession) for interactive, print and RPC runs alike, and only optional entries (labels, session names, bug reports) come from the interactive mode alone. All 278 headless print and RPC session files on this host carry exactly those header fields. hq sessions therefore lists every pi session; no interactive pi session was run to compare."
+note = "Nothing in a pi session file names the run's mode. Every header the pinned source writes (SessionManager.newSession, createBranchedSession and forkFrom) has the same fields, type, version, id, timestamp, cwd and an optional parentSession, whatever the mode, and the entries after it come from code shared by interactive, print and RPC runs. All 278 headless print and RPC session files on this host carry exactly those header fields. hq sessions therefore lists every pi session; no interactive pi session was run to compare."
 
 
 [facts.transcript-self-describing]

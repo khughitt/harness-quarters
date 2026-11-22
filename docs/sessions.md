@@ -38,6 +38,8 @@ not current support in this registry.
 
 Pi keeps no index: the list reads the files pi's own picker reads, `*.jsonl` directly
 inside each directory under `sessions/`, and a missing `sessions/` lists nothing.
+An empty file, which pi creates just before writing the header and which a kill can
+leave behind, is counted as excluded (`empty`) rather than listed.
 The first line must be a version-3 `session` header with an id, a zoned
 timestamp and an absolute cwd; anything else stops the list, naming the file. The
 label is pi's own: the latest `session_info` name (an empty name clears it), else the
@@ -599,12 +601,18 @@ The tool's default stores cover Claude Code and Codex. Agy and pi are explicit
 harness selections during the current trial period; do not change that measured
 default as a documentation cleanup. SESSION_LOGS_CLAUDE, SESSION_LOGS_CODEX,
 SESSION_LOGS_AGY and SESSION_LOGS_PI (pi's `sessions/` directory) select isolated
-roots. A pi file without a version-3 session header first stops the run; a later
-line that is not an entry counts as malformed, as pi itself skips it. A pi call is
+roots. A non-empty pi file without a version-3 session header first stops the run;
+an empty file holds no events; a later line that is not an entry counts as
+malformed, as pi itself skips it. A bash call pi saved with empty arguments because
+its response was aborted or failed has no command; elsewhere a bash call without a
+command string stops the run. A `/skill:NAME args` message, which pi stores with
+the skill file expanded in a `<skill …>` block, is read as the command the person
+typed. A pi call is
 named `ENTRY:CALL` (its assistant entry's id, then the provider's call id), which a
 `--fork` copy keeps. A pi turn ends at the next human message, at an aborted
-response (interrupted) or an error response (unknown), or where the next entry's
-parent is not the entry before it: the person moved to another branch. The tool resolves its hq helpers from its
+response (interrupted), or where the next entry's parent is not the entry before it:
+the person moved to another branch. A turn whose last response is an error is
+unknown; an error pi retried past is not. The tool resolves its hq helpers from its
 real path and refuses a detached copy without them. Episode references are private
 local locators even though records contain no transcript text.
 

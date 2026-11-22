@@ -63,7 +63,7 @@ def test_agy_adapter_shape(tmp_path):
 def test_pi_adapter_shape(tmp_path):
     adapter = harness_stores.by_alias("pi")
     assert adapter.slug == "pi" and adapter.home_variable == "PI_CODING_AGENT_DIR"
-    assert adapter.exclusion_reasons == ()
+    assert adapter.exclusion_reasons == ("empty",)
     assert adapter.notes_segment({}) is None
     assert adapter.episode_env == "SESSION_LOGS_PI"
     assert adapter.episode_root(tmp_path) == tmp_path / ".pi" / "agent" / "sessions"

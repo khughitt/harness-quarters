@@ -2233,3 +2233,43 @@ def test_default_extract_never_reads_pi(tmp_path):
     code, _, err = run_cli(["extract", "--harness", "pi", "--out", str(tmp_path / "pi-only.jsonl")], env)
     assert code == 0 and json.loads(err)["roots"] == {"pi": str(tmp_path / ".pi" / "agent" / "sessions")}
     assert json.loads(err)["anchors_seen"] == 1
+
+
+def test_pi_bash_call_cut_off_by_an_abort_or_error_has_no_command(tmp_path):
+    """pi saves a call the model was still writing with empty arguments when the response is
+    aborted or fails; that is pi's own output, not a format change."""
+    for stop in ("aborted", "error"):
+        s = se.read_pi(pi_file(tmp_path / stop, [
+            p_user("00000001", None, 0, "go"),
+            p_assistant("00000002", "00000001", 1, calls=[("call_1", "bash", {})], stop=stop),
+        ]))
+        [call] = [e for e in s.events if e.kind == "tool_call"]
+        assert call.commands == () and call.call_id == pi_call("00000002", "call_1")
+
+
+def p_skill(text_after=""):
+    block = ('<skill name="flow" location="/skills/flow/SKILL.md">\nReferences are relative to /skills/flow.\n\n'
+             "What's the status of the task? Is it still running?\n</skill>")
+    return block + (f"\n\n{text_after}" if text_after else "")
+
+
+def test_pi_skill_expansion_is_the_command_the_person_typed(tmp_path):
+    s = se.read_pi(pi_file(tmp_path / "pi", [
+        p_user("00000001", None, 0, p_skill()),
+        p_user("00000002", "00000001", 1, p_skill("take ai-000001")),
+        p_user("00000003", "00000002", 2, "<b>not a skill block</b>"),
+    ]))
+    assert [e.text for e in s.events if e.kind == "human"] == [
+        "/skill:flow", "/skill:flow take ai-000001", "<b>not a skill block</b>"]
+    assert not any(se.heuristic_label(e.text) for e in s.events if e.kind == "human")
+
+
+def test_pi_empty_file_is_read_as_no_events(tmp_path):
+    """pi creates a session file before it writes the header, and a kill can leave it empty;
+    pi's picker skips it."""
+    p = tmp_path / "pi" / "--w--" / f"x_{PI_SID}.jsonl"
+    p.parent.mkdir(parents=True)
+    p.write_text("")
+    for read in (se.pi_header, se.read_pi):
+        s = read(p)
+        assert (s.harness, s.session_id, s.events) == ("pi", None, [])

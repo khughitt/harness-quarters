@@ -1415,7 +1415,7 @@ def test_pi_header_drift_is_an_error_naming_the_file(env, header, problem):
     assert "Traceback" not in result.stderr
 
 
-@pytest.mark.parametrize("text", ["", "\n", "{not json\n", '{"type":"session","version":3'])
+@pytest.mark.parametrize("text", ["\n", "{not json\n", '{"type":"session","version":3'])
 def test_pi_file_without_a_header_is_an_error_naming_the_file(env, text):
     home = pi_home(env)
     path = home / "sessions" / "--x--" / f"2026-01-01T00-00-00-000Z_{PID}.jsonl"
@@ -1424,6 +1424,32 @@ def test_pi_file_without_a_header_is_an_error_naming_the_file(env, text):
     result = env.run("sessions", "--harness", "pi")
     assert result.returncode != 0
     assert str(path) in result.stderr and "Traceback" not in result.stderr
+
+
+def test_pi_empty_file_is_counted_not_listed(env):
+    """pi creates a session file before writing its header; a kill can leave it empty, and
+    pi's own picker skips it."""
+    home = pi_home(env)
+    pi_session(home, PID, env.project("alpha"), pi_user("listed"))
+    empty = home / "sessions" / "--x--" / f"2026-01-01T00-00-00-000Z_{PID2}.jsonl"
+    empty.parent.mkdir()
+    empty.write_text("")
+    result = env.run("sessions", "--harness", "pi")
+    assert [row.rsplit("  ", 1)[-1] for row in rows(result)] == ["listed"]
+    assert "excluded: pi 1 empty" in footer(result)
+
+
+def test_pi_unreadable_sessions_directory_is_an_error_naming_it(env):
+    home = pi_home(env)
+    pi_session(home, PID, env.project("alpha"), pi_user("x"))
+    directory = next((home / "sessions").iterdir())
+    directory.chmod(0)
+    try:
+        result = env.run("sessions", "--harness", "pi")
+    finally:
+        directory.chmod(0o700)
+    assert result.returncode != 0
+    assert str(directory) in result.stderr and "Traceback" not in result.stderr
 
 
 def test_absent_pi_home_is_named_not_an_error(env):

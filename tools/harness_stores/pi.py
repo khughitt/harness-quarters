@@ -30,8 +30,14 @@ def session_files(root: Path) -> list[Path]:
     directly under `sessions/`. Anything else there is not a session to pi either."""
     if not root.is_dir():
         return []   # pi creates sessions/ with its first saved session
-    return sorted(path for directory in root.iterdir() if directory.is_dir()
-                  for path in directory.iterdir() if path.suffix == ".jsonl" and path.is_file())
+    files, directory = [], root
+    try:
+        for directory in sorted(root.iterdir()):
+            if directory.is_dir():
+                files.extend(path for path in directory.iterdir() if path.suffix == ".jsonl" and path.is_file())
+    except OSError as error:
+        raise SourceError(f"{directory}: {error.strerror or error}") from None
+    return sorted(files)
 
 
 def parse_time(path: Path, value) -> int:
@@ -112,7 +118,11 @@ def read_pi(home: Home) -> tuple[list[Session], dict[str, int]]:
                 mtime_ns = os.fstat(handle.fileno()).st_mtime_ns
         except OSError as error:
             raise SourceError(f"{path}: {error.strerror or error}") from None
-        header = read_header(path, lines[0] if lines else b"")
+        if not lines:   # pi creates the file before writing its header; its own picker skips it
+            sessions.append(Session(home=home, id=path.stem, cwd=None, recency_ms=mtime_ns // 1_000_000,
+                                    label="", transcript=path, excluded="empty"))
+            continue
+        header = read_header(path, lines[0])
         sessions.append(Session(home=home, id=header["id"], cwd=header["cwd"], recency_ms=mtime_ns // 1_000_000,
                                 label=label_of(lines[1:]), transcript=path))
     return sessions, {}
@@ -137,7 +147,7 @@ def archive_sources(user_home: Path) -> tuple["Source", ...]:
 ADAPTER = Adapter(
     slug="pi", alias="pi", colour=color.PI, home_variable="PI_CODING_AGENT_DIR",
     homes=homes, list_sessions=lambda home, archived: read_pi(home), notes_segment=lambda notes: None,
-    exclusion_reasons=(), resume_argv=resume_argv,
+    exclusion_reasons=("empty",), resume_argv=resume_argv,
     short_id=lambda sid: sid[-8:],   # a UUIDv7 starts with its timestamp; the tail is random
     archive_sources=archive_sources, episode_env="SESSION_LOGS_PI",
     episode_root=lambda user_home: homes(user_home)[0].path / "sessions")

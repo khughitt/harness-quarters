@@ -410,10 +410,16 @@ def read_agy(path: Path) -> Session:
 _PI_VERSION = 3
 
 
-def _pi_first(path: Path) -> dict:
-    """The header: the first line, a version-3 `session` record with a string id."""
+_PI_SKILL = re.compile(r'^<skill name="([^"]+)" location="([^"]+)">\n[\s\S]*?\n</skill>(?:\n\n([\s\S]+))?$')
+
+
+def _pi_first(path: Path) -> dict | None:
+    """The header: the first line, a version-3 `session` record with a string id. None for an
+    empty file, which pi creates before writing the header and its own picker skips."""
     with open(path, encoding="utf-8", errors="replace") as handle:
         first = handle.readline()
+    if first == "":
+        return None
     try:
         r = json.loads(first)
     except json.JSONDecodeError:
@@ -426,6 +432,8 @@ def _pi_first(path: Path) -> dict:
 
 def pi_header(path: Path) -> Session:
     r = _pi_first(path)
+    if r is None:
+        return Session(PI_HARNESS, path, None, None, "pi", False, [], 0)
     cwd = r.get("cwd")
     return Session(PI_HARNESS, path, r["id"], cwd if isinstance(cwd, str) else None, "pi", False, [], 0)
 
@@ -438,8 +446,19 @@ def _pi_call_names(path: Path, line: int, eid: str, blocks: list) -> list[tuple[
     return [(b, f"{eid}:{b['id']}") for b in calls]
 
 
+def _pi_human(text: str) -> str:
+    """The person's words: a `/skill:NAME args` command is stored expanded, the skill file
+    inside pi's `<skill …>` block and the args after it; keep what they typed."""
+    skill = _PI_SKILL.match(text)
+    if skill is None:
+        return text
+    return f"/skill:{skill.group(1)}" + (f" {skill.group(3).strip()}" if skill.group(3) and skill.group(3).strip() else "")
+
+
 def read_pi(path: Path) -> Session:
     s = pi_header(path)
+    if s.session_id is None:
+        return s
     names: dict[str, str] = {}   # provider call id -> the latest call named with it
     previous = None
     for line, r in _lines(path):
@@ -464,7 +483,7 @@ def read_pi(path: Path) -> Session:
         if role == "user":
             body = _text_blocks(content).strip()
             if body:
-                s.events.append(Event("human", t, line, eid, body))
+                s.events.append(Event("human", t, line, eid, _pi_human(body)))
         elif role == "assistant":
             blocks = content if isinstance(content, list) else []
             calls = _pi_call_names(path, line, eid, blocks)
@@ -475,10 +494,12 @@ def read_pi(path: Path) -> Session:
                 commands = ()
                 if b["name"] == "bash":
                     command = (b.get("arguments") or {}).get("command")
-                    if not isinstance(command, str):
+                    if isinstance(command, str):
+                        commands = (command,)
+                    # pi keeps a call cut off mid-generation with empty arguments
+                    elif not (command is None and message.get("stopReason") in ("aborted", "error")):
                         raise SystemExit(f"session-episodes: pi session {path}:{line} has a bash call "
                                          "without a command string")
-                    commands = (command,)
                 names[b["id"]] = name
                 s.events.append(Event("tool_call", t, line, eid, call_id=name, tool=b["name"], commands=commands))
             if message.get("stopReason") == "aborted":
