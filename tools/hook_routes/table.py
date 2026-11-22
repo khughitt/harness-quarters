@@ -5,6 +5,15 @@ import tomllib
 
 __all__ = ["Binding", "Finding", "Line", "RouteState", "Subscriber", "SubscriberFile", "Table", "load"]
 
+# The home links and legacy relay runtime consume these tracked outputs.
+_REQUIRED_HOMES = {
+    ("claude-code", "harnesses/claude/settings.json"),
+    ("codex", "harnesses/codex/hooks.json"),
+    ("codex", "harnesses/codex/work/hooks.json"),
+    ("agy", "harnesses/agy/hooks.json"),
+}
+_REQUIRED_SUBSCRIBER_OUTPUT = "relay/subscribers.template.json"
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -32,10 +41,19 @@ class Subscriber:
 
 
 @dataclass(frozen=True)
+class _SubscriberSelection:
+    name: str
+    harnesses: list[str] | None = None
+    kinds: list[str] | None = None
+    tools: list[str] | None = None
+    nativeEvents: list[str] | None = None
+
+
+@dataclass(frozen=True)
 class SubscriberFile:
     path: str
     output: str
-    subscribers: tuple[dict, ...]
+    subscribers: tuple[_SubscriberSelection, ...]
 
 
 @dataclass(frozen=True)
@@ -98,7 +116,15 @@ def _subscriber(argv, privateFields=(), **fields):
 
 
 def _subscriber_file(path, output, subscribers):
-    return SubscriberFile(path, output, tuple(subscribers))
+    selections = []
+    for entry in subscribers:
+        if not isinstance(entry, dict):
+            raise ValueError(f"{output}: expected a named subscriber selection")
+        try:
+            selections.append(_SubscriberSelection(**entry))
+        except TypeError as error:
+            raise ValueError(f"{output}:{entry.get('name', '<unnamed>')}: {error}") from error
+    return SubscriberFile(path, output, tuple(selections))
 
 
 def _named(data, construct):
@@ -115,8 +141,15 @@ def _validate(table):
             continue
         raise ValueError(f"states.{name}: expected a native owner and reason or an existing owner and grant")
 
-    outputs = [home.path for home in table.homes.values()]
-    outputs += [source.output for source in table.subscriber_files.values()]
+    homes = {(home.harness, home.path) for home in table.homes.values()}
+    subscriber_outputs = [source.output for source in table.subscriber_files.values()]
+    missing = [f"{path} ({harness})" for harness, path in sorted(_REQUIRED_HOMES - homes)]
+    if _REQUIRED_SUBSCRIBER_OUTPUT not in subscriber_outputs:
+        missing.append(_REQUIRED_SUBSCRIBER_OUTPUT)
+    if missing:
+        raise ValueError("missing required output declarations: " + ", ".join(missing))
+
+    outputs = [home.path for home in table.homes.values()] + subscriber_outputs
     if len(set(outputs)) != len(outputs):
         raise ValueError("hook routes repeat an output path")
     for output in outputs:
@@ -128,8 +161,8 @@ def _validate(table):
             raise ValueError(f"subscribers.{name}: unknown policy {subscriber.policy!r}")
     for name, source in table.subscriber_files.items():
         for entry in source.subscribers:
-            if entry["name"] not in table.subscribers:
-                raise ValueError(f"subscriber_files.{name}: unknown subscriber {entry['name']!r}")
+            if entry.name not in table.subscribers:
+                raise ValueError(f"subscriber_files.{name}: unknown subscriber {entry.name!r}")
     for name, home in table.homes.items():
         if home.harness not in ("agy", "claude-code", "codex"):
             raise ValueError(f"homes.{name}: unknown harness {home.harness!r}")

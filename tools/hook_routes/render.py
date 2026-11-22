@@ -101,12 +101,15 @@ def _hooks(table, settings, home):
 def _subscriber_file(table, source):
     subscribers = []
     for entry in source.subscribers:
-        name = entry["name"]
+        name = entry.name
         subscriber = table.subscribers[name]
         result = {"name": name, "role": subscriber.role}
         if subscriber.registry is not None:
             result["registry"] = subscriber.registry
-        result.update((key, value) for key, value in entry.items() if key != "name")
+        for key in ("harnesses", "kinds", "tools", "nativeEvents"):
+            value = getattr(entry, key)
+            if value is not None:
+                result[key] = value
         if subscriber.privateFields:
             result["privateFields"] = subscriber.privateFields
         result["argv"] = [f"@HOME@/{arg[2:]}" if arg.startswith("~/") else arg for arg in subscriber.argv]

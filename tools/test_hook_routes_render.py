@@ -123,3 +123,45 @@ def test_check_reports_an_unexpected_claude_event(checkout):
     result = _check(checkout)
     assert result.returncode == 1
     assert 'UnknownEvent' in result.stderr
+
+
+def test_check_requires_the_codex_work_destination(checkout):
+    root, _ = checkout
+    path = root / 'harnesses/hook-routes.toml'
+    before, _, tail = path.read_text().partition('[homes.codex-work]')
+    _, _, after = tail.partition('[homes.agy]')
+    path.write_text(before + '[homes.agy]' + after)
+
+    result = _check(checkout)
+
+    assert result.returncode == 1
+    assert CODEX_WORK in result.stderr
+
+
+def test_check_requires_the_legacy_subscriber_destination(checkout):
+    root, _ = checkout
+    path = root / 'harnesses/hook-routes.toml'
+    alternate = 'relay/alternate.template.json'
+    path.write_text(path.read_text().replace(f'output = "{SUBSCRIBERS}"', f'output = "{alternate}"'))
+    shutil.copyfile(root / SUBSCRIBERS, root / alternate)
+
+    result = _check(checkout)
+
+    assert result.returncode == 1
+    assert SUBSCRIBERS in result.stderr
+
+
+def test_check_rejects_a_subscriber_role_override(checkout):
+    root, _ = checkout
+    path = root / 'harnesses/hook-routes.toml'
+    path.write_text(path.read_text().replace('{ name = "ops-guard",',
+                                             '{ name = "ops-guard", role = "observer",'))
+    template_path = root / SUBSCRIBERS
+    template = json.loads(template_path.read_bytes())
+    template['subscribers'][0]['role'] = 'observer'
+    template_path.write_text(json.dumps(template, indent=2) + '\n')
+
+    result = _check(checkout)
+
+    assert result.returncode == 1
+    assert 'ops-guard' in result.stderr and 'role' in result.stderr
