@@ -1,6 +1,8 @@
 """Host admission, deployment and status use the binding's installed bytes and identity."""
 from dataclasses import replace
 from hashlib import sha256
+import json
+from pathlib import Path
 import stat
 
 import pytest
@@ -201,7 +203,6 @@ def test_harness_timeout_below_outer_budget(tmp_path):
 
 
 def test_missing_installed_version_cannot_match_records(tmp_path, runtime, monkeypatch, capsys):
-    import json
     from hook_routes import cli
     from hook_routes.preflight import run
     from hook_routes.qualification import qualification_findings
@@ -240,7 +241,6 @@ def mixed_file_table(tmp_path, *, subscriber_harness, relay_kind=None):
 @pytest.mark.parametrize("entry_point", ["check", "status"])
 @pytest.mark.parametrize("relay_kind", [None, "model-change"])
 def test_implicit_qualified_policy_is_reported(tmp_path, runtime, monkeypatch, capsys, entry_point, relay_kind):
-    import json
     from hook_routes import cli
     table = mixed_file_table(tmp_path, subscriber_harness="claude-code", relay_kind=relay_kind)
     pin = table.runtimes["v0.5.0"]
@@ -263,3 +263,95 @@ def test_excluded_qualified_policy_keeps_static_check_portable(tmp_path, monkeyp
     table = mixed_file_table(tmp_path, subscriber_harness="codex")
     monkeypatch.setenv("HOME", str(tmp_path))
     assert not qualification_findings(table, home=tmp_path)
+
+
+@pytest.fixture
+def deployed_host(tmp_path, runtime):
+    from hook_routes.deploy import deploy, live_files
+    from hook_routes.render import subscriber_bytes
+
+    table = today(tmp_path)
+    # The standalone launcher uses the checkout pin independently of the hook's runtime.
+    installation = tmp_path / ".local/share/relay/v0.5.0"
+    installation.parent.mkdir(parents=True)
+    installation.symlink_to(runtime.parents[1], target_is_directory=True)
+    source = table.subscriber_files[table.reconciliation_file]
+    digest = sha256(subscriber_bytes(table, source, tmp_path)).hexdigest()[:12]
+    reconcile = replace(source, path=f"~/.config/relay/v0.5.0-{digest}/relay/subscribers.json")
+    files = dict(table.subscriber_files, reconcile=reconcile)
+    table = replace(table, reconciliation_file="reconcile", subscriber_files=files)
+    for command in ("d/ops/hooks/relay-guard", "d/familiar/bin/familiar"):
+        stub = tmp_path / command
+        stub.parent.mkdir(parents=True)
+        stub.write_text("raise AssertionError('preflight executed the hook')")
+        stub.chmod(0o700)
+    deploy(live_files(table, tmp_path), tmp_path)
+    return table
+
+
+@pytest.mark.parametrize(("source", "bad_directory"), [("shared-v0.5.0", False), ("reconcile", True)])
+def test_preflight_loads_deployed_file_with_relay(tmp_path, deployed_host, source, bad_directory):
+    from hook_routes.preflight import run
+    from hook_routes.table import expand_path
+    table = deployed_host
+    assert not run(table, home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)
+    path = Path(expand_path(table.subscriber_files[source].path, tmp_path))
+    if bad_directory:
+        path.parent.chmod(0o755)
+    else:
+        path.chmod(0o644)
+    findings = run(table, home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)
+    assert any(f.where == source and "privately owned" in f.message for f in findings)
+
+
+def test_preflight_checks_wrapped_guard_and_observer(tmp_path, deployed_host):
+    from hook_routes.preflight import run
+    guard = tmp_path / "d/ops/hooks/relay-guard"
+    familiar = tmp_path / "d/familiar/bin/familiar"
+    guard.chmod(0o600)  # The interpreter only needs to read the guard.
+    assert not run(deployed_host, home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)
+    guard.unlink()
+    familiar.chmod(0o600)
+    findings = run(deployed_host, home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)
+    for path in (guard, familiar):
+        assert any(f.code == "missing-command" and str(path) in f.message for f in findings)
+
+
+def test_preflight_checks_native_agy_session_start_delegates(tmp_path):
+    from hook_routes.preflight import run
+    table = load(TABLE)
+    agy = table.homes["agy"]
+    binding = next(b for b in agy.bindings if b.event == "SessionStart" and b.lines[0].kind == "native")
+    table = replace(table, homes={"agy": replace(agy, bindings=(binding,))})
+    findings = run(table, home=tmp_path, path_env="", next_dir=None)
+    for name in ("claude-profile", "capture-notice"):
+        assert any(f.code == "missing-command" and f.message.endswith(name) for f in findings)
+
+
+def test_review_accepts_claude_live_pick_and_refuses_hook_change(tmp_path):
+    from hook_routes.deploy import review_files
+    from hook_routes.render import render_next
+    table = replace(today(tmp_path), root=tmp_path / "checkout")
+    path = table.homes["claude"].path
+    local = table.root / path
+    local.parent.mkdir(parents=True)
+    local.write_text('{"model":"original","hooks":{}}')
+    review = tmp_path / "review"
+    for name, data in render_next(table, tmp_path).items():
+        destination = review / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(data)
+    frozen = (review / path).read_bytes()
+    local.write_text('{"model":"changed","hooks":{}}')
+    assert review_files(table, tmp_path, review) == {}
+    assert (review / path).read_bytes() == frozen
+    (review / path).write_bytes(json.dumps(dict(json.loads(frozen), hooks={})).encode())
+    with pytest.raises(ValueError, match="reviewed"):
+        review_files(table, tmp_path, review)
+
+
+def test_reconciliation_uses_standalone_runtime(tmp_path, deployed_host, monkeypatch):
+    from hook_routes.preflight import run
+    monkeypatch.setenv("RELAY_INSTALL_ROOT", str(tmp_path / "absent-standalone"))
+    findings = run(deployed_host, home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)
+    assert [(f.code, f.where) for f in findings] == [("runtime", "reconcile")]

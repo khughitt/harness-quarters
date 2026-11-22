@@ -8,7 +8,7 @@ from .rules import validate
 from .table import Finding, SubscriberFile, Table, expand_path, load_candidate
 
 __all__ = ["render_live", "render_next", "render_candidate", "splice_claude_hooks", "check_live",
-           "subscriber_bytes", "subscriber_address"]
+           "subscriber_bytes", "subscriber_address", "claude_hooks"]
 
 
 def _space(text, index):
@@ -49,6 +49,12 @@ def _claude_hooks_span(text):
     if span is None:
         raise ValueError("missing top-level hooks member")
     return span
+
+
+def claude_hooks(data: bytes):
+    text = data.decode("utf-8")
+    start, end, _ = _claude_hooks_span(text)
+    return json.loads(text[start:end])
 
 
 def splice_claude_hooks(text: str, hooks: dict) -> str:

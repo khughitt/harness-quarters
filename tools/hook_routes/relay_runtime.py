@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import subprocess
 
-__all__ = ["call", "package_for", "budget_payload"]
+__all__ = ["call", "package_for", "standalone_package", "budget_payload"]
 
 
 _NODE = Path("/usr/bin/node")
@@ -16,7 +16,10 @@ def package_for(table, version, home):
     executable = Path(command)
     if not executable.is_absolute() or executable.resolve() != _NODE.resolve():
         raise ValueError(f"relay hook executable {command} must resolve to {_NODE}")
-    script = Path(filename)
+    return _package(Path(filename), version, runtime.commit)
+
+
+def _package(script, version, commit):
     if not script.is_absolute() or not script.is_file():
         raise ValueError(f"missing relay runtime {script}")
     package = script.parent.parent
@@ -26,10 +29,22 @@ def package_for(table, version, home):
         raise ValueError(f"{script}: expected the {version} relay package bin")
     lock = package.parents[1] / "package-lock.json"
     installed = json.loads(lock.read_bytes())["packages"]["node_modules/relay"]
-    if (installed["resolved"].rpartition("#")[2] != runtime.commit
+    if (installed["resolved"].rpartition("#")[2] != commit
             or f"v{installed['version']}" != version):
-        raise ValueError(f"{lock}: installed relay identity differs from {version} at {runtime.commit}")
+        raise ValueError(f"{lock}: installed relay identity differs from {version} at {commit}")
     return package
+
+
+def standalone_package(root, home):
+    pin = root / "relay"
+    version = json.loads((pin / "package.json").read_bytes())["dependencies"]["relay"].rpartition("#")[2]
+    lock = json.loads((pin / "package-lock.json").read_bytes())
+    entry = lock["packages"]["node_modules/relay"]
+    commit = entry["resolved"].rpartition("#")[2]
+    if version != f"v{entry['version']}" or not commit:
+        raise ValueError(f"{pin}: standalone relay package and lock disagree")
+    install = Path(os.environ.get("RELAY_INSTALL_ROOT") or home / ".local/share/relay")
+    return _package(install / version / "node_modules/relay/bin/relay.js", version, commit)
 
 
 def budget_payload(home, binding, line, data, *, tool=None):

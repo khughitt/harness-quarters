@@ -126,11 +126,17 @@ Static checks use the versions in the records. Host version probes run in
   Repeating the deployment keeps identical files and refuses different content.
 - `tools/hook-routes deploy next DIR` checks the review directory from
   `render next` against the effective target for this home and installs its
-  new digest-addressed subscriber files. The live legacy base stays available
+  new digest-addressed subscriber files. The review compares Claude’s top-level
+  `hooks` value, so a local model or effort pick can change. Every other output
+  must match byte for byte. The frozen directory stays intact. The live legacy base stays available
   for rollback.
 - `tools/hook-routes preflight [--next DIR]` resolves the commands, checks the
   installed runtimes, budgets and subscriber selections, and reads the deployed
-  subscriber bytes. Existing routes also undergo the host selection check. With
+  subscriber bytes. Each consuming runtime loads the deployed file through relay's
+  public config reader, including the standalone pin for reconciliation. Preflight
+  checks the interpreter and script or observer behind the shipped `env` wrappers
+  and the executables passed to the native agy SessionStart adapter. Existing
+  routes also undergo the host selection check. With
   `--next` it checks the review directory and the live relay selections that the
   cutover relies on for subscriber retention. A qualified binding needs
   a successful harness version probe and records for that version in both modes.

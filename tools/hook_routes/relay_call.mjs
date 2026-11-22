@@ -1,11 +1,11 @@
 // Call the selected installation's public relay API with one JSON request on stdin.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 async function run(runtime, op, payload) {
-  if (!['budget', 'qualify', 'project', 'parse-guard'].includes(op)) {
+  if (!['load', 'budget', 'qualify', 'project', 'parse-guard'].includes(op)) {
     throw new Error(`unsupported operation: ${op}`);
   }
   const manifest = join(runtime, 'package.json');
@@ -19,6 +19,10 @@ async function run(runtime, op, payload) {
     return import(pathToFileURL(require.resolve(specifier)));
   };
   const relay = await api('.');
+  if (op === 'load') {
+    await relay.loadSubscribers({ configDir: dirname(payload.path), subscribersPath: payload.path });
+    return {};
+  }
   const { harness, event, outerMs } = payload;
   if (op === 'project') {
     const normalized = relay.normalizeHookEvent(harness, event, payload.raw, { invokingCwd: payload.invokingCwd });

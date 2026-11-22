@@ -1,5 +1,6 @@
 """Inspect this host's commands, relay installations, budgets and deployed files."""
 from hashlib import sha256
+import os
 from pathlib import Path
 import re
 import shlex
@@ -8,7 +9,7 @@ import subprocess
 
 from .deploy import review_files
 from .qualification import admit_binding, qualification_findings
-from .relay_runtime import package_for
+from .relay_runtime import call, package_for, standalone_package
 from .render import subscriber_address, subscriber_bytes
 from .rules import validate
 from .table import Finding, expand_path
@@ -35,11 +36,23 @@ def installed_versions(path_env: str) -> dict[str, str]:
     return versions
 
 
-def _command(argv, home, path_env, where):
-    name = expand_path(argv[0], home)
-    if shutil.which(name, path=path_env) is None:
-        return Finding("missing-command", where, f"cannot execute {name}")
-    return None
+def _command_findings(argv, home, path_env, where):
+    args = [expand_path(token, home) for token in argv]
+    executables = [args[0]]
+    # The shipped schema-2 subscribers use env to run an absolute command.
+    if args[0] == "env" and len(args) >= 2 and Path(args[1]).is_absolute():
+        executables.append(args[1])
+        if args[1] == "/usr/bin/python3" and len(args) >= 3 and Path(args[2]).is_absolute():
+            script = Path(args[2])
+            if not script.is_file() or not os.access(script, os.R_OK):
+                yield Finding("missing-command", where, f"cannot read script {script}")
+    # This native adapter treats only SessionStart's remaining arguments as commands.
+    agy_hook = home / "d" / "hq" / "harnesses/agy/hook"
+    if Path(args[0]) == agy_hook and args[1:2] == ["SessionStart"]:
+        executables.extend(args[2:])
+    for name in executables:
+        if shutil.which(name, path=path_env) is None:
+            yield Finding("missing-command", where, f"cannot execute {name}")
 
 
 def run(table, *, home: Path, path_env: str, next_dir: Path | None) -> list[Finding]:
@@ -52,9 +65,12 @@ def run(table, *, home: Path, path_env: str, next_dir: Path | None) -> list[Find
             findings.append(Finding("review-files", str(next_dir), str(error)))
 
     sources = table.subscriber_files | (table.target_files if target else {})
-    used = {table.reconciliation_file}
-    if target and table.reconciliation_next is not None:
-        used = {table.reconciliation_next}
+    reconcile = (table.reconciliation_next if target else None) or table.reconciliation_file
+    readers = {reconcile: set()}
+    try:
+        readers[reconcile].add(standalone_package(table.root, home))
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        findings.append(Finding("runtime", reconcile, str(error)))
     packages = {}
     for name, settings, index, binding in table.bindings():
         where = f"{name}:{binding.event}[{index}]"
@@ -76,33 +92,43 @@ def run(table, *, home: Path, path_env: str, next_dir: Path | None) -> list[Find
                         packages[line.runtime] = None
                         findings.append(Finding("runtime", where, str(error)))
             for argv in commands:
-                if finding := _command(argv, home, path_env, where):
-                    findings.append(finding)
+                findings.extend(_command_findings(argv, home, path_env, where))
             if line.kind != "relay":
                 continue
             if line in active:
-                used.add(line.subscriber_file)
+                selected = readers.setdefault(line.subscriber_file, set())
+                if packages[line.runtime]:
+                    selected.add(packages[line.runtime])
             if packages[line.runtime]:
                 data = subscriber_bytes(table, sources[line.subscriber_file], home)
                 try:
                     admit_binding(table, settings, binding, line, sources, data, packages[line.runtime])
                 except (OSError, ValueError) as error:
                     findings.append(Finding("relay-budget", where, str(error)))
-    for name in sorted(used):
+    for name, installations in sorted(readers.items()):
         source = sources[name]
         expected = subscriber_bytes(table, source, home)
         address = subscriber_address(source, expected, home)
         path = home / ".config/relay" / address
-        try:
-            actual_digest = sha256(path.read_bytes()).hexdigest()
-            if actual_digest != sha256(expected).hexdigest():
-                findings.append(Finding("deployed-digest", name, f"{path} has sha256 {actual_digest}"))
-        except OSError as error:
-            findings.append(Finding("deployed-file", name, str(error)))
+        for installation in sorted(installations):
+            try:
+                call(installation, "load", {"path": str(path)})
+            except (OSError, ValueError) as error:
+                findings.append(Finding("deployed-file", name, str(error)))
+        # The public default loader permits an absent file. Every declared file
+        # is required here, even an intentionally empty subscriber composition.
+        if path.is_file():
+            try:
+                actual_digest = sha256(path.read_bytes()).hexdigest()
+                if actual_digest != sha256(expected).hexdigest():
+                    findings.append(Finding("deployed-digest", name, f"{path} has sha256 {actual_digest}"))
+            except OSError as error:
+                findings.append(Finding("deployed-file", name, str(error)))
+        else:
+            findings.append(Finding("deployed-file", name, f"missing regular subscriber file {path}"))
         for entry in source.subscribers:
             argv = table.subscribers[entry.name].argv
-            if finding := _command(argv, home, path_env, f"{name}:{entry.name}"):
-                findings.append(finding)
+            findings.extend(_command_findings(argv, home, path_env, f"{name}:{entry.name}"))
     versions = installed_versions(path_env)
     findings.extend(qualification_findings(table, home=home, target=target, versions=versions))
     return findings

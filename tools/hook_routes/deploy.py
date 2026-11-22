@@ -1,11 +1,12 @@
 """Publish immutable subscriber bytes below a host's private relay config base."""
 from hashlib import sha256
+import json
 import os
 from pathlib import Path
 import re
 import tempfile
 
-from .render import render_next, subscriber_address, subscriber_bytes
+from .render import claude_hooks, render_next, subscriber_address, subscriber_bytes
 from .table import expand_path
 
 __all__ = ["deploy", "live_files", "review_files", "reconcile_base"]
@@ -39,9 +40,17 @@ def live_files(table, home):
 
 def review_files(table, home, directory):
     rendered = render_next(table, home)
+    claude_paths = {settings.path for settings in table.homes.values() if settings.harness == "claude-code"}
     for name, data in rendered.items():
         path = directory / name
-        if not path.resolve().is_relative_to(directory.resolve()) or path.read_bytes() != data:
+        if not path.resolve().is_relative_to(directory.resolve()):
+            raise ValueError(f"{path}: reviewed output is outside its directory")
+        reviewed = path.read_bytes()
+        if name in claude_paths:
+            # JSON normalization preserves type distinctions such as true versus 1.
+            if json.dumps(claude_hooks(reviewed), sort_keys=True) != json.dumps(claude_hooks(data), sort_keys=True):
+                raise ValueError(f"{path}: reviewed hooks differ from render next")
+        elif reviewed != data:
             raise ValueError(f"{path}: reviewed bytes differ from render next")
     # Rendered settings and live templates never become deployment destinations.
     names = {line.subscriber_file for _, _, _, binding in table.bindings()

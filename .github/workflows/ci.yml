@@ -79,6 +79,7 @@ jobs:
           sudo install -m 755 "$(command -v uv)" /usr/bin/uv
           sudo install -m 755 "$(command -v just)" /usr/bin/just
           sudo install -m 755 "$(command -v node)" /usr/bin/node
+          printf 'RELAY_NPM=%s\n' "$(command -v npm)" >> "$GITHUB_ENV"
           curl --fail --silent --show-error --location \
             https://raw.githubusercontent.com/khughitt/dotfiles/2a686c0c4915ba0daae9f6455cfe45233780fc33/bin/work-link \
             --output "$RUNNER_TEMP/work-link"
@@ -115,6 +116,15 @@ jobs:
             dpkg-query -W zsh libatomic1 curl attr
             git -C .ci-tools/tasks-src rev-parse HEAD
           } >> "$HQ_TEST_ARTIFACT_DIR/setup-report.txt"
+
+      - name: Prepare the pinned relay for qualification tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          relay_root=$(mktemp -d "$RUNNER_TEMP/hq-relay.XXXXXX")
+          RELAY_INSTALL_ROOT="$relay_root" just relay-install
+          RELAY_INSTALL_ROOT="$relay_root" relay/bin/relay --version >> "$HQ_TEST_ARTIFACT_DIR/setup-report.txt"
+          printf 'HQ_TEST_RELAY_ROOT=%s\n' "$relay_root" >> "$GITHUB_ENV"
 
       - name: Hydrate hq
         run: just setup

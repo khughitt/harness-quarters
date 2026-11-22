@@ -25,18 +25,21 @@ class Reference:
     where: str
 
 
-def _expand(token):
+def _reference_token(token):
     for prefix in ("~/", "@HOME@/", "$HOME/", "${HOME}/"):
         if token.startswith(prefix):
-            return str(Path.home() / token[len(prefix):])
+            token = str(Path.home() / token[len(prefix):])
+            break
+    if "/" in token and not token.startswith("-") and "://" not in token and "=" not in token.partition("/")[0]:
+        return os.path.normpath(token).replace("//", "/")
     return token
 
 
 def donor_references(table: Table, donor: str) -> list[Reference]:
-    expected = _expand(donor)
+    expected = _reference_token(donor)
 
     def matches(argv):
-        return any(_expand(argument) == expected for argument in argv)
+        return any(_reference_token(argument) == expected for argument in argv)
 
     def matching_entries(name):
         return [

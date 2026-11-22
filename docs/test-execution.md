@@ -98,6 +98,9 @@ storage route, together with curl for the verified download.
 The disposable runner installs
 tools at the exact /usr/bin paths its fixtures use. It runs setup,
 portable hygiene and the same complete suite, with TT_FORCE=1 at job scope.
+The job runs `just relay-install` with the repository lock in a temporary
+installation root. Qualification and preflight tests require that runtime via
+`HQ_TEST_RELAY_ROOT`. A missing installation there fails the tests.
 All branch pushes and manual dispatch are covered, with no duplicate PR trigger.
 
 The always-run artifact upload retains HQ_TEST_ARTIFACT_DIR for seven days. Its
@@ -107,14 +110,13 @@ setup or partial run retains available evidence and remains unverified.
 
 The accepted hosted omissions are these exact local integration checks:
 
-- tools/test_relay_subscribers.py::test_template_validates_against_registered_relay_budgets
-- tools/test_agy_hooks.py::test_relay_v030_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard
+- tools/test_agy_hooks.py::test_relay_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard
 - tools/test_harness_links.py::test_registered_owner_targets_match_portable_fixture_shapes
 
-Portable owner fixtures exercise the existing link behavior tests without private
-checkouts; the added local integration check also copies the real registered
-targets and compares their shapes. No module is excluded. All three pass locally;
-their registry-dependent behavior remains outside hosted coverage. The local
-preparation pilot exercises
-two miniature partitions and failure retention, not Ubuntu or hosted coverage.
+Portable owner fixtures exercise link behavior without private checkouts. The local
+integration check also copies the real registered targets and compares their shapes.
+Both listed checks need the local project registry. The hosted suite includes the
+pinned budget check in `tools/test_hook_routes_relay.py` and the qualification and
+preflight cases. No module is excluded. The local preparation pilot exercises
+two miniature partitions and failure retention.
 The separate mods and live capability probes are outside just test.

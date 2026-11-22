@@ -10,7 +10,7 @@ and [capabilities](../harness-capabilities.md) for native/adapter/policy boundar
 `$HOME/.local/share/relay/` (falling back to the account's passwd home when
 `HOME` is overridden and `RELAY_INSTALL_ROOT` is unset). Node and npm come from `/usr/bin`.
 
-After approval for a live rollout, run `just relay-install` from the reviewed
+For a standalone launcher upgrade, after approval for the live rollout, run `just relay-install` from the reviewed
 checkout before merging its pin into main. This installs the new runtime in its
 stable versioned directory before the home launcher selects it. Resolve
 `command -v relay`, inspect `readlink -f` of that path, and check `relay --version`
@@ -26,25 +26,27 @@ destination cause a refusal. The v0.3.0 schema-1 rollback file stays at
 `~/.config/relay/subscribers.json`. Run `just relay-reap` for reconciliation.
 It points `XDG_CONFIG_HOME` at the live table's `reconciliation_file` base.
 
-Before a qualified cutover, render `tools/hook-routes render next --out DIR`
-in its reviewed worktree. With deployment authorized, run
-`tools/hook-routes deploy next DIR` followed by `tools/hook-routes preflight --next DIR`
-on each host that shares the settings. Preflight checks the bytes installed there
-and the harness version against the record. Keep earlier installations and files
-until rollback is released. See [hook routes](../hook-routes.md).
+Prepare each hook cutover on every host that shares the settings before
+requesting activation. Use the exact reviewed revision and install each new
+runtime it names with approval. With subscriber deployment authorized, use the
+sequence that matches the reviewed table:
+
+- For a proposed `next`, use its frozen `tools/hook-routes render next --out DIR`
+  output. From that reviewed revision, run `tools/hook-routes deploy next DIR`
+  and `tools/hook-routes preflight --next DIR` against the same output on each host.
+- For a reviewed branch that already promotes the target to live bindings, run
+  `tools/hook-routes deploy live` and `tools/hook-routes preflight` from that
+  exact branch revision on each host before merging it into main.
+
+Record each host's result. A missing runtime, failed preflight or unreachable host
+holds activation. Keep earlier installations and files until rollback is released.
+See [hook routes](../hook-routes.md).
 
 Schema 2 resolves each subscriber's `argv[0]` on `PATH` and passes later arguments
 literally. The template names `env` there, followed by the same absolute interpreter and
 checkout paths the schema-1 file used, so a session whose `PATH` starts inside a
 repository (an activated in-repo `.venv`) still runs the guard rather than failing it
 `EXECUTABLE_FORBIDDEN`.
-
-Hook images name an absolute runtime and subscriber file, and every host that shares this
-checkout switches when an image change merges. Before merging images that name a new
-version, run `just relay-install` and `just relay-subscribers` in the main checkout on every
-such host: a missing subscriber file fails relay's config load, and Claude Code and Codex
-prompts and tool calls then fail closed. Land the template and recipe ahead of the images
-so each host can render first.
 
 For an isolated rehearsal, set `RELAY_INSTALL_ROOT` to a private scratch directory
 for both `just relay-install` and the worktree's explicit `relay/bin/relay` path.
@@ -94,8 +96,9 @@ From relay 0.5.0, `relay install` writes a dispatch binding only for a route its
 images from its route table: a version move changes only the runtime directory and subscriber file in
 each relay command (plus any route the move adds or retires, named in its task), and
 `tools/test_relay_wiring.py`, `tools/test_relay_subscribers.py` and `tools/test_agy_hooks.py`
-pin the result against the installed runtime. Before merging, install and render on every
-host (above), record the prior pairs with the new relay's
+pin the result against the installed runtime. Before merging, complete the
+reviewed deployment and preflight sequence above on every host. Record the
+prior pairs with the new relay's
 `relay pairs --harness <harness> --target <settings>`, and freeze the rollback: revert the
 image commit, which restores the prior runtime and subscriber paths, both still in place.
 

@@ -2,6 +2,7 @@
 from dataclasses import replace
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -11,16 +12,19 @@ from hook_routes.table import Binding, Line, RouteState, Subscriber, load
 
 CHECKOUT = Path(__file__).resolve().parents[1]
 TABLE = CHECKOUT / "harnesses/hook-routes.toml"
-PACKAGE = Path.home() / ".local/share/relay/v0.5.0/node_modules/relay"
 MODES = ("interactive", "non-interactive")
 
 
 @pytest.fixture
 def runtime(tmp_path, monkeypatch):
-    if not (PACKAGE / "package.json").is_file():
+    root = os.environ.get("HQ_TEST_RELAY_ROOT")
+    package = (Path(root) if root else Path.home() / ".local/share/relay") / "v0.5.0/node_modules/relay"
+    if not (package / "package.json").is_file():
+        if root:
+            pytest.fail(f"missing required pinned relay test installation: {package}")
         pytest.skip("relay v0.5.0 is not installed")
     monkeypatch.setenv("HOME", str(tmp_path))
-    return PACKAGE
+    return package
 
 
 def qualified_table(tmp_path, runtime):

@@ -2,6 +2,10 @@
 # relay_kind and subscriber policies are the coverage observed for the pinned relay.
 reconciliation_file = "shared-v0.5.0"
 
+# Distinct argv still present in the retained schema-1 default subscriber file.
+[rollback_bases."v0.3.0"]
+commands = ["/usr/bin/python3 ~/d/ops/hooks/relay-guard", "~/d/familiar/bin/familiar observe"]
+
 [runtimes."v0.5.0"]
 command = "/usr/bin/node"
 script = "~/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js"

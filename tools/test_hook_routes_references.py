@@ -150,3 +150,28 @@ def test_changed_codex_entries_covers_shifted_and_removed_positions(codex_base):
     assert changed_codex_entries(repo, "HEAD", rendered) == [
         f"{home / '.codex/hooks.json'}:stop:{position}:0" for position in range(4)
     ]
+
+
+def test_retained_schema_one_commands_survive_without_live_callers():
+    from hook_routes.references import donor_references
+
+    table = load(TABLE)
+    empty = replace(table.subscriber_files[table.reconciliation_file], subscribers=())
+    table = replace(table, homes={}, subscriber_files={table.reconciliation_file: empty})
+    for donor in (_ops_donor("relay-guard"), str(Path("~", "d", "familiar", "bin", "familiar"))):
+        refs = donor_references(table, donor)
+        assert len(refs) == 1 and refs[0].kind == "rollback-base"
+
+
+def test_rollback_donor_path_is_compared_lexically():
+    from hook_routes.references import donor_references
+    from hook_routes.table import RollbackBase
+
+    table = replace(load(TABLE), rollback_bases={"only": RollbackBase(commands=(
+        "python3 @HOME@/not-present/../donor", "report --value=unused/../token",
+        "python3 scripts/unmade/../guard",
+    ))})
+    refs = donor_references(table, "${HOME}/other/../donor")
+    assert [(ref.kind, ref.where) for ref in refs] == [("rollback-base", "only:command[0]")]
+    assert not donor_references(table, "--value=token")
+    assert donor_references(table, "scripts/guard")[0].where == "only:command[2]"
