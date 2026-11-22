@@ -7,7 +7,7 @@ import shlex
 
 from .table import Finding, RouteState, Table
 
-__all__ = ["PolicyRoute", "RELAY_BUILTINS", "fixed_tool", "route_status", "selected_entries", "validate"]
+__all__ = ["PolicyRoute", "RELAY_BUILTINS", "fixed_tool", "possible_entries", "route_status", "selected_entries", "validate"]
 
 _NOTIFICATION_MATCHERS = {"idle_prompt", "permission_prompt"}
 _HOME_PREFIXES = ("~/", "@HOME@/", "$HOME/", "${HOME}/")
@@ -54,22 +54,24 @@ def fixed_tool(home, binding):
     return None
 
 
-def _admitted(entry, home, binding, line):
+def possible_entries(files, home, binding, line):
+    """Entries the harness, native event and fixed tool have not excluded."""
+    if line.subscriber_file is None:
+        return ()
     tool = fixed_tool(home, binding)
-    return (
-        (entry.harnesses is None or home.harness in entry.harnesses)
-        and (entry.nativeEvents is None or (line.relay_event or binding.event) in entry.nativeEvents)
-        and (entry.kinds is None or line.relay_kind is None or line.relay_kind in entry.kinds)
+    event = line.relay_event or binding.event
+    return tuple(
+        entry for entry in files[line.subscriber_file].subscribers
+        if (entry.harnesses is None or home.harness in entry.harnesses)
+        and (entry.nativeEvents is None or event in entry.nativeEvents)
         and (entry.tools is None or tool is None or tool in entry.tools)
     )
 
 
 def selected_entries(table, files, home, binding, line):
-    if line.subscriber_file is None:
-        return ()
     return tuple(
-        entry for entry in files[line.subscriber_file].subscribers
-        if _admitted(entry, home, binding, line)
+        entry for entry in possible_entries(files, home, binding, line)
+        if (entry.kinds is None or line.relay_kind is None or line.relay_kind in entry.kinds)
         and (line.relay_kind is not None or entry.nativeEvents is not None or entry.kinds is None
              or table.subscribers[entry.name].policy in line.policies)
     )

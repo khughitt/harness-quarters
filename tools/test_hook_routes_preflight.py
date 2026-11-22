@@ -216,3 +216,50 @@ def test_missing_installed_version_cannot_match_records(tmp_path, runtime, monke
     monkeypatch.setenv("PATH", str(tmp_path))
     assert cli.main(["status"]) == 0
     assert "installed version" in capsys.readouterr().out
+
+
+def mixed_file_table(tmp_path, *, subscriber_harness, relay_kind=None):
+    from hook_routes.table import RouteState, Subscriber
+    table = today(tmp_path)
+    home = table.homes["claude"]
+    binding = home.bindings[0]
+    line = binding.lines[0]
+    policies = line.policies if relay_kind is None else ("relay-provenance",)
+    binding = replace(binding, lines=(replace(line, policies=policies, relay_kind=relay_kind),))
+    source = table.subscriber_files[table.reconciliation_file]
+    notice = replace(source.subscribers[0], name="session-profile", harnesses=[subscriber_harness],
+                     kinds=["session-start"], nativeEvents=None, tools=None)
+    return replace(
+        table, homes={"claude": replace(home, bindings=(binding,))},
+        states={**table.states, "profile": RouteState("relay", records=("missing-proof.json",))},
+        subscribers={**table.subscribers, notice.name: Subscriber("profile", "notice", ("true",), 500)},
+        subscriber_files={table.reconciliation_file: replace(source, subscribers=(*source.subscribers, notice))},
+    )
+
+
+@pytest.mark.parametrize("entry_point", ["check", "status"])
+@pytest.mark.parametrize("relay_kind", [None, "model-change"])
+def test_implicit_qualified_policy_is_reported(tmp_path, runtime, monkeypatch, capsys, entry_point, relay_kind):
+    import json
+    from hook_routes import cli
+    table = mixed_file_table(tmp_path, subscriber_harness="claude-code", relay_kind=relay_kind)
+    pin = table.runtimes["v0.5.0"]
+    table.runtimes["v0.5.0"] = replace(pin, script=str(runtime / "bin/relay.js"))
+    monkeypatch.setattr(cli, "load", lambda _: table)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    code = cli.main([entry_point])
+    out, err = capsys.readouterr()
+    if entry_point == "check":
+        assert code == 1
+        assert "qualification:" in err and "pinned relay" in err
+    else:
+        assert code == 0
+        diagnostics = [json.loads(line) for line in out.splitlines()]
+        assert any(r.get("code") == "qualification" and "pinned relay" in r["message"] for r in diagnostics)
+
+
+def test_excluded_qualified_policy_keeps_static_check_portable(tmp_path, monkeypatch):
+    from hook_routes.qualification import qualification_findings
+    table = mixed_file_table(tmp_path, subscriber_harness="codex")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert not qualification_findings(table, home=tmp_path)

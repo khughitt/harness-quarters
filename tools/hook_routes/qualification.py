@@ -6,7 +6,7 @@ import sys
 
 from .relay_runtime import budget_payload, call, package_for
 from .render import subscriber_address, subscriber_bytes
-from .rules import RELAY_BUILTINS, fixed_tool, selected_entries
+from .rules import RELAY_BUILTINS, fixed_tool, possible_entries, selected_entries
 from .table import Finding
 
 __all__ = ["admit_binding", "check_binding", "qualification_findings"]
@@ -53,14 +53,17 @@ def admit_binding(table, home, binding, line, files, data, package):
 
 
 def _line_findings(table, home, binding, line, files, records_dir, render_home, versions, where):
-    entries = selected_entries(table, files, home, binding, line)
-    evidence = _evidence(table, line, entries)
-    if not evidence:
+    # A declared or omitted kind cannot prove that a qualified subscriber is
+    # absent. Only the pinned runtime knows which kind this event projects.
+    if not _evidence(table, line, possible_entries(files, home, binding, line)):
         return
     source = files[line.subscriber_file]
     data = subscriber_bytes(table, source, render_home)
     package = package_for(table, line.runtime, render_home)
     payload = admit_binding(table, home, binding, line, files, data, package)
+    evidence = _evidence(table, line, selected_entries(table, files, home, binding, line))
+    if not evidence:
+        return
     if versions is not None and home.harness not in versions:
         raise ValueError(f"could not observe the installed version for {home.harness}")
     digest = sha256(data).hexdigest()

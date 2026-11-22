@@ -112,6 +112,11 @@ coverage against relay's adapter. Relay validates the complete subscriber file,
 budget, roles, record and proof for the exact event. The rendered harness timeout
 must cover the relay outer budget. Each cited version needs
 passing records for both `interactive` and `non-interactive` on the platform.
+If the harness, native event and tool filters leave a qualified file entry
+possible, both `check` and `status` verify the binding's selection against its
+pinned relay. A missing or incorrect `relay_kind` cannot hide a selected policy.
+Bindings whose qualified entries are all excluded by those filters and which
+declare only existing policies need no installed relay for static checking.
 Static checks use the versions in the records. Host version probes run in
 `preflight` and in the default `status` report for qualified routes.
 
