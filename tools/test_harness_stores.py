@@ -28,17 +28,18 @@ def test_aliases_and_slugs_are_unique():
     assert len({a.slug for a in harness_stores.ADAPTERS}) == len(harness_stores.ADAPTERS)
 
 
-def test_registry_order_is_claude_codex_agy():
+def test_registry_order_is_claude_codex_agy_pi():
     assert [(a.alias, a.slug) for a in harness_stores.ADAPTERS] == [
-        ("claude", "claude-code"), ("codex", "codex"), ("agy", "agy")]
+        ("claude", "claude-code"), ("codex", "codex"), ("agy", "agy"), ("pi", "pi")]
 
 
 def test_homes_follow_registry_order(tmp_path):
     assert [(h.name, h.harness, h.kind) for h in harness_stores.homes(tmp_path)] == [
         ("claude", "claude", "personal"), ("claude-work", "claude", "work"),
         ("codex", "codex", "personal"), ("codex-work", "codex", "work"),
-        ("agy", "agy", "personal")]
-    assert harness_stores.homes(tmp_path)[-1].path == tmp_path / ".gemini" / "antigravity-cli"
+        ("agy", "agy", "personal"), ("pi", "pi", "personal")]
+    assert harness_stores.homes(tmp_path)[-2].path == tmp_path / ".gemini" / "antigravity-cli"
+    assert harness_stores.homes(tmp_path)[-1].path == tmp_path / ".pi" / "agent"
 
 
 def test_unknown_adapter_names_raise_key_error():
@@ -59,23 +60,41 @@ def test_agy_adapter_shape(tmp_path):
     assert adapter.resume_argv(session, ["--flag"]) == ["agy", "--flag", "--conversation", "cid"]
 
 
+def test_pi_adapter_shape(tmp_path):
+    adapter = harness_stores.by_alias("pi")
+    assert adapter.slug == "pi" and adapter.home_variable == "PI_CODING_AGENT_DIR"
+    assert adapter.exclusion_reasons == ()
+    assert adapter.notes_segment({}) is None
+    assert adapter.episode_env == "SESSION_LOGS_PI"
+    assert adapter.episode_root(tmp_path) == tmp_path / ".pi" / "agent" / "sessions"
+    transcript = tmp_path / ".pi" / "agent" / "sessions" / "--x--" / "2026-01-01T00-00-00-000Z_sid.jsonl"
+    session = harness_stores.Session(adapter.homes(tmp_path)[0], "01a18264-30aa-73b5-bec6-de3594e99d2c",
+                                     "/x", 0, "", transcript)
+    assert adapter.resume_argv(session, ["--flag"]) == ["pi", "--flag", "--session", str(transcript)]
+    assert adapter.short_id(session.id) == "94e99d2c"   # a UUIDv7 head is its timestamp
+
+
+def agy_home(tmp_path):
+    return harness_stores.by_alias("agy").homes(tmp_path)[0]
+
+
 def session_without_cwd(tmp_path, home):
     return harness_stores.Session(home, "cid", None, 0, "label", tmp_path / "t.jsonl", excluded="no workspace")
 
 
 def test_here_filter_drops_a_session_without_cwd(tmp_path):
-    home = harness_stores.homes(tmp_path)[-1]
+    home = agy_home(tmp_path)
     assert cli.here_filter({str(tmp_path)})(session_without_cwd(tmp_path, home)) is False
 
 
 def test_format_rows_names_a_session_without_cwd_instead_of_crashing(tmp_path):
-    home = harness_stores.homes(tmp_path)[-1]
+    home = agy_home(tmp_path)
     with pytest.raises(cli.UsageError, match="no workspace"):
         cli.format_rows([session_without_cwd(tmp_path, home)], {}, tmp_path, color.Painter(None))
 
 
 def test_launch_refuses_a_session_without_cwd(tmp_path):
-    home = harness_stores.homes(tmp_path)[-1]
+    home = agy_home(tmp_path)
     with pytest.raises(launch.LaunchError, match="no workspace"):
         launch.launch(session_without_cwd(tmp_path, home), {"agy": []}, tmp_path / "hq.toml")
 

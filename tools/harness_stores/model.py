@@ -28,7 +28,7 @@ class Adapter:
     slug: str                     # canonical harness slug (harnesses.toml, [harnesses.<slug>])
     alias: str                    # the `hq sessions --harness` value
     colour: color.Colour
-    home_variable: str | None     # environment variable naming a work home
+    home_variable: str | None     # variable relocating the home: a work row sets it, a personal row unsets it
     homes: Callable[[Path], tuple[Home, ...]]
     list_sessions: Callable[[Home, bool], tuple[list[Session], dict[str, int]]]
     notes_segment: Callable[[dict[str, int]], str | None]

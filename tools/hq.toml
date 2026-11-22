@@ -1,8 +1,9 @@
 # Flags `hq sessions -i` adds when it resumes a session, per home: the same flags the
 # user's own launchers pass, so a resumed session behaves like one started by hand
 # (claude, claude-work: the cl and clw aliases; codex, codex-work: cor and cowor, the
-# work resume alias). Codex flags go before the `resume` subcommand. A home missing
-# here is an error at launch, not an empty flag list.
+# work resume alias; pi: none, as no pi alias passes any). Codex flags go
+# before the `resume` subcommand. A home missing here is an error at launch, not an empty
+# flag list.
 
 [homes.claude]
 flags = ["--dangerously-skip-permissions"]
@@ -18,3 +19,6 @@ flags = ["--dangerously-skip-permissions"]
 
 [homes.codex-work]
 flags = ["--no-daemon", "--dangerously-bypass-approvals-and-sandbox"]
+
+[homes.pi]
+flags = []

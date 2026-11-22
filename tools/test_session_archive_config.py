@@ -25,6 +25,7 @@ def test_sources_table_matches_spec(tmp_path):
         "codex-work": ("codex", ".codex-work", ".codex-work/sessions", False, True, True),
         "agy": ("agy", ".gemini/antigravity-cli", ".gemini/antigravity-cli/brain", False, False, True),
         "agy-summaries": ("agy", ".gemini/antigravity-cli", ".gemini/antigravity-cli", False, False, False),
+        "pi": ("pi", ".pi/agent", ".pi/agent/sessions", False, False, True),
     }
 
 
