@@ -92,6 +92,7 @@ class Line:
     relay_event: str | None = None
     states: dict[str, RouteState] = field(default_factory=dict)
     delegates: tuple[tuple[str, ...], ...] = ()
+    relay_kind: str | None = None
 
     @property
     def kind(self) -> str:
@@ -241,6 +242,9 @@ def _validate_structure(table, *, required_outputs):
             for line in lines:
                 if not line.policies:
                     raise ValueError(f"{where}: every line needs a policy")
+                if line.relay_kind is not None and (line.kind != "relay" or not isinstance(line.relay_kind, str)
+                                                   or not line.relay_kind.strip()):
+                    raise ValueError(f"{where}: relay_kind must name the expected selector kind for a relay line")
                 if set(line.states) - set(line.policies):
                     raise ValueError(f"{where}: state override for a policy absent from the line")
                 for policy in line.policies:
@@ -315,7 +319,10 @@ def load_candidate(table: Table, path: Path) -> Table:
     if unknown:
         raise ValueError(f"unknown candidate fields: {', '.join(sorted(unknown))}")
 
-    homes = table.homes.copy()
+    homes = {
+        name: replace(home, bindings=tuple(replace(binding, next=None) for binding in home.bindings))
+        for name, home in table.homes.items()
+    }
     moved = set()
     for move in data.get("moves", ()):
         name, index = move["home"], move["binding"]
@@ -335,9 +342,9 @@ def load_candidate(table: Table, path: Path) -> Table:
         table, homes=homes,
         subscribers=_candidate_additions(table.subscribers, data.get("subscribers", {}), _subscriber, "subscribers"),
         runtimes=_candidate_additions(table.runtimes, data.get("runtimes", {}), _Runtime, "runtimes"),
-        target_files=_candidate_additions(table.target_files, data.get("target_files", {}), _target_file, "target files"),
-        reconciliation_next=data.get("reconciliation_next", table.reconciliation_next),
-        removals=table.removals + tuple(Removal(**fields) for fields in data.get("removals", ())),
+        target_files=_named(data.get("target_files", {}), _target_file),
+        reconciliation_next=data.get("reconciliation_next"),
+        removals=tuple(Removal(**fields) for fields in data.get("removals", ())),
     )
     _validate_structure(proposed, required_outputs=False)
     return proposed

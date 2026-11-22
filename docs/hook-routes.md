@@ -8,7 +8,7 @@ hook wiring and the relay subscriber template.
 | Table | Fields |
 | --- | --- |
 | `homes` | Each home names its harness, repository-relative settings path and ordered bindings. Each binding names an event, an optional matcher and its ordered lines. |
-| Lines | Each names its policies and any harness timeout in seconds. A native line names its literal command. A relay line names a runtime, subscriber file and outer budget in milliseconds. `relay_event` supplies a distinct relay event argument when needed. An agy bridge line names its transport command, runtime and ordered delegate argv. |
+| Lines | Each names its policies and any harness timeout in seconds. A native line names its literal command. A relay line names a runtime, subscriber file and outer budget in milliseconds. `relay_event` supplies a distinct relay event argument when needed, and `relay_kind` records the expected selector kind. An agy bridge line names its transport command, runtime and ordered delegate argv. |
 | `states` | Policy defaults. A line's `states` map can replace a policy's metadata for that binding. Native routes name an owner and reason. Existing relay routes name an owner and the grant for the current deployment. Relay routes cite qualification `records`. Bridge routes cite fixture `evidence`. `activation` names the user grant task note that made a former target live. |
 | `runtimes` | Each version names the command, runtime script and relay commit in that runtime's lock. |
 | `subscribers` | Each subscriber names its policy, role, argv and `timeoutMs`. Observers can declare a registry and event-specific `privateFields`. |
@@ -43,12 +43,20 @@ live `lines` list and put the new lines in `next`. A target line can point at
 a named `target_files` composition. Use fresh names so a candidate can leave
 the live runtime and file untouched.
 
-`check` checks current and effective target policy paths independently. It uses
-each line's policy declarations and subscriber selectors that establish a native
-path or have no event filter. The two literal Claude Notification matchers are
-disjoint. Overlap involving other matchers is rejected. Relay determines
-selection for kind-only filters because it owns event projection. Reconciliation
-keeps reconcile-capable observers unless their owner has authorized removal.
+`check` checks current and effective target policy paths independently. Every
+live policy keeps a target path for the same home, event and matcher, unless a
+named removal retires its subscribers. A policy can move to another group for
+that event and matcher. The two literal Claude Notification matchers are disjoint.
+Overlap involving other matchers is rejected.
+
+Relay owns event projection. The shipped relay lines declare the built-in and
+subscriber policies observed with the pinned runtime and record their expected
+`relay_kind`. The cutover check uses that kind and the file's selectors to
+preserve current subscribers, including their tool coverage. When the kind is
+undeclared, the static check uses explicit policy membership and native-event
+selectors as evidence and requires preserved selector coverage for known entries.
+Reconciliation keeps current reconcile-capable observers and covers newly added
+observers in the effective target, accounting for authorized removals.
 
 `tools/hook-routes render next --out DIR` renders the target review files to a new
 or empty directory. The candidate compositions expand HOME before hashing, and
@@ -58,8 +66,9 @@ contains those exact deployed JSON bytes under
 `<version>-<sha256-prefix>/relay/subscribers.json`. The prefix has 12 hex digits.
 
 `tools/hook-routes render candidate FILE --out DIR` renders a TOML slice for
-qualification before records exist. The slice can add `runtimes`, `subscribers`
-and `target_files`, and can name `reconciliation_next` and `removals`. Each
+qualification before records exist. It starts from the live routes and applies
+the slice's own targets. The slice can add `runtimes`, `subscribers` and
+`target_files`, and can name `reconciliation_next` and `removals`. Each
 `[[moves]]` entry has a `home`, the zero-based `binding` index in that home's
 ordered array, and replacement `lines` using the same syntax as `next`. For example,
 a slice that moves a Codex Stop binding to a new native command can contain

@@ -45,6 +45,7 @@ def _relay():
     return Line(
         ("guard",), runtime="v0.5.0", subscriber_file="target", outer_ms=500, timeout=1,
         states={"guard": RouteState("relay", records=("qualification.json",))},
+        relay_kind="turn-end",
     )
 
 
@@ -112,12 +113,12 @@ def test_current_with_two_runnable_paths_refused(table):
 def _with_nonselecting_binding(table):
     from hook_routes.table import RouteState
 
-    line = Line(("other",), runtime="v0.5.0", subscriber_file="shared", outer_ms=500, timeout=1)
+    line = Line(("relay-hooks",), runtime="v0.5.0", subscriber_file="shared", outer_ms=500, timeout=1)
     notify = Binding("Notification", "idle_prompt", (line,))
     moved = table.homes["codex"].bindings[0]
     return replace(
         _stop(table, moved, notify),
-        states={**table.states, "other": RouteState("existing", "owner-123456", grant="grant")},
+        states={**table.states, "relay-hooks": RouteState("existing", "owner-123456", grant="grant")},
     )
 
 
@@ -135,18 +136,19 @@ def test_removal_without_owner_refused(table):
     assert _findings(replace(table, removals=(Removal("guard", ""),))) == ["removal-owner"]
 
 
-def test_retirement_leaving_containing_file_refused(table):
+@pytest.mark.parametrize("all_moved", [False, True])
+def test_retirement_leaving_containing_file_refused(table, all_moved):
     from hook_routes.table import Removal, RouteState, Subscriber, TargetSubscriberFile
 
     base = load(TABLE)
     old = base.subscriber_files[base.reconciliation_file]
     # Both relay lines name the file. Its filter selects the old guard on Stop.
-    entry = replace(old.subscribers[0], name="retired", nativeEvents=["Stop"])
-    relay = replace(_relay(), policies=("other",), states={})
+    entry = replace(old.subscribers[0], name="retired", kinds=["turn-end"], nativeEvents=["Stop"], tools=None)
+    relay = replace(_relay(), policies=("relay-hooks",), states={})
     stop = Binding("Stop", None, (replace(relay, subscriber_file="shared"),), next=(relay,))
     table = replace(
         _with_nonselecting_binding(_stop(table, stop)),
-        states={"other": RouteState("existing", "owner-123456", grant="grant"),
+        states={"relay-hooks": RouteState("existing", "owner-123456", grant="grant"),
                 "retired": RouteState("existing", "owner-123456", grant="grant")},
         subscribers={"retired": Subscriber("retired", "guard", ("old-guard",), 500)},
         subscriber_files={"shared": replace(old, subscribers=(entry,)),
@@ -156,8 +158,12 @@ def test_retirement_leaving_containing_file_refused(table):
     )
     from hook_routes.rules import validate
 
+    if all_moved:
+        stop, notify = table.homes["codex"].bindings
+        move = replace(notify.lines[0], subscriber_file="target")
+        table = _stop(table, stop, replace(notify, next=(move,)))
     findings = validate(table)
-    assert [item.code for item in findings] == ["retirement-reference"], findings
+    assert [item.code for item in findings] == ([] if all_moved else ["retirement-reference"]), findings
 
 
 def test_relay_target_requires_a_subscriber_selection(table):
@@ -284,3 +290,120 @@ def test_candidate_cli_writes_manifest_of_review_files(tmp_path):
     assert manifest == {"kind": "candidate", "files": files}
     hooks = json.loads((out / codex.path).read_bytes())["hooks"]
     assert hooks["Stop"][0]["hooks"][0]["command"] == "fixture-guard"
+
+
+def _codex_move(table, *, home="codex", event="Stop", relay=False, change):
+    settings = table.homes[home]
+    bindings = list(settings.bindings)
+    index = next(index for index, binding in enumerate(bindings)
+                 if binding.event == event and bool(binding.lines[0].runtime) == relay)
+    bindings[index] = change(bindings[index])
+    return replace(table, homes={**table.homes, home: replace(settings, bindings=tuple(bindings))})
+
+
+@pytest.mark.parametrize(("policy", "relay"), [("claim-guard", False), ("relay-hooks", True)])
+def test_target_cannot_drop_a_live_policy_without_replacement(policy, relay):
+    from hook_routes.rules import validate
+
+    table = _codex_move(load(TABLE), relay=relay, change=lambda binding: replace(binding, next=()))
+    findings = validate(table)
+    assert any(item.code == "missing-route" and policy in item.where for item in findings), findings
+
+
+def test_live_policy_can_move_between_event_groups(table):
+    table = _transition(table)
+    live = table.homes["codex"].bindings[0]
+    source = replace(live, next=())
+    destination = Binding("Stop", "*", (), next=live.next)
+    assert _findings(_stop(table, source, destination)) == []
+
+
+@pytest.mark.parametrize("omission", ["entry", "kind", "tools"])
+def test_target_cannot_drop_the_shipped_relay_subscriber(omission):
+    from hook_routes.rules import route_status, validate
+    from hook_routes.table import TargetSubscriberFile
+
+    table = load(TABLE)
+    source = table.subscriber_files[table.reconciliation_file]
+    event, subscriber = ("PreToolUse", "ops-guard") if omission == "tools" else ("Stop", "familiar")
+    target = []
+    for entry in source.subscribers:
+        if entry.name == subscriber:
+            if omission == "entry":
+                continue
+            if omission == "kind":
+                entry = replace(entry, kinds=["session-start", "reconcile"])
+            if omission == "tools":
+                entry = replace(entry, tools=["AnotherTool"])
+        target.append(entry)
+    table = _codex_move(table, event=event, relay=True, change=lambda binding: replace(
+        binding, next=(replace(binding.lines[0], subscriber_file="stop-candidate"),),
+    ))
+    table = replace(
+        table, target_files={"stop-candidate": TargetSubscriberFile("v0.5.0", tuple(target))},
+    )
+
+    findings = validate(table)
+    assert any(item.code == "cutover-composition" and subscriber in item.message
+               for item in findings), findings
+    assert any(route.home == "codex" and route.event == event and route.policy == subscriber
+               for route in route_status(table))
+
+
+def test_slice_uses_state_and_only_its_own_directives(tmp_path):
+    from hook_routes.render import render_candidate, render_live
+    from hook_routes.table import Removal, TargetSubscriberFile
+
+    table = _codex_move(load(TABLE), change=lambda binding: replace(
+        binding, next=(replace(binding.lines[0], command="unrelated-personal-guard"),),
+    ))
+    table = replace(
+        table, reconciliation_next="unrelated-reconcile",
+        target_files={"unrelated-reconcile": TargetSubscriberFile("v0.5.0", ())},
+        removals=(Removal("ops-guard", "owner-123456"),),
+    )
+    work = table.homes["codex-work"]
+    index = next(index for index, binding in enumerate(work.bindings)
+                 if binding.event == "Stop" and binding.lines[0].policies == ("claim-guard",))
+    candidate = tmp_path / "candidate.toml"
+    candidate.write_text(f"""
+        [[moves]]
+        home = "codex-work"
+        binding = {index}
+        lines = [{{policies = ["claim-guard"], command = "fixture-work-guard"}}]
+        """)
+    home = tmp_path / "home"
+
+    rendered = render_candidate(table, candidate, home)
+    assert rendered[table.homes["codex"].path] == render_live(table, home)[table.homes["codex"].path]
+    assert json.loads(rendered[work.path])["hooks"]["Stop"][0]["hooks"][0]["command"] == "fixture-work-guard"
+
+
+@pytest.mark.parametrize("field", ["command", "script"])
+def test_relay_runtime_cannot_render_a_repository_path(table, field):
+    table = _transition(table)
+    donor = Path("d", "fixture", "hooks", "runtime-script")
+    runtime = replace(table.runtimes["v0.5.0"], **{field: f"~/{donor}"})
+    assert _findings(replace(table, runtimes={"v0.5.0": runtime})) == ["repository-path"]
+
+
+@pytest.mark.parametrize("moves_reconciliation", [False, True])
+def test_new_reconcile_observer_needs_effective_reconciliation_file(table, moves_reconciliation):
+    from hook_routes.table import RouteState, Subscriber, TargetSubscriberFile
+
+    table = _transition(table)
+    target = table.target_files["target"]
+    observe = replace(
+        target.subscribers[0], name="observe", kinds=["turn-end", "reconcile"], tools=None,
+    )
+    binding = table.homes["codex"].bindings[0]
+    line = binding.next[0]
+    line = replace(line, policies=(*line.policies, "observe"),
+                   states={**line.states, "observe": RouteState("relay", records=("qualification.json",))})
+    table = replace(
+        _stop(table, replace(binding, next=(line,))),
+        subscribers={**table.subscribers, "observe": Subscriber("observe", "observer", ("observe",), 500)},
+        target_files={"target": TargetSubscriberFile("v0.5.0", (*target.subscribers, observe))},
+        reconciliation_next="target" if moves_reconciliation else None,
+    )
+    assert _findings(table) == ([] if moves_reconciliation else ["reconciliation"])

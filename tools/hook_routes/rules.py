@@ -36,22 +36,37 @@ def _home_relative(token):
     return token
 
 
-def _admitted(entry, home, binding):
+def _fixed_tool(home, binding):
+    if (home.harness in ("claude-code", "codex")
+            and binding.event in ("PreToolUse", "PostToolUse", "PostToolUseFailure")
+            and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", binding.matcher or "")):
+        return binding.matcher
+    return None
+
+
+def _admitted(entry, home, binding, line):
+    tool = _fixed_tool(home, binding)
     return (
         (entry.harnesses is None or home.harness in entry.harnesses)
-        and (entry.nativeEvents is None or binding.event in entry.nativeEvents)
+        and (entry.nativeEvents is None or (line.relay_event or binding.event) in entry.nativeEvents)
+        and (entry.kinds is None or line.relay_kind is None or line.relay_kind in entry.kinds)
+        and (entry.tools is None or tool is None or tool in entry.tools)
     )
 
 
-def _declared_policies(table, files, home, binding, line):
-    policies = dict.fromkeys(line.policies)
-    if line.subscriber_file is not None:
-        for entry in files[line.subscriber_file].subscribers:
-            # Kind-only selectors require relay's projection. Native event selectors
-            # give the table enough information to check the possible path directly.
-            if _admitted(entry, home, binding) and (entry.nativeEvents is not None or entry.kinds is None):
-                policies[table.subscribers[entry.name].policy] = None
-    return policies
+def _selected_entries(table, files, home, binding, line):
+    if line.subscriber_file is None:
+        return ()
+    return tuple(
+        entry for entry in files[line.subscriber_file].subscribers
+        if _admitted(entry, home, binding, line)
+        and (line.relay_kind is not None or entry.nativeEvents is not None or entry.kinds is None
+             or table.subscribers[entry.name].policy in line.policies)
+    )
+
+
+def _declared_policies(table, line, entries):
+    return dict.fromkeys((*line.policies, *(table.subscribers[entry.name].policy for entry in entries)))
 
 
 def _overlap(event, left, right):
@@ -60,22 +75,18 @@ def _overlap(event, left, right):
     return True
 
 
-def _check_state(state, kind, where, findings, *, records):
+def _state_problem(state, kind, *, records):
     if state is None:
-        findings.append(Finding("route-state", where, "a runnable policy needs a declared state"))
-    elif state.kind == "native" and kind == "native" and _text(state.owner) and _text(state.reason):
-        return
-    elif state.kind == "existing" and kind == "relay" and _text(state.owner) and _text(state.grant):
-        return
-    elif state.kind == kind == "relay" and (not records or state.records and all(map(_text, state.records))):
-        return
-    elif state.kind == kind == "bridge" and _text(state.evidence):
-        return
-    else:
-        findings.append(Finding(
-            "route-state", where,
-            f"{state.kind} state on a {kind} line needs its owner and reason, owner and grant, records or bridge evidence",
-        ))
+        return "a runnable policy needs a declared state"
+    if state.kind == "native" and kind == "native" and _text(state.owner) and _text(state.reason):
+        return None
+    if state.kind == "existing" and kind == "relay" and _text(state.owner) and _text(state.grant):
+        return None
+    if state.kind == kind == "relay" and (not records or state.records and all(map(_text, state.records))):
+        return None
+    if state.kind == kind == "bridge" and _text(state.evidence):
+        return None
+    return f"{state.kind} state on a {kind} line needs its owner and reason, owner and grant, records or bridge evidence"
 
 
 def _text(value):
@@ -96,7 +107,8 @@ def route_status(table: Table) -> list[PolicyRoute]:
     def collect(target):
         routes = {}
         for name, home, _, binding, line, files in _configuration(table, target=target):
-            for policy in _declared_policies(table, files, home, binding, line):
+            entries = _selected_entries(table, files, home, binding, line)
+            for policy in _declared_policies(table, line, entries):
                 key = (policy, name, binding.event, binding.matcher)
                 routes[key] = (table.policy_state(policy, line), binding.next is not None)
         return routes
@@ -111,7 +123,7 @@ def route_status(table: Table) -> list[PolicyRoute]:
     return status
 
 
-def _repository_tokens(table, files, line, policy, home, binding):
+def _repository_tokens(table, line, policy, home, entries):
     args = []
     if line.command is not None:
         command = shlex.split(line.command)
@@ -121,12 +133,13 @@ def _repository_tokens(table, files, line, policy, home, binding):
         args.extend(command)
     for argv in line.delegates:
         args.extend(argv)
-    if line.subscriber_file is not None:
-        source = files[line.subscriber_file]
-        for entry in source.subscribers:
-            subscriber = table.subscribers[entry.name]
-            if subscriber.policy == policy and _admitted(entry, home, binding):
-                args.extend(subscriber.argv)
+    if line.kind == "relay":
+        runtime = table.runtimes[line.runtime]
+        args.extend((runtime.command, runtime.script))
+    for entry in entries:
+        subscriber = table.subscribers[entry.name]
+        if subscriber.policy == policy:
+            args.extend(subscriber.argv)
     return [arg for arg in args if _home_relative(arg).startswith("d/")]
 
 
@@ -135,17 +148,19 @@ def _check_configuration(table, *, target, records):
     paths = {}
     mode = "next" if target else "state"
     for name, home, index, binding, line, files in _configuration(table, target=target):
-        for policy in _declared_policies(table, files, home, binding, line):
+        entries = _selected_entries(table, files, home, binding, line)
+        subscriber_policies = {table.subscribers[entry.name].policy for entry in entries}
+        for policy in _declared_policies(table, line, entries):
             where = f"{_where(name, binding, index)}:{policy}:{mode}"
             state = table.policy_state(policy, line)
-            _check_state(state, line.kind, where, findings, records=records)
-            if state is not None and state.kind == line.kind == "relay" and policy not in _RELAY_BUILTINS:
-                if not any(table.subscribers[entry.name].policy == policy and _admitted(entry, home, binding)
-                           for entry in files[line.subscriber_file].subscribers):
-                    findings.append(Finding("route-selection", where, "relay route needs a subscriber on this binding"))
+            problem = _state_problem(state, line.kind, records=records)
+            if problem is not None:
+                findings.append(Finding("route-state", where, problem))
+            elif line.kind == "relay" and policy not in _RELAY_BUILTINS and policy not in subscriber_policies:
+                findings.append(Finding("route-selection", where, "relay route needs a subscriber on this binding"))
             # A grandfathered path is permitted only if it has a named owner.
             if state is not None and state.kind not in ("native", "existing"):
-                args = _repository_tokens(table, files, line, policy, home, binding)
+                args = _repository_tokens(table, line, policy, home, entries)
                 if args:
                     findings.append(Finding("repository-path", where, f"repository path in {state.kind} route: {args[0]}"))
             key = (name, binding.event, policy)
@@ -167,20 +182,22 @@ def _check_reconciliation(table, removals):
     files = table.subscriber_files | table.target_files
     current_name = table.reconciliation_file
     current = _reconcile_observers(table, table.subscriber_files[current_name])
-    # A pointer changed directly in state still has to keep the observers declared
-    # by its live compositions. Rollback-only compositions can hold retired entries.
-    live_names = {line.subscriber_file for _, _, _, _, line, _ in _configuration(table, target=False)}
-    required = current.union(*(_reconcile_observers(table, table.subscriber_files[name])
-                               for name in live_names - {None}))
-    if required - current:
+
+    def required(target):
+        names = {line.subscriber_file for _, _, _, _, line, _ in _configuration(table, target=target)}
+        return current.union(*(_reconcile_observers(table, files[name]) for name in names - {None}))
+
+    live_missing = required(False) - current
+    if live_missing:
         yield Finding("reconciliation", current_name,
-                      f"missing reconcile observers: {', '.join(sorted(required - current))}")
-    if table.reconciliation_next is not None:
-        target = _reconcile_observers(table, files[table.reconciliation_next])
-        missing = required - removals - target
-        if missing:
-            yield Finding("reconciliation", table.reconciliation_next,
-                          f"missing reconcile observers: {', '.join(sorted(missing))}")
+                      f"missing reconcile observers: {', '.join(sorted(live_missing))}")
+    target_name = table.reconciliation_next or current_name
+    target_missing = required(True) - removals - _reconcile_observers(table, files[target_name])
+    if target_name == current_name:
+        target_missing -= live_missing
+    if target_missing:
+        yield Finding("reconciliation", target_name,
+                      f"missing reconcile observers in target: {', '.join(sorted(target_missing))}")
 
 
 def _check_removals(table, removals):
@@ -205,29 +222,55 @@ def _check_removals(table, removals):
             yield Finding("retirement-reference", target_name, f"{entry.name} is still present in reconciliation")
 
 
-def _check_compositions(table, removals):
-    files = table.subscriber_files | table.target_files
-    for name, home, index, binding in table.bindings():
+def _coverage_key(name, binding):
+    return name, binding.event, None if binding.matcher == "*" else binding.matcher
+
+
+def _includes_filter(allowed, required):
+    return allowed is None or (required is not None and set(required).issubset(allowed))
+
+
+def _preserves_selection(line, entry, target_line, target_entry, binding, tool):
+    if (target_line.relay_event or binding.event) != (line.relay_event or binding.event):
+        return False
+    if line.relay_kind is not None and target_line.relay_kind not in (None, line.relay_kind):
+        return False
+    kinds = (line.relay_kind,) if line.relay_kind is not None else entry.kinds
+    tools = (tool,) if tool is not None else entry.tools
+    return _includes_filter(target_entry.kinds, kinds) and _includes_filter(target_entry.tools, tools)
+
+
+def _check_cutover_coverage(table, removals):
+    target_policies = {}
+    target_entries = {}
+    for name, home, _, binding, line, files in _configuration(table, target=True):
+        key = _coverage_key(name, binding)
+        entries = _selected_entries(table, files, home, binding, line)
+        target_policies.setdefault(key, set()).update(_declared_policies(table, line, entries))
+        target_entries.setdefault(key, []).extend((line, entry) for entry in entries)
+
+    for name, home, index, binding, line, files in _configuration(table, target=False):
         if binding.next is None:
             continue
-        # Routes can move between two groups of the same event and matcher.
-        related = [item for item in home.bindings if (item.event, item.matcher) == (binding.event, binding.matcher)]
-        target_entries = {
-            entry.name
-            for other in related for line in other.target if line.subscriber_file is not None
-            for entry in files[line.subscriber_file].subscribers if _admitted(entry, home, other)
-        }
-        required = {
-            entry.name
-            for line in binding.lines if line.subscriber_file is not None
-            for entry in table.subscriber_files[line.subscriber_file].subscribers
-            if _admitted(entry, home, binding)
-            and (entry.nativeEvents is not None or entry.kinds is None or table.subscribers[entry.name].policy in line.policies)
-        }
-        missing = required - target_entries - removals
-        if missing:
-            yield Finding("cutover-composition", _where(name, binding, index),
-                          f"cutover drops subscribers without a removal: {', '.join(sorted(missing))}")
+        key = _coverage_key(name, binding)
+        where = _where(name, binding, index)
+        entries = _selected_entries(table, files, home, binding, line)
+        for policy in _declared_policies(table, line, entries):
+            if policy in target_policies.get(key, ()):
+                continue
+            retired = {entry.name for entry in entries if table.subscribers[entry.name].policy == policy}
+            if retired and retired <= removals and policy not in _RELAY_BUILTINS:
+                continue
+            yield Finding("missing-route", f"{where}:{policy}:next", "live policy needs a target path on this binding's event and matcher")
+
+        tool = _fixed_tool(home, binding)
+        for entry in entries:
+            if entry.name in removals:
+                continue
+            if not any(entry.name == other.name and _preserves_selection(line, entry, next_line, other, binding, tool)
+                       for next_line, other in target_entries.get(key, ())):
+                yield Finding("cutover-composition", where,
+                              f"target must retain the applicable selector for {entry.name}")
 
 
 def validate(table: Table, *, records: bool = True) -> list[Finding]:
@@ -256,7 +299,7 @@ def validate(table: Table, *, records: bool = True) -> list[Finding]:
         for finding in _check_configuration(table, target=True, records=records):
             if (finding.code, finding.where.removesuffix(":next"), finding.message) not in existing:
                 findings.append(finding)
+        findings.extend(_check_cutover_coverage(table, removals))
     findings.extend(_check_reconciliation(table, removals))
     findings.extend(_check_removals(table, removals))
-    findings.extend(_check_compositions(table, removals))
     return findings
