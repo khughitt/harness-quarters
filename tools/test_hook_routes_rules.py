@@ -87,7 +87,8 @@ def test_donor_path_in_relay_state_refused(table):
     assert _findings(replace(table, subscribers={"guard": guard})) == ["repository-path"]
 
 
-def test_nonselecting_argv_uses_the_composition_policy_state(table):
+@pytest.mark.parametrize("prefix", ["~/", "~/./", "~/tmp/..//", "@HOME@/./", "./"])
+def test_nonselecting_argv_uses_the_composition_policy_state(table, prefix):
     from hook_routes.table import Subscriber
 
     table = _transition(table)
@@ -95,7 +96,7 @@ def test_nonselecting_argv_uses_the_composition_policy_state(table):
     extra = replace(target.subscribers[0], name="guard-on-end", nativeEvents=["SessionEnd"],
                     kinds=["session-end"])
     donor = Path("d", "fixture", "hooks", "old-session-end")
-    extra_subscriber = Subscriber("guard", "observer", ("env", f"~/{donor}"), 500)
+    extra_subscriber = Subscriber("guard", "observer", ("env", f"{prefix}{donor}"), 500)
     table = replace(table, subscribers={**table.subscribers, extra.name: extra_subscriber},
                     target_files={"target": replace(target, subscribers=(*target.subscribers, extra))})
     assert _findings(table) == ["repository-path"]
@@ -219,17 +220,21 @@ def test_cutover_status_shows_existing_route_moved_to_another_file(table):
 
 
 @pytest.mark.parametrize("delegate", ["tasks-stop", f"~/{Path('d', 'fixture', 'hooks', 'claim-guard')}"])
-def test_agy_bridge_allows_hq_transport_and_checks_delegate_paths(table, delegate):
+@pytest.mark.parametrize("prefix", ["~/", "~/./"])
+def test_agy_bridge_allows_hq_transport_and_checks_delegate_paths(table, delegate, prefix):
     from hook_routes.table import RouteState
 
     state = RouteState("bridge", evidence="bridge-fixtures")
     transport = Path("d", "hq", "harnesses", "agy", "hook")
-    line = Line(("guard",), command=f"~/{transport} Stop",
+    line = Line(("guard",), command=f"{prefix}{transport} Stop",
                 runtime="v0.5.0", delegates=((delegate, "Stop"),), states={"guard": state})
     agy = replace(load(TABLE).homes["agy"], bindings=(Binding("Stop", None, (line,)),))
     assert _findings(replace(table, homes={"agy": agy})) == (
         ["repository-path"] if delegate.startswith("~/") else []
     )
+    other_hook = replace(line, command=f"{prefix}{transport}-other Stop")
+    agy = replace(agy, bindings=(Binding("Stop", None, (other_hook,)),))
+    assert _findings(replace(table, homes={"agy": agy})) == ["repository-path"]
 
 
 def test_today_table_is_valid():
@@ -462,10 +467,14 @@ def test_candidate_keeps_an_inherited_definition_selected_by_its_slice(table, tm
 
 
 @pytest.mark.parametrize("field", ["command", "script"])
-def test_relay_runtime_cannot_render_a_repository_path(table, field):
+@pytest.mark.parametrize("spelling", ["home", "absolute-dot-component"])
+def test_relay_runtime_cannot_render_a_repository_path(table, field, spelling, tmp_path, monkeypatch):
     table = _transition(table)
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
     donor = Path("d", "fixture", "hooks", "runtime-script")
-    runtime = replace(table.runtimes["v0.5.0"], **{field: f"~/{donor}"})
+    path = f"~/{donor}" if spelling == "home" else f"{home.parent}/./{home.name}/{donor}"
+    runtime = replace(table.runtimes["v0.5.0"], **{field: path})
     assert _findings(replace(table, runtimes={"v0.5.0": runtime})) == ["repository-path"]
 
 

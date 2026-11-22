@@ -1,6 +1,7 @@
 """Check the live and proposed policy paths independently."""
 from dataclasses import dataclass
 from pathlib import Path
+from posixpath import normpath
 import re
 import shlex
 
@@ -30,10 +31,14 @@ def _where(home, binding, index):
 
 
 def _home_relative(token):
-    for prefix in (*_HOME_PREFIXES, str(Path.home()) + "/"):
+    home = normpath("/" + str(Path.home()).lstrip("/")).rstrip("/")
+    for prefix in _HOME_PREFIXES:
         if token.startswith(prefix):
-            return token[len(prefix):]
-    return token
+            token = f"{home}/{token[len(prefix):]}"
+            break
+    if token.startswith("/"):
+        token = "/" + token.lstrip("/")
+    return normpath(token).removeprefix(f"{home}/")
 
 
 def _fixed_tool(home, binding):
