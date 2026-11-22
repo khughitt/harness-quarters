@@ -87,6 +87,39 @@ def test_donor_path_in_relay_state_refused(table):
     assert _findings(replace(table, subscribers={"guard": guard})) == ["repository-path"]
 
 
+def test_nonselecting_argv_uses_the_composition_policy_state(table):
+    from hook_routes.table import Subscriber
+
+    table = _transition(table)
+    target = table.target_files["target"]
+    extra = replace(target.subscribers[0], name="guard-on-end", nativeEvents=["SessionEnd"],
+                    kinds=["session-end"])
+    donor = Path("d", "fixture", "hooks", "old-session-end")
+    extra_subscriber = Subscriber("guard", "observer", ("env", f"~/{donor}"), 500)
+    table = replace(table, subscribers={**table.subscribers, extra.name: extra_subscriber},
+                    target_files={"target": replace(target, subscribers=(*target.subscribers, extra))})
+    assert _findings(table) == ["repository-path"]
+
+
+@pytest.mark.parametrize("authorized", [False, True])
+def test_stored_argv_in_unbound_live_file_needs_an_owned_state(table, authorized):
+    from hook_routes.table import RouteState, Subscriber
+
+    old = load(TABLE)
+    source = old.subscriber_files[old.reconciliation_file]
+    entry = replace(source.subscribers[0], name="unowned")
+    donor = Path("d", "fixture", "hooks", "held-guard")
+    named = replace(source, output="relay/held.json", subscribers=(entry,))
+    state = (RouteState("existing", owner="owner-123456", grant="grant") if authorized
+             else RouteState("relay", records=("record.json",)))
+    table = replace(
+        table, subscriber_files={**table.subscriber_files, "held": named},
+        subscribers={"unowned": Subscriber("unowned", "guard", ("env", f"~/{donor}"), 500)},
+        states={**table.states, "unowned": state},
+    )
+    assert _findings(table) == ([] if authorized else ["repository-path"])
+
+
 def test_native_to_relay_transition_valid(table):
     assert _findings(_transition(table)) == []
 
@@ -212,7 +245,7 @@ def test_reconciliation_move_keeps_reconcile_observers(table, complete):
     workers, familiar = old.subscribers[2], old.subscribers[1]
     target = TargetSubscriberFile("v0.5.0", (workers, familiar) if complete else (workers,))
     table = replace(
-        table, subscribers=today.subscribers, subscriber_files={"shared": old},
+        table, states={**table.states, **today.states}, subscribers=today.subscribers, subscriber_files={"shared": old},
         target_files={"target": target}, reconciliation_next="target",
     )
     assert _findings(table) == ([] if complete else ["reconciliation"])
@@ -352,14 +385,32 @@ def test_target_cannot_drop_the_shipped_relay_subscriber(omission):
 
 def test_slice_uses_state_and_only_its_own_directives(tmp_path):
     from hook_routes.render import render_candidate, render_live
-    from hook_routes.table import Removal, TargetSubscriberFile
+    from hook_routes.table import Removal, RouteState, Subscriber, TargetSubscriberFile
 
     table = _codex_move(load(TABLE), change=lambda binding: replace(
         binding, next=(replace(binding.lines[0], command="unrelated-personal-guard"),),
     ))
+    shared = table.subscriber_files[table.reconciliation_file]
+    pending = replace(shared.subscribers[1], name="pending-observer", kinds=["turn-end"])
+
+    def add_pending(binding):
+        line = binding.lines[0]
+        added = replace(
+            line, policies=(*line.policies, pending.name), subscriber_file="pending-personal",
+            states={pending.name: RouteState("relay", records=("pending.json",))},
+        )
+        return replace(binding, next=(added,))
+
+    table = _codex_move(table, relay=True, change=add_pending)
+    table = replace(
+        table,
+        subscribers={**table.subscribers, pending.name: Subscriber(pending.name, "observer", ("pending-observer",), 500)},
+        target_files={"pending-personal": TargetSubscriberFile("v0.5.0", (*shared.subscribers, pending))},
+    )
+    assert _findings(table) == []
     table = replace(
         table, reconciliation_next="unrelated-reconcile",
-        target_files={"unrelated-reconcile": TargetSubscriberFile("v0.5.0", ())},
+        target_files={**table.target_files, "unrelated-reconcile": TargetSubscriberFile("v0.5.0", ())},
         removals=(Removal("ops-guard", "owner-123456"),),
     )
     work = table.homes["codex-work"]
@@ -377,6 +428,37 @@ def test_slice_uses_state_and_only_its_own_directives(tmp_path):
     rendered = render_candidate(table, candidate, home)
     assert rendered[table.homes["codex"].path] == render_live(table, home)[table.homes["codex"].path]
     assert json.loads(rendered[work.path])["hooks"]["Stop"][0]["hooks"][0]["command"] == "fixture-work-guard"
+
+
+def test_candidate_keeps_an_inherited_definition_selected_by_its_slice(table, tmp_path):
+    from hook_routes.render import render_candidate
+    from hook_routes.table import RouteState, Subscriber
+
+    table = _transition(table)
+    target = table.target_files["target"]
+    entry = replace(target.subscribers[0], name="follow", nativeEvents=["Stop"])
+    binding = table.homes["codex"].bindings[0]
+    line = binding.next[0]
+    line = replace(line, policies=(*line.policies, "follow"),
+                   states={**line.states, "follow": RouteState("relay", records=("follow.json",))})
+    table = replace(
+        _stop(table, replace(binding, next=(line,))),
+        subscribers={**table.subscribers, "follow": Subscriber("follow", "observer", ("follow-stop",), 500)},
+        target_files={"target": replace(target, subscribers=(*target.subscribers, entry))},
+    )
+    candidate = tmp_path / "candidate.toml"
+    candidate.write_text("""
+        [target_files.slice]
+        runtime = "v0.5.0"
+        subscribers = [{name = "guard", kinds = ["turn-end"]}, {name = "follow", kinds = ["turn-end"]}]
+
+        [[moves]]
+        home = "codex"
+        binding = 0
+        lines = [{policies = ["guard", "follow"], runtime = "v0.5.0", relay_kind = "turn-end", subscriber_file = "slice", outer_ms = 500, timeout = 1, states = {guard = {state = "relay"}, follow = {state = "relay"}}}]
+        """)
+    rendered = render_candidate(table, candidate, tmp_path / "home")
+    assert any(b'"new-guard"' in content and b'"follow-stop"' in content for content in rendered.values())
 
 
 @pytest.mark.parametrize("field", ["command", "script"])

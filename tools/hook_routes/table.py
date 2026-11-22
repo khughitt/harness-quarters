@@ -338,13 +338,22 @@ def load_candidate(table: Table, path: Path) -> Table:
         bindings[index] = replace(bindings[index], next=_lines(move["lines"]))
         homes[name] = replace(home, bindings=tuple(bindings))
 
+    target_files = _named(data.get("target_files", {}), _target_file)
+    removals = tuple(Removal(**fields) for fields in data.get("removals", ()))
+    used_subscribers = {
+        entry.name
+        for source in (*table.subscriber_files.values(), *target_files.values())
+        for entry in source.subscribers
+    }
+    used_subscribers.update(removal.subscriber for removal in removals)
+    inherited = {name: subscriber for name, subscriber in table.subscribers.items() if name in used_subscribers}
     proposed = replace(
         table, homes=homes,
-        subscribers=_candidate_additions(table.subscribers, data.get("subscribers", {}), _subscriber, "subscribers"),
+        subscribers=_candidate_additions(inherited, data.get("subscribers", {}), _subscriber, "subscribers"),
         runtimes=_candidate_additions(table.runtimes, data.get("runtimes", {}), _Runtime, "runtimes"),
-        target_files=_named(data.get("target_files", {}), _target_file),
+        target_files=target_files,
         reconciliation_next=data.get("reconciliation_next"),
-        removals=tuple(Removal(**fields) for fields in data.get("removals", ())),
+        removals=removals,
     )
     _validate_structure(proposed, required_outputs=False)
     return proposed

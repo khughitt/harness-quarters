@@ -123,7 +123,7 @@ def route_status(table: Table) -> list[PolicyRoute]:
     return status
 
 
-def _repository_tokens(table, line, policy, home, entries):
+def _repository_tokens(table, line, home):
     args = []
     if line.command is not None:
         command = shlex.split(line.command)
@@ -136,11 +136,43 @@ def _repository_tokens(table, line, policy, home, entries):
     if line.kind == "relay":
         runtime = table.runtimes[line.runtime]
         args.extend((runtime.command, runtime.script))
-    for entry in entries:
-        subscriber = table.subscribers[entry.name]
-        if subscriber.policy == policy:
-            args.extend(subscriber.argv)
     return [arg for arg in args if _home_relative(arg).startswith("d/")]
+
+
+def _owns_repository_path(state):
+    return state is not None and state.kind in ("native", "existing") and _text(state.owner)
+
+
+def _check_subscriber_paths(table, *, target):
+    if target:
+        files = table.subscriber_files | table.target_files
+        used = {table.reconciliation_next or table.reconciliation_file}
+    else:
+        files = table.subscriber_files
+        used = set(files)
+
+    authorities = {}
+    for _, home, _, binding, line, _ in _configuration(table, target=target):
+        source = line.subscriber_file
+        if source is None:
+            continue
+        used.add(source)
+        entries = _selected_entries(table, files, home, binding, line)
+        for policy in _declared_policies(table, line, entries):
+            key = source, policy
+            authorities[key] = authorities.get(key, True) and _owns_repository_path(table.policy_state(policy, line))
+
+    # Every entry is emitted, including those outside all selectors of a binding.
+    for source in sorted(used):
+        for entry in files[source].subscribers:
+            subscriber = table.subscribers[entry.name]
+            path = next((arg for arg in subscriber.argv if _home_relative(arg).startswith("d/")), None)
+            if path is None:
+                continue
+            policy = subscriber.policy
+            if not authorities.get((source, policy), _owns_repository_path(table.states.get(policy))):
+                yield Finding("repository-path", f"{source}:{entry.name}",
+                              f"subscriber repository path needs an owned native or existing policy: {path}")
 
 
 def _check_configuration(table, *, target, records):
@@ -160,7 +192,7 @@ def _check_configuration(table, *, target, records):
                 findings.append(Finding("route-selection", where, "relay route needs a subscriber on this binding"))
             # A grandfathered path is permitted only if it has a named owner.
             if state is not None and state.kind not in ("native", "existing"):
-                args = _repository_tokens(table, line, policy, home, entries)
+                args = _repository_tokens(table, line, home)
                 if args:
                     findings.append(Finding("repository-path", where, f"repository path in {state.kind} route: {args[0]}"))
             key = (name, binding.event, policy)
@@ -293,13 +325,17 @@ def validate(table: Table, *, records: bool = True) -> list[Finding]:
 
     current = _check_configuration(table, target=False, records=records)
     findings.extend(current)
-    if any(binding.next is not None for _, _, _, binding in table.bindings()):
+    findings.extend(_check_subscriber_paths(table, target=False))
+    has_moves = any(binding.next is not None for _, _, _, binding in table.bindings())
+    if has_moves:
         # A defect inherited by the target is already reported against state.
         existing = {(finding.code, finding.where.removesuffix(":state"), finding.message) for finding in current}
         for finding in _check_configuration(table, target=True, records=records):
             if (finding.code, finding.where.removesuffix(":next"), finding.message) not in existing:
                 findings.append(finding)
         findings.extend(_check_cutover_coverage(table, removals))
+    if has_moves or table.reconciliation_next is not None:
+        findings.extend(finding for finding in _check_subscriber_paths(table, target=True) if finding not in findings)
     findings.extend(_check_reconciliation(table, removals))
     findings.extend(_check_removals(table, removals))
     return findings

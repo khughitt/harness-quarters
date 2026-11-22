@@ -57,6 +57,9 @@ undeclared, the static check uses explicit policy membership and native-event
 selectors as evidence and requires preserved selector coverage for known entries.
 Reconciliation keeps current reconcile-capable observers and covers newly added
 observers in the effective target, accounting for authorized removals.
+Repository path checks cover every stored subscriber argv. Each file uses
+the binding-level states for policies declared on it, and the policy default
+for stored entries without a binding state on that file.
 
 `tools/hook-routes render next --out DIR` renders the target review files to a new
 or empty directory. The candidate compositions expand HOME before hashing, and
@@ -67,7 +70,8 @@ contains those exact deployed JSON bytes under
 
 `tools/hook-routes render candidate FILE --out DIR` renders a TOML slice for
 qualification before records exist. It starts from the live routes and applies
-the slice's own targets. The slice can add `runtimes`, `subscribers` and
+the slice's own targets. It inherits subscriber definitions used by the
+live files and those referenced by the slice. The slice can add `runtimes`, `subscribers` and
 `target_files`, and can name `reconciliation_next` and `removals`. Each
 `[[moves]]` entry has a `home`, the zero-based `binding` index in that home's
 ordered array, and replacement `lines` using the same syntax as `next`. For example,
