@@ -175,3 +175,16 @@ def test_rollback_donor_path_is_compared_lexically():
     assert [(ref.kind, ref.where) for ref in refs] == [("rollback-base", "only:command[0]")]
     assert not donor_references(table, "--value=token")
     assert donor_references(table, "scripts/guard")[0].where == "only:command[2]"
+
+
+@pytest.mark.parametrize(("query", "retained"), [
+    ("~//donor", "~/donor"), ("~/donor", "~//donor"),
+    ("@HOME@///donor", "$HOME/donor"), ("${HOME}/donor", "$HOME///donor"),
+])
+def test_home_separator_in_rollback_reference(tmp_path, monkeypatch, query, retained):
+    from hook_routes.references import donor_references, Reference
+    from hook_routes.table import RollbackBase
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    table = replace(load(TABLE), rollback_bases={"only": RollbackBase(commands=(f"python3 {retained}",))})
+    assert donor_references(table, query) == [Reference("rollback-base", "only:command[0]")]

@@ -28,7 +28,7 @@ class Reference:
 def _reference_token(token):
     for prefix in ("~/", "@HOME@/", "$HOME/", "${HOME}/"):
         if token.startswith(prefix):
-            token = str(Path.home() / token[len(prefix):])
+            token = f"{Path.home()}/{token[len(prefix):]}"
             break
     if "/" in token and not token.startswith("-") and "://" not in token and "=" not in token.partition("/")[0]:
         return os.path.normpath(token).replace("//", "/")

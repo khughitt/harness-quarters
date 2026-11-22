@@ -374,3 +374,34 @@ def test_reconciliation_uses_launchers_account_home_fallback(tmp_path, deployed_
     monkeypatch.delenv("RELAY_INSTALL_ROOT", raising=False)
     monkeypatch.setattr(pwd, "getpwuid", lambda uid: SimpleNamespace(pw_dir=str(account)))
     assert not run(table, home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)
+
+
+def test_target_agy_session_start_bridge_checks_only_declared_commands(tmp_path, deployed_host):
+    from hook_routes.preflight import run
+    from hook_routes.render import render_next
+    from hook_routes.table import RouteState
+
+    table = deployed_host
+    transport = Path("d", "hq", "harnesses", "agy", "hook")
+    adapter = tmp_path / transport
+    adapter.parent.mkdir(parents=True)
+    for executable in (adapter, tmp_path / "lore", tmp_path / "mindful", tmp_path / "env"):
+        executable.touch(mode=0o700)
+    runtime_dir = tmp_path / ".local/share/relay/v0.5.0/node_modules/relay"
+    command = (f"~/{transport} SessionStart --runtime '{runtime_dir}' "
+               "--delegate 'lore hook profile-notice' --delegate 'mindful notice session-start'")
+    line = Line(("claude-profile", "capture-notice"), runtime="v0.5.0", command=command,
+                delegates=(("lore", "hook", "profile-notice"), ("mindful", "notice", "session-start")),
+                states={name: RouteState("bridge", evidence="fixture") for name in ("claude-profile", "capture-notice")})
+    agy = replace(load(TABLE).homes["agy"], bindings=(Binding("SessionStart", None, (), next=(line,)),))
+    table = replace(table, homes={**table.homes, "agy": agy})
+    directory = tmp_path / "review"
+    for name, data in render_next(table, tmp_path).items():
+        path = directory / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    options = dict(home=tmp_path, path_env=str(tmp_path), next_dir=directory)
+    assert not run(table, **options)
+    (tmp_path / "mindful").unlink()
+    findings = run(table, **options)
+    assert [(f.code, f.message) for f in findings] == [("missing-command", "cannot execute mindful")]

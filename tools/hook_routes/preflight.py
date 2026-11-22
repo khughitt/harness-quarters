@@ -46,10 +46,6 @@ def _command_findings(argv, home, path_env, where):
             script = Path(args[2])
             if not script.is_file() or not os.access(script, os.R_OK):
                 yield Finding("missing-command", where, f"cannot read script {script}")
-    # This native adapter treats only SessionStart's remaining arguments as commands.
-    agy_hook = home / "d" / "hq" / "harnesses/agy/hook"
-    if Path(args[0]) == agy_hook and args[1:2] == ["SessionStart"]:
-        executables.extend(args[2:])
     for name in executables:
         if shutil.which(name, path=path_env) is None:
             yield Finding("missing-command", where, f"cannot execute {name}")
@@ -81,7 +77,12 @@ def run(table, *, home: Path, path_env: str, next_dir: Path | None) -> list[Find
         for line in (*active, *previous):
             commands = [*line.delegates]
             if line.command:
-                commands.append(shlex.split(line.command))
+                argv = shlex.split(line.command)
+                commands.append(argv)
+                if line.kind == "native" and argv[1:2] == ["SessionStart"]:
+                    agy_hook = home / "d" / "hq" / "harnesses/agy/hook"
+                    if Path(expand_path(argv[0], home)) == agy_hook:
+                        commands.extend((delegate,) for delegate in argv[2:])
             if line.runtime:
                 runtime = table.runtimes[line.runtime]
                 commands.append(runtime.argv(home))
