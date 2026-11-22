@@ -7,8 +7,8 @@ import shutil
 import subprocess
 
 from .deploy import review_files
-from .qualification import qualification_findings
-from .relay_runtime import budget_payload, call, package_for
+from .qualification import admit_binding, qualification_findings
+from .relay_runtime import package_for
 from .render import subscriber_address, subscriber_bytes
 from .rules import validate
 from .table import Finding, expand_path
@@ -56,10 +56,13 @@ def run(table, *, home: Path, path_env: str, next_dir: Path | None) -> list[Find
     if target and table.reconciliation_next is not None:
         used = {table.reconciliation_next}
     packages = {}
-    checked_budgets = set()
     for name, settings, index, binding in table.bindings():
         where = f"{name}:{binding.event}[{index}]"
-        for line in binding.target if target else binding.lines:
+        active = binding.target if target else binding.lines
+        # A cutover's retention check depends on the declaration of the live
+        # composition it replaces. Verify that selection as well as the target.
+        previous = tuple(line for line in binding.lines if line.kind == "relay" and line not in active)
+        for line in (*active, *previous):
             commands = [*line.delegates]
             if line.command:
                 commands.append(shlex.split(line.command))
@@ -77,14 +80,12 @@ def run(table, *, home: Path, path_env: str, next_dir: Path | None) -> list[Find
                     findings.append(finding)
             if line.kind != "relay":
                 continue
-            used.add(line.subscriber_file)
-            key = (line.runtime, line.subscriber_file, settings.harness, line.relay_event or binding.event,
-                   line.outer_ms)
-            if packages[line.runtime] and key not in checked_budgets:
-                checked_budgets.add(key)
+            if line in active:
+                used.add(line.subscriber_file)
+            if packages[line.runtime]:
                 data = subscriber_bytes(table, sources[line.subscriber_file], home)
                 try:
-                    call(packages[line.runtime], "budget", budget_payload(settings, binding, line, data))
+                    admit_binding(table, settings, binding, line, sources, data, packages[line.runtime])
                 except (OSError, ValueError) as error:
                     findings.append(Finding("relay-budget", where, str(error)))
     for name in sorted(used):

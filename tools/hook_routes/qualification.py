@@ -9,7 +9,7 @@ from .render import subscriber_address, subscriber_bytes
 from .rules import RELAY_BUILTINS, fixed_tool, selected_entries
 from .table import Finding
 
-__all__ = ["check_binding", "qualification_findings"]
+__all__ = ["admit_binding", "check_binding", "qualification_findings"]
 
 _MODES = ("interactive", "non-interactive")
 
@@ -31,33 +31,38 @@ def _evidence(table, line, entries):
             if (state := table.policy_state(policy, line)) and state.kind == "relay"}
 
 
-def _line_findings(table, home, binding, line, files, records_dir, render_home, versions, where):
-    source = files[line.subscriber_file]
-    # An undeclared implicit policy may be selected by the actual adapter. Include
-    # every file entry here before deciding whether a runtime check is needed.
-    possible = _evidence(table, line, source.subscribers)
-    if not possible:
-        return
-    data = subscriber_bytes(table, source, render_home)
-    package = package_for(table, line.runtime, render_home)
+def admit_binding(table, home, binding, line, files, data, package):
+    """Check this declaration against the selection and budget of its pinned relay."""
+    if problem := line.relay_timeout_problem():
+        raise ValueError(problem)
     payload = budget_payload(home, binding, line, data, tool=fixed_tool(home, binding))
     actual = call(package, "budget", payload)
-    selected = [e for e in source.subscribers if e.name in actual["subscribers"]]
-    evidence = _evidence(table, line, selected)
     expected = selected_entries(table, files, home, binding, line)
-    if not evidence and not _evidence(table, line, expected):
-        return
     if line.relay_kind is not None and line.relay_kind != actual["kind"]:
         raise ValueError(f"declared relay_kind {line.relay_kind} differs from pinned relay's {actual['kind']}")
     if set(actual["subscribers"]) != {e.name for e in expected}:
         raise ValueError(f"declared selector coverage differs from pinned relay's {actual['subscribers']}")
-    selected_policies = {table.subscribers[e.name].policy for e in selected}
+    selected_policies = {table.subscribers[name].policy for name in actual["subscribers"]}
     missing = set(line.policies) - selected_policies - RELAY_BUILTINS
     if missing:
         raise ValueError(f"no selected subscriber for {', '.join(sorted(missing))}")
 
     if payload["event"] not in (binding.event, f"{binding.event}:{binding.matcher}"):
         raise ValueError(f"{payload['event']} does not name the rendered event and matcher")
+    return payload
+
+
+def _line_findings(table, home, binding, line, files, records_dir, render_home, versions, where):
+    entries = selected_entries(table, files, home, binding, line)
+    evidence = _evidence(table, line, entries)
+    if not evidence:
+        return
+    source = files[line.subscriber_file]
+    data = subscriber_bytes(table, source, render_home)
+    package = package_for(table, line.runtime, render_home)
+    payload = admit_binding(table, home, binding, line, files, data, package)
+    if versions is not None and home.harness not in versions:
+        raise ValueError(f"could not observe the installed version for {home.harness}")
     digest = sha256(data).hexdigest()
     expected_address = f"{line.runtime}-{digest[:12]}/relay/subscribers.json"
     if subscriber_address(source, data, render_home) != expected_address:
@@ -76,7 +81,7 @@ def _line_findings(table, home, binding, line, files, records_dir, render_home, 
             except ValueError as error:
                 raise ValueError(f"{name}: {error}") from error
             covered.setdefault(version, set()).add(mode)
-        required = covered.keys() if versions is None else [versions.get(home.harness, "unknown")]
+        required = covered.keys() if versions is None else [versions[home.harness]]
         for version in required:
             absent = [mode for mode in _MODES if mode not in covered.get(version, ())]
             if absent:

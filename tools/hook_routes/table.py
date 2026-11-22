@@ -100,6 +100,13 @@ class Line:
             return "native"
         return "relay" if self.command is None else "bridge"
 
+    def relay_timeout_problem(self) -> str | None:
+        if self.kind == "relay" and not (
+                type(self.timeout) is int and type(self.outer_ms) is int
+                and 0 < self.outer_ms <= self.timeout * 1000):
+            return f"harness timeout {self.timeout}s must cover the positive relay outer budget {self.outer_ms}ms"
+        return None
+
 
 @dataclass(frozen=True)
 class Binding:

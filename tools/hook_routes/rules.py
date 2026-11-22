@@ -192,6 +192,8 @@ def _check_configuration(table, render_home, *, target, records):
     mode = "next" if target else "state"
     for name, home, index, binding, line, files in _configuration(table, target=target):
         entries = selected_entries(table, files, home, binding, line)
+        if problem := line.relay_timeout_problem():
+            findings.append(Finding("relay-timeout", f"{_where(name, binding, index)}:{mode}", problem))
         subscriber_policies = {table.subscribers[entry.name].policy for entry in entries}
         for policy in _declared_policies(table, line, entries):
             where = f"{_where(name, binding, index)}:{policy}:{mode}"

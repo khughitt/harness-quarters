@@ -71,19 +71,18 @@ def test_helper_refuses_unexported_path(runtime):
 
 
 def test_budget_admits_today_bindings(runtime, tmp_path):
-    from hook_routes.relay_runtime import call
+    from hook_routes.qualification import admit_binding
     from hook_routes.render import subscriber_bytes
     table = load(TABLE)
     bindings = set()
     for _, home, _, binding in table.bindings():
         for line in binding.lines:
             if line.kind == "relay":
-                bindings.add((home.harness, line.relay_event or binding.event, line.outer_ms, line.relay_kind))
+                source = table.subscriber_files[line.subscriber_file]
+                admit_binding(table, home, binding, line, table.subscriber_files,
+                              subscriber_bytes(table, source, tmp_path), runtime)
+                bindings.add((home.harness, line.relay_event or binding.event, line.outer_ms))
     assert len(bindings) >= 15
-    config = json.loads(subscriber_bytes(table, table.subscriber_files[table.reconciliation_file], tmp_path))
-    for harness, event, outer_ms, kind in bindings:
-        result = call(runtime, "budget", dict(config=config, harness=harness, event=event, outerMs=outer_ms))
-        assert result["kind"] == kind
 
 
 def test_qualify_accepts_matching_record(tmp_path, runtime):

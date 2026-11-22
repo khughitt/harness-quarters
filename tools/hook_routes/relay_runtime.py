@@ -7,11 +7,17 @@ import subprocess
 __all__ = ["call", "package_for", "budget_payload"]
 
 
+_NODE = Path("/usr/bin/node")
+
+
 def package_for(table, version, home):
     runtime = table.runtimes[version]
-    _, filename = runtime.argv(home)
+    command, filename = runtime.argv(home)
+    executable = Path(command)
+    if not executable.is_absolute() or executable.resolve() != _NODE.resolve():
+        raise ValueError(f"relay hook executable {command} must resolve to {_NODE}")
     script = Path(filename)
-    if not script.is_file():
+    if not script.is_absolute() or not script.is_file():
         raise ValueError(f"missing relay runtime {script}")
     package = script.parent.parent
     manifest = json.loads((package / "package.json").read_bytes())
@@ -34,7 +40,7 @@ def budget_payload(home, binding, line, data, *, tool=None):
 def call(runtime: Path, op: str, payload: dict, *, timeout_s: float = 10) -> dict:
     try:
         result = subprocess.run(
-            ["/usr/bin/node", Path(__file__).with_name("relay_call.mjs"), runtime, op],
+            [_NODE, Path(__file__).with_name("relay_call.mjs"), runtime, op],
             input=json.dumps(payload), capture_output=True, text=True, timeout=timeout_s,
             env={"PATH": os.defpath, "HOME": str(Path.home())},
         )

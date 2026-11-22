@@ -141,3 +141,78 @@ def test_preflight_refuses_runtime_script_outside_pinned_bin(tmp_path, runtime):
     table.runtimes["v0.5.0"] = replace(table.runtimes["v0.5.0"], script=str(runtime / "src/index.js"))
     findings = run(table, home=tmp_path, path_env=str(tmp_path), next_dir=None)
     assert any(f.code == "runtime" and "bin" in f.message for f in findings)
+
+
+@pytest.mark.parametrize("variant", ["live", "bad-target", "bad-live-before-cutover"])
+def test_existing_selector_coverage(tmp_path, runtime, variant):
+    from hook_routes.preflight import run
+    from hook_routes.qualification import qualification_findings
+    from hook_routes.render import render_next
+    table = today(tmp_path)
+    pin = table.runtimes["v0.5.0"]
+    table.runtimes["v0.5.0"] = replace(pin, script=str(runtime / "bin/relay.js"))
+    binding = table.homes["claude"].bindings[0]
+    original, = binding.lines
+    wrong = replace(original, policies=("relay-provenance",), relay_kind="model-change")
+    if variant == "bad-target":
+        binding = replace(binding, lines=(), next=(wrong,))
+    else:
+        binding = replace(binding, lines=(wrong,))
+        if variant == "bad-live-before-cutover":
+            from hook_routes.table import TargetSubscriberFile
+            # The false live declaration makes the observer's removal look safe.
+            table = replace(table, target_files={"empty": TargetSubscriberFile("v0.5.0", ())})
+            target = replace(original, policies=("relay-provenance",), subscriber_file="empty")
+            binding = replace(binding, next=(target,))
+    settings = replace(table.homes["claude"], bindings=(binding,))
+    table = replace(table, homes={"claude": settings})
+    assert not qualification_findings(table, home=tmp_path)
+    directory = None
+    if variant != "live":
+        directory = tmp_path / "review"
+        for path, data in render_next(table, tmp_path).items():
+            output = directory / path
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(data)
+    findings = run(table, home=tmp_path, path_env=str(tmp_path), next_dir=directory)
+    assert any("pinned relay" in f.message and "session-start" in f.message for f in findings)
+
+
+def test_wrong_hook_executable(tmp_path, runtime):
+    from hook_routes.preflight import run
+    from hook_routes.qualification import qualification_findings
+    table, _, _ = qualified_table(tmp_path, runtime)
+    pin = table.runtimes["v0.5.0"]
+    table.runtimes["v0.5.0"] = replace(pin, command="/bin/false")
+    findings = run(table, home=tmp_path, path_env=str(tmp_path), next_dir=None)
+    assert any(f.code == "runtime" and "/usr/bin/node" in f.message for f in findings)
+    assert "/usr/bin/node" in str(qualification_findings(table, home=tmp_path))
+
+
+def test_harness_timeout_below_outer_budget(tmp_path):
+    from hook_routes.rules import validate
+    table = today(tmp_path)
+    binding = table.homes["claude"].bindings[0]
+    short = replace(binding.lines[0], timeout=1)
+    for changed in (replace(binding, lines=(short,)), replace(binding, next=(short,))):
+        settings = replace(table.homes["claude"], bindings=(changed,))
+        findings = validate(replace(table, homes={"claude": settings}), home=tmp_path)
+        assert any(f.code == "relay-timeout" for f in findings)
+
+
+def test_missing_installed_version_cannot_match_records(tmp_path, runtime, monkeypatch, capsys):
+    import json
+    from hook_routes import cli
+    from hook_routes.preflight import run
+    from hook_routes.qualification import qualification_findings
+    table, _, directory = qualified_table(tmp_path, runtime)
+    for path in directory.glob("*.json"):
+        record = json.loads(path.read_text())
+        path.write_text(json.dumps(dict(record, version="unknown")))
+    assert not qualification_findings(table, home=tmp_path)
+    findings = run(table, home=tmp_path, path_env=str(tmp_path), next_dir=None)
+    assert any("installed version" in f.message and "claude-code" in f.message for f in findings)
+    monkeypatch.setattr(cli, "load", lambda _: table)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    assert cli.main(["status"]) == 0
+    assert "installed version" in capsys.readouterr().out

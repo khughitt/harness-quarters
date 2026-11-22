@@ -105,10 +105,12 @@ The candidate render checks the route structure and writes `manifest.json` with
 
 For each `relay` state and target, `check` reads the records named in
 `harnesses/qualification/` and calls the binding's installed relay package. It
-checks the package's bin, version and locked commit, the digest-addressed path
+checks that the hook runs the helper's Node executable and the package's declared
+bin, version and locked commit. It checks the digest-addressed path
 and SHA-256 of the rendered subscriber bytes, and the binding's selector
 coverage against relay's adapter. Relay validates the complete subscriber file,
-budget, roles, record and proof for the exact event. Each cited version needs
+budget, roles, record and proof for the exact event. The rendered harness timeout
+must cover the relay outer budget. Each cited version needs
 passing records for both `interactive` and `non-interactive` on the platform.
 Static checks use the versions in the records. Host version probes run in
 `preflight` and in the default `status` report for qualified routes.
@@ -122,9 +124,11 @@ Static checks use the versions in the records. Host version probes run in
   new digest-addressed subscriber files. The live legacy base stays available
   for rollback.
 - `tools/hook-routes preflight [--next DIR]` resolves the commands, checks the
-  installed runtimes and budgets, and reads the deployed subscriber bytes.
-  With `--next` it also checks the review directory. A qualified binding needs
-  records covering this host's installed harness version and both session modes.
+  installed runtimes, budgets and subscriber selections, and reads the deployed
+  subscriber bytes. Existing routes also undergo the host selection check. With
+  `--next` it checks the review directory and the live relay selections that the
+  cutover relies on for subscriber retention. A qualified binding needs
+  a successful harness version probe and records for that version in both modes.
   A version with carried latency evidence still needs relay's qualification
   record with its fresh exact-version proof. Preflight exits 1 on a finding.
 - `tools/hook-routes reconcile-base` prints the live reconciliation file's XDG
