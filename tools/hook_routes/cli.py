@@ -49,7 +49,7 @@ def _render(args, table):
     elif args.variant == "candidate":
         _write_review(args.out, render_candidate(table, args.slice, args.home), candidate=True)
     else:
-        findings = validate(table)
+        findings = validate(table, home=args.home)
         if findings:
             return _report(findings)
         for name, data in render_live(table, args.home).items():

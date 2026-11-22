@@ -6,7 +6,7 @@ from typing import Literal
 
 __all__ = [
     "Binding", "Finding", "Line", "Removal", "RollbackBase", "RouteState", "Subscriber",
-    "SubscriberFile", "Table", "TargetSubscriberFile", "load", "load_candidate",
+    "SubscriberFile", "Table", "TargetSubscriberFile", "expand_path", "load", "load_candidate",
 ]
 
 # The home links and legacy relay runtime consume these tracked outputs.
@@ -120,11 +120,18 @@ class _Home:
     bindings: tuple[Binding, ...]
 
 
+def expand_path(path: str, home: Path) -> str:
+    return str(home / path[2:]) if path.startswith("~/") else path
+
+
 @dataclass(frozen=True)
 class _Runtime:
     command: str
     script: str
     commit: str
+
+    def argv(self, home: Path) -> tuple[str, str]:
+        return expand_path(self.command, home), expand_path(self.script, home)
 
 
 @dataclass(frozen=True)

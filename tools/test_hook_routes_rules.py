@@ -469,13 +469,38 @@ def test_candidate_keeps_an_inherited_definition_selected_by_its_slice(table, tm
 @pytest.mark.parametrize("field", ["command", "script"])
 @pytest.mark.parametrize("spelling", ["home", "absolute-dot-component"])
 def test_relay_runtime_cannot_render_a_repository_path(table, field, spelling, tmp_path, monkeypatch):
+    from hook_routes.render import render_next
+
     table = _transition(table)
     home = tmp_path / "home"
     monkeypatch.setenv("HOME", str(home))
     donor = Path("d", "fixture", "hooks", "runtime-script")
     path = f"~/{donor}" if spelling == "home" else f"{home.parent}/./{home.name}/{donor}"
     runtime = replace(table.runtimes["v0.5.0"], **{field: path})
-    assert _findings(replace(table, runtimes={"v0.5.0": runtime})) == ["repository-path"]
+    table = replace(table, runtimes={"v0.5.0": runtime})
+    assert _findings(table) == ["repository-path"]
+    with pytest.raises(ValueError, match="repository-path"):
+        render_next(table, home)
+
+
+@pytest.mark.parametrize("field", ["command", "script"])
+@pytest.mark.parametrize("prefix", ["~/", "~//"])
+def test_candidate_validates_the_runtime_token_it_emits(table, field, prefix, tmp_path):
+    import shlex
+    from unittest.mock import patch
+    from hook_routes import rules
+    from hook_routes.render import render_next
+
+    home = tmp_path / "render-home"
+    table = _transition(table)
+    runtime = replace(table.runtimes["v0.5.0"], **{field: prefix + "fixture-tools/runner"})
+    table = replace(table, runtimes={"v0.5.0": runtime})
+    with patch.object(rules, "_home_relative", wraps=rules._home_relative) as classify:
+        rendered = render_next(table, home)
+
+    command = json.loads(rendered[table.homes["codex"].path])["hooks"]["Stop"][0]["hooks"][0]["command"]
+    token = shlex.split(command)[0 if field == "command" else 1]
+    assert token in [call.args[0] for call in classify.call_args_list]
 
 
 @pytest.mark.parametrize("moves_reconciliation", [False, True])

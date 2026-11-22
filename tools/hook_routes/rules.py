@@ -30,8 +30,8 @@ def _where(home, binding, index):
     return f"{home}:{binding.event}[{index}]"
 
 
-def _home_relative(token):
-    home = normpath("/" + str(Path.home()).lstrip("/")).rstrip("/")
+def _home_relative(token, home):
+    home = normpath(str(home)).replace("//", "/").rstrip("/")
     for prefix in _HOME_PREFIXES:
         if token.startswith(prefix):
             token = f"{home}/{token[len(prefix):]}"
@@ -128,27 +128,27 @@ def route_status(table: Table) -> list[PolicyRoute]:
     return status
 
 
-def _repository_tokens(table, line, home):
+def _repository_tokens(table, line, home, render_home):
     args = []
     if line.command is not None:
         command = shlex.split(line.command)
         # hq owns the agy transport; the restriction still applies to its delegates.
-        if line.kind == "bridge" and home.harness == "agy" and command and _home_relative(command[0]) == _AGY_BRIDGE:
+        if (line.kind == "bridge" and home.harness == "agy" and command
+                and _home_relative(command[0], render_home) == _AGY_BRIDGE):
             command = command[1:]
         args.extend(command)
     for argv in line.delegates:
         args.extend(argv)
     if line.kind == "relay":
-        runtime = table.runtimes[line.runtime]
-        args.extend((runtime.command, runtime.script))
-    return [arg for arg in args if _home_relative(arg).startswith("d/")]
+        args.extend(table.runtimes[line.runtime].argv(render_home))
+    return [arg for arg in args if _home_relative(arg, render_home).startswith("d/")]
 
 
 def _owns_repository_path(state):
     return state is not None and state.kind in ("native", "existing") and _text(state.owner)
 
 
-def _check_subscriber_paths(table, *, target):
+def _check_subscriber_paths(table, render_home, *, target):
     if target:
         files = table.subscriber_files | table.target_files
         used = {table.reconciliation_next or table.reconciliation_file}
@@ -171,7 +171,7 @@ def _check_subscriber_paths(table, *, target):
     for source in sorted(used):
         for entry in files[source].subscribers:
             subscriber = table.subscribers[entry.name]
-            path = next((arg for arg in subscriber.argv if _home_relative(arg).startswith("d/")), None)
+            path = next((arg for arg in subscriber.argv if _home_relative(arg, render_home).startswith("d/")), None)
             if path is None:
                 continue
             policy = subscriber.policy
@@ -180,7 +180,7 @@ def _check_subscriber_paths(table, *, target):
                               f"subscriber repository path needs an owned native or existing policy: {path}")
 
 
-def _check_configuration(table, *, target, records):
+def _check_configuration(table, render_home, *, target, records):
     findings = []
     paths = {}
     mode = "next" if target else "state"
@@ -197,7 +197,7 @@ def _check_configuration(table, *, target, records):
                 findings.append(Finding("route-selection", where, "relay route needs a subscriber on this binding"))
             # A grandfathered path is permitted only if it has a named owner.
             if state is not None and state.kind not in ("native", "existing"):
-                args = _repository_tokens(table, line, home)
+                args = _repository_tokens(table, line, home, render_home)
                 if args:
                     findings.append(Finding("repository-path", where, f"repository path in {state.kind} route: {args[0]}"))
             key = (name, binding.event, policy)
@@ -310,7 +310,9 @@ def _check_cutover_coverage(table, removals):
                               f"target must retain the applicable selector for {entry.name}")
 
 
-def validate(table: Table, *, records: bool = True) -> list[Finding]:
+def validate(table: Table, *, home: Path | None = None, records: bool = True) -> list[Finding]:
+    if home is None:
+        home = Path.home()
     findings = []
     for name in sorted(table.subscriber_files.keys() & table.target_files.keys()):
         findings.append(Finding("cutover-scope", name, "target file would replace a live subscriber file"))
@@ -328,19 +330,19 @@ def validate(table: Table, *, records: bool = True) -> list[Finding]:
         else:
             removals.add(removal.subscriber)
 
-    current = _check_configuration(table, target=False, records=records)
+    current = _check_configuration(table, home, target=False, records=records)
     findings.extend(current)
-    findings.extend(_check_subscriber_paths(table, target=False))
+    findings.extend(_check_subscriber_paths(table, home, target=False))
     has_moves = any(binding.next is not None for _, _, _, binding in table.bindings())
     if has_moves:
         # A defect inherited by the target is already reported against state.
         existing = {(finding.code, finding.where.removesuffix(":state"), finding.message) for finding in current}
-        for finding in _check_configuration(table, target=True, records=records):
+        for finding in _check_configuration(table, home, target=True, records=records):
             if (finding.code, finding.where.removesuffix(":next"), finding.message) not in existing:
                 findings.append(finding)
         findings.extend(_check_cutover_coverage(table, removals))
     if has_moves or table.reconciliation_next is not None:
-        findings.extend(finding for finding in _check_subscriber_paths(table, target=True) if finding not in findings)
+        findings.extend(finding for finding in _check_subscriber_paths(table, home, target=True) if finding not in findings)
     findings.extend(_check_reconciliation(table, removals))
     findings.extend(_check_removals(table, removals))
     return findings

@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from .rules import validate
-from .table import Finding, SubscriberFile, Table, load_candidate
+from .table import Finding, SubscriberFile, Table, expand_path, load_candidate
 
 __all__ = ["render_live", "render_next", "render_candidate", "splice_claude_hooks", "check_live"]
 
@@ -60,10 +60,6 @@ def _json_file(value):
     return (json.dumps(value, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
 
 
-def _expand(path, home):
-    return str(home / path[2:]) if path.startswith("~/") else path
-
-
 def _quote(value):
     # The current relay images enclose even uncomplicated paths in single quotes.
     return "'" + value.replace("'", "'\"'\"'") + "'"
@@ -72,13 +68,13 @@ def _quote(value):
 def _command(table, binding, line, harness, home):
     if line.kind in ("native", "bridge"):
         return line.command
-    runtime = table.runtimes[line.runtime]
+    command, script = table.runtimes[line.runtime].argv(home)
     subscribers = table.subscriber_files[line.subscriber_file]
     event = binding.event if line.relay_event is None else line.relay_event
     return (
-        f"{_quote(_expand(runtime.command, home))} {_quote(_expand(runtime.script, home))}"
+        f"{_quote(command)} {_quote(script)}"
         f" hook --harness {harness} --outer-ms {line.outer_ms}"
-        f" --subscribers {_quote(_expand(subscribers.path, home))} {event}"
+        f" --subscribers {_quote(expand_path(subscribers.path, home))} {event}"
     )
 
 
@@ -150,7 +146,7 @@ def render_live(table: Table, home: Path) -> dict[str, bytes]:
 
 
 def _render_target(table, home, *, records):
-    findings = validate(table, records=records)
+    findings = validate(table, home=home, records=records)
     if findings:
         details = "\n".join(f"{item.where}: {item.code}: {item.message}" for item in findings)
         raise ValueError(details)
