@@ -137,10 +137,11 @@ def _repository_tokens(table, line, home, render_home):
     args = []
     if line.command is not None:
         command = shlex.split(line.command)
-        # hq owns the agy transport; the restriction still applies to its delegates.
-        if (line.kind == "bridge" and home.harness == "agy" and command
-                and _repository_paths(command[0], render_home) == {_AGY_BRIDGE}):
-            command = command[1:]
+        if line.kind == "bridge" and home.harness == "agy" and command:
+            # The bridge shell expands a leading ~/ in the literal command it receives.
+            transport_home = Path.home() if line.command.lstrip().startswith("~/") else render_home
+            if _repository_paths(command[0], transport_home) == {_AGY_BRIDGE}:
+                command = command[1:]
         args.extend(command)
     for argv in line.delegates:
         args.extend(argv)

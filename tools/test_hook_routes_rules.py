@@ -221,7 +221,8 @@ def test_cutover_status_shows_existing_route_moved_to_another_file(table):
 
 @pytest.mark.parametrize("delegate", ["tasks-stop", f"~/{Path('d', 'fixture', 'hooks', 'claim-guard')}"])
 @pytest.mark.parametrize("prefix", ["~/", "~/./"])
-def test_agy_bridge_allows_hq_transport_and_checks_delegate_paths(table, delegate, prefix):
+def test_agy_bridge_allows_hq_transport_and_checks_delegate_paths(table, delegate, prefix, tmp_path, monkeypatch):
+    from hook_routes.render import render_next
     from hook_routes.table import RouteState
 
     state = RouteState("bridge", evidence="bridge-fixtures")
@@ -229,12 +230,22 @@ def test_agy_bridge_allows_hq_transport_and_checks_delegate_paths(table, delegat
     line = Line(("guard",), command=f"{prefix}{transport} Stop",
                 runtime="v0.5.0", delegates=((delegate, "Stop"),), states={"guard": state})
     agy = replace(load(TABLE).homes["agy"], bindings=(Binding("Stop", None, (line,)),))
-    assert _findings(replace(table, homes={"agy": agy})) == (
-        ["repository-path"] if delegate.startswith("~/") else []
-    )
-    other_hook = replace(line, command=f"{prefix}{transport}-other Stop")
+    table = replace(table, homes={"agy": agy})
+    assert _findings(table) == (["repository-path"] if delegate.startswith("~/") else [])
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    render_home = tmp_path / "d" / "fixture" / "home"
+    if delegate.startswith("~/"):
+        with pytest.raises(ValueError, match=f"repository-path: .*{delegate}"):
+            render_next(table, render_home)
+    else:
+        rendered = render_next(table, render_home)
+        assert json.loads(rendered[agy.path])["hq"]["Stop"][0]["command"] == line.command
+
+    other_hook = replace(line, command=f"{prefix}{transport}-other Stop", delegates=(("tasks-stop", "Stop"),))
     agy = replace(agy, bindings=(Binding("Stop", None, (other_hook,)),))
-    assert _findings(replace(table, homes={"agy": agy})) == ["repository-path"]
+    with pytest.raises(ValueError, match=f"repository-path: .*{transport}-other"):
+        render_next(replace(table, homes={"agy": agy}), render_home)
 
 
 def test_today_table_is_valid():
