@@ -483,6 +483,30 @@ def test_relay_runtime_cannot_render_a_repository_path(table, field, spelling, t
         render_next(table, home)
 
 
+@pytest.mark.parametrize("path_home", ["process-home", "render-home"])
+def test_render_home_preserves_subscriber_check_for_both_homes(table, path_home, tmp_path, monkeypatch):
+    from hook_routes.render import render_next
+
+    monkeypatch.setenv("HOME", str(tmp_path / "process-home"))
+    table = _transition(table)
+    path = tmp_path / path_home / "d" / "fixture" / "subscriber"
+    guard = replace(table.subscribers["guard"], argv=(str(path),))
+    table = replace(table, subscribers={"guard": guard})
+    with pytest.raises(ValueError, match="target:guard: repository-path"):
+        render_next(table, tmp_path / "render-home")
+
+
+def test_relative_render_home_preserves_relative_runtime_check(table):
+    from hook_routes.render import render_next
+
+    table = _transition(table)
+    path = Path("d", "fixture", "runtime-script")
+    runtime = replace(table.runtimes["v0.5.0"], script=str(path))
+    table = replace(table, runtimes={"v0.5.0": runtime})
+    with pytest.raises(ValueError, match=f"repository-path: .*{path}"):
+        render_next(table, Path("d"))
+
+
 @pytest.mark.parametrize("field", ["command", "script"])
 @pytest.mark.parametrize("prefix", ["~/", "~//"])
 def test_candidate_validates_the_runtime_token_it_emits(table, field, prefix, tmp_path):
@@ -495,7 +519,7 @@ def test_candidate_validates_the_runtime_token_it_emits(table, field, prefix, tm
     table = _transition(table)
     runtime = replace(table.runtimes["v0.5.0"], **{field: prefix + "fixture-tools/runner"})
     table = replace(table, runtimes={"v0.5.0": runtime})
-    with patch.object(rules, "_home_relative", wraps=rules._home_relative) as classify:
+    with patch.object(rules, "_repository_paths", wraps=rules._repository_paths) as classify:
         rendered = render_next(table, home)
 
     command = json.loads(rendered[table.homes["codex"].path])["hooks"]["Stop"][0]["hooks"][0]["command"]

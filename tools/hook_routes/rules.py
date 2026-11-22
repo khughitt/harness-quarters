@@ -30,15 +30,20 @@ def _where(home, binding, index):
     return f"{home}:{binding.event}[{index}]"
 
 
-def _home_relative(token, home):
-    home = normpath(str(home)).replace("//", "/").rstrip("/")
+def _repository_paths(token, render_home):
     for prefix in _HOME_PREFIXES:
         if token.startswith(prefix):
-            token = f"{home}/{token[len(prefix):]}"
+            token = f"{render_home}/{token[len(prefix):]}"
             break
-    if token.startswith("/"):
-        token = "/" + token.lstrip("/")
-    return normpath(token).removeprefix(f"{home}/")
+    path = normpath(token).replace("//", "/")
+    # Literal d/ paths and paths under either home retain their own meaning.
+    candidates = {path}
+    for home in (render_home, Path.home()):
+        if path.startswith("/"):
+            home = home.absolute()
+        base = normpath(str(home)).replace("//", "/").rstrip("/")
+        candidates.add(path.removeprefix(f"{base}/"))
+    return {candidate for candidate in candidates if candidate.startswith("d/")}
 
 
 def _fixed_tool(home, binding):
@@ -134,14 +139,14 @@ def _repository_tokens(table, line, home, render_home):
         command = shlex.split(line.command)
         # hq owns the agy transport; the restriction still applies to its delegates.
         if (line.kind == "bridge" and home.harness == "agy" and command
-                and _home_relative(command[0], render_home) == _AGY_BRIDGE):
+                and _repository_paths(command[0], render_home) == {_AGY_BRIDGE}):
             command = command[1:]
         args.extend(command)
     for argv in line.delegates:
         args.extend(argv)
     if line.kind == "relay":
         args.extend(table.runtimes[line.runtime].argv(render_home))
-    return [arg for arg in args if _home_relative(arg, render_home).startswith("d/")]
+    return [arg for arg in args if _repository_paths(arg, render_home)]
 
 
 def _owns_repository_path(state):
@@ -171,7 +176,7 @@ def _check_subscriber_paths(table, render_home, *, target):
     for source in sorted(used):
         for entry in files[source].subscribers:
             subscriber = table.subscribers[entry.name]
-            path = next((arg for arg in subscriber.argv if _home_relative(arg, render_home).startswith("d/")), None)
+            path = next((arg for arg in subscriber.argv if _repository_paths(arg, render_home)), None)
             if path is None:
                 continue
             policy = subscriber.policy
