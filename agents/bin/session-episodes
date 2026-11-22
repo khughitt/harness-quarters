@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare pre-flow episodes from the Claude Code, Codex and agy session stores.
+"""Prepare pre-flow episodes from the Claude Code, Codex, agy and pi session stores.
 
 session-episodes extract  [--harness SLUG]... [--since DAYS] [--project PREFIX] [--window-minutes N]
                           [--labels PATH] [--anchors PATH] --out PATH
@@ -10,8 +10,8 @@ session-episodes label    <id> yes|no --episodes PATH [--labels PATH]
 The contract is docs/sessions.md in the ai checkout.
 Read-only over the stores and every tasks/ directory; standard library only. Store roots
 come from hq's tools/harness_stores, found from this file's real path; `extract` reads
-Claude Code and Codex unless `--harness` names the set (agy only on request until the
-flow-trial-1 readout, 2027-02-16).
+Claude Code and Codex unless `--harness` names the set (agy and pi only on request until
+the flow-trial-1 readout, 2027-02-16).
 """
 
 from __future__ import annotations
@@ -43,13 +43,16 @@ except ImportError as error:
 CLAUDE_HARNESS = "claude-code"
 CODEX_HARNESS = "codex"
 AGY_HARNESS = "agy"
+PI_HARNESS = "pi"
 WAIT_TOOLS = {"AskUserQuestion", "EnterPlanMode", "ExitPlanMode"}
 AGY_WAIT_TOOLS = {"ask_question"}
+PI_WAIT_TOOLS: set[str] = set()   # pi has no built-in tool that asks the person
 CODEX_WAIT_TOOL = "request_user_input"
 CODEX_INJECTED = ("# AGENTS.md", "<environment_context>", "<INSTRUCTIONS>", "<skills_instruct",
                   "<turn_aborted>", "<permissions", "<user_shell", "<collaboration_mode")
-INTERACTIVE = {CLAUDE_HARNESS: ("cli",), CODEX_HARNESS: ("codex-tui", "codex_exec"), AGY_HARNESS: ("agy",)}
-DEFAULT_HARNESSES = (CLAUDE_HARNESS, CODEX_HARNESS)  # agy joins after the 2027-02-16 readout (obs-f5710b)
+INTERACTIVE = {CLAUDE_HARNESS: ("cli",), CODEX_HARNESS: ("codex-tui", "codex_exec"), AGY_HARNESS: ("agy",),
+               PI_HARNESS: ("pi",)}   # a pi header does not say whether a run was headless
+DEFAULT_HARNESSES = (CLAUDE_HARNESS, CODEX_HARNESS)  # agy and pi join after the 2027-02-16 readout (obs-f5710b)
 INTERRUPT_MARK = "[Request interrupted by user"
 # a Claude Code or Codex user turn that starts with a paste: the wrapper tags are the harness's, the
 # text inside and after them is the person's
@@ -393,6 +396,100 @@ def read_agy(path: Path) -> Session:
                 s.events.append(Event("tool_result", t, line, call_id=background.pop(ended[0]), text=ended[1]))
         elif kind == "ERROR_MESSAGE":
             s.events.append(Event("error", t, line, text=str(r.get("error", ""))))
+    return s
+
+
+# --- pi ------------------------------------------------------------------------
+#
+# One entry per line, the `session` header first. Entries form a tree through parentId and
+# are appended in the order written, so a branch the person returns to with /tree continues
+# from an earlier entry. Provider call ids are only unique within one response: a call is
+# named `<entry id>:<call id>`. pi keeps entry ids when it copies a session (--fork), so a
+# copy's calls keep their names.
+
+_PI_VERSION = 3
+
+
+def _pi_first(path: Path) -> dict:
+    """The header: the first line, a version-3 `session` record with a string id."""
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        first = handle.readline()
+    try:
+        r = json.loads(first)
+    except json.JSONDecodeError:
+        r = None
+    if not (isinstance(r, dict) and r.get("type") == "session" and r.get("version") == _PI_VERSION
+            and isinstance(r.get("id"), str) and r["id"]):
+        raise SystemExit(f"session-episodes: pi session {path}:1 is not a version-{_PI_VERSION} session header")
+    return r
+
+
+def pi_header(path: Path) -> Session:
+    r = _pi_first(path)
+    cwd = r.get("cwd")
+    return Session(PI_HARNESS, path, r["id"], cwd if isinstance(cwd, str) else None, "pi", False, [], 0)
+
+
+def _pi_call_names(path: Path, line: int, eid: str, blocks: list) -> list[tuple[dict, str]]:
+    calls = [b for b in blocks if isinstance(b, dict) and b.get("type") == "toolCall"]
+    for b in calls:
+        if not isinstance(b.get("id"), str) or not isinstance(b.get("name"), str):
+            raise SystemExit(f"session-episodes: pi session {path}:{line} has a toolCall without a string id and name")
+    return [(b, f"{eid}:{b['id']}") for b in calls]
+
+
+def read_pi(path: Path) -> Session:
+    s = pi_header(path)
+    names: dict[str, str] = {}   # provider call id -> the latest call named with it
+    previous = None
+    for line, r in _lines(path):
+        if line == 1:
+            continue
+        if not (isinstance(r, dict) and isinstance(r.get("type"), str) and isinstance(r.get("id"), str)
+                and isinstance(r.get("timestamp"), str)):
+            s.malformed += 1   # pi skips such a line too; an unfinished last line is one
+            continue
+        try:
+            t = at_ms(r["timestamp"])
+        except ValueError:
+            raise SystemExit(f"session-episodes: pi session {path}:{line} has timestamp {r['timestamp']!r}")
+        eid = r["id"]
+        if previous is not None and r.get("parentId") != previous:
+            s.events.append(Event("branch", t, line, eid))
+        previous = eid
+        message = r.get("message") if r["type"] == "message" else None
+        if not isinstance(message, dict):
+            continue   # model and thinking changes, labels, summaries, compactions, extension entries
+        role, content = message.get("role"), message.get("content")
+        if role == "user":
+            body = _text_blocks(content).strip()
+            if body:
+                s.events.append(Event("human", t, line, eid, body))
+        elif role == "assistant":
+            blocks = content if isinstance(content, list) else []
+            calls = _pi_call_names(path, line, eid, blocks)
+            body = _text_blocks(content)
+            s.events.append(Event("assistant", t, line, eid, body, text_only=bool(body.strip()) and not calls,
+                                  pending=tuple(name for _, name in calls)))
+            for b, name in calls:
+                commands = ()
+                if b["name"] == "bash":
+                    command = (b.get("arguments") or {}).get("command")
+                    if not isinstance(command, str):
+                        raise SystemExit(f"session-episodes: pi session {path}:{line} has a bash call "
+                                         "without a command string")
+                    commands = (command,)
+                names[b["id"]] = name
+                s.events.append(Event("tool_call", t, line, eid, call_id=name, tool=b["name"], commands=commands))
+            if message.get("stopReason") == "aborted":
+                s.events.append(Event("interrupt", t, line, eid, "aborted"))
+            elif message.get("stopReason") == "error":
+                s.events.append(Event("error", t, line, eid, str(message.get("errorMessage", ""))))
+        elif role == "toolResult":
+            name = names.get(message.get("toolCallId"))
+            if name is not None:
+                s.events.append(Event("tool_result", t, line, eid, _text_blocks(content), call_id=name))
+        # system prompts, `!` shell runs (bashExecution), extension and summary messages: not the human
     return s
 
 
@@ -815,7 +912,7 @@ class Turn:
 
 
 def _tail_turn(session: Session, anchor_index: int, wait_tools: set[str]) -> Turn:
-    """A turn judged from its tail (Claude Code and agy): text with no tool calls completes
+    """A turn judged from its tail (Claude Code, agy and pi): text with no tool calls completes
     it; an error tail is unknown; unanswered calls that only ask the person are wait."""
     events = session.events
     results: set[str] = set()
@@ -824,7 +921,7 @@ def _tail_turn(session: Session, anchor_index: int, wait_tools: set[str]) -> Tur
     outcome = None
     for i in range(anchor_index + 1, len(events)):
         e = events[i]
-        if e.kind in ("human", "interrupt"):
+        if e.kind in ("human", "interrupt", "branch"):   # pi: a branch leaves this turn's path
             if e.kind == "interrupt":
                 outcome, last_index = "interrupted", i
             break
@@ -1315,6 +1412,7 @@ READERS: dict[str, tuple[str, Callable[[Path], Session | None], Callable[[Path],
     CODEX_HARNESS: ("**/*.jsonl", codex_header, read_codex, _codex_turn),
     AGY_HARNESS: ("brain/*/.system_generated/logs/transcript_full.jsonl", agy_header, read_agy,
                   lambda s, i: _tail_turn(s, i, AGY_WAIT_TOOLS)),
+    PI_HARNESS: ("*/*.jsonl", pi_header, read_pi, lambda s, i: _tail_turn(s, i, PI_WAIT_TOOLS)),
 }
 
 

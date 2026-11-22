@@ -1998,3 +1998,238 @@ def test_a_symlinked_script_imports_from_its_real_checkout(tmp_path):
                             env=child_env(tmp_path))
     assert result.returncode == 0, result.stderr
     assert "--harness" in result.stdout and "agy" in result.stdout
+
+
+# --- pi -------------------------------------------------------------------------
+#
+# One entry per line under sessions/<cwd-slug>/<timestamp>_<id>.jsonl, the session header
+# first; entries form a tree through parentId. The shapes follow pi 1.1.0's own files, the
+# content is made up.
+
+PI_SID = "01a18264-30aa-73b5-bec6-de3594e99d2c"
+
+
+def p_header(sid=PI_SID, t=0, **extra):
+    return {"type": "session", "version": 3, "id": sid, "timestamp": ts(t), "cwd": "/w", **extra}
+
+
+def p_entry(kind, eid, parent, t, **extra):
+    return {"type": kind, "id": eid, "parentId": parent, "timestamp": ts(t), **extra}
+
+
+def p_message(eid, parent, t, role, content, **extra):
+    return p_entry("message", eid, parent, t, message={"role": role, "content": content, "timestamp": ms(t), **extra})
+
+
+def p_user(eid, parent, t, text):
+    return p_message(eid, parent, t, "user", [{"type": "text", "text": text}])
+
+
+def p_assistant(eid, parent, t, text="", calls=(), stop=None):
+    content = [{"type": "thinking", "thinking": "Thinking."}]
+    if text:
+        content.append({"type": "text", "text": text})
+    content += [{"type": "toolCall", "id": cid, "name": name, "arguments": args} for cid, name, args in calls]
+    return p_message(eid, parent, t, "assistant", content, api="openai-completions", provider="p", model="m",
+                     stopReason=stop or ("toolUse" if calls else "stop"))
+
+
+def p_bash(cid, command):
+    return (cid, "bash", {"command": command})
+
+
+def p_result(eid, parent, t, cid, text, name="bash", error=False):
+    return p_message(eid, parent, t, "toolResult", [{"type": "text", "text": text}], toolCallId=cid,
+                     toolName=name, isError=error)
+
+
+def pi_file(root, entries, sid=PI_SID, header=None, raw=()):
+    """A session under root/<cwd-slug>; `raw` lines are written verbatim after the entries."""
+    p = root / "--w--" / f"2026-09-17T12-00-00-000Z_{sid}.jsonl"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    lines = [json.dumps(r, separators=(",", ":")) for r in (header or p_header(sid), *entries)]
+    p.write_text("".join(line + "\n" for line in [*lines, *raw]))
+    return p
+
+
+def pi_story(root, sid=PI_SID, start_out=OK):
+    return pi_file(root, [
+        p_entry("model_change", "00000001", None, 0, provider="p", modelId="m"),
+        p_message("00000002", "00000001", 0, "system", "", sections={"preamble": "You are pi."}),
+        p_user("00000003", "00000002", 0, "Let's take ai-000001"),
+        p_assistant("00000004", "00000003", 5, calls=[p_bash("call_1", "tasks start ai-000001")]),
+        p_result("00000005", "00000004", 6, "call_1", start_out),
+        p_assistant("00000006", "00000005", 60, text="Started ai-000001."),
+        p_user("00000007", "00000006", 700, "Is it still running?"),
+    ], sid=sid)
+
+
+def pi_call(eid, cid):
+    return f"{eid}:{cid}"
+
+
+def test_pi_session_identity_human_text_and_calls(tmp_path):
+    p = pi_story(tmp_path / "pi")
+    s = se.read_pi(p)
+    assert (s.harness, s.session_id, s.cwd, s.entrypoint, s.subagent) == ("pi", PI_SID, "/w", "pi", False)
+    assert [(e.kind, e.text, e.line) for e in s.events if e.kind == "human"] == [
+        ("human", "Let's take ai-000001", 4), ("human", "Is it still running?", 8)]
+    [call] = [e for e in s.events if e.kind == "tool_call"]
+    assert (call.call_id, call.tool, call.commands, call.line) == (pi_call("00000004", "call_1"), "bash",
+                                                                   ("tasks start ai-000001",), 5)
+    header = se.pi_header(p)
+    assert (header.session_id, header.cwd, header.entrypoint, header.subagent, header.events) == (
+        PI_SID, "/w", "pi", False, [])
+
+
+def test_pi_confirmed_start_is_an_episode_with_a_completed_turn(tmp_path):
+    s = se.read_pi(pi_story(tmp_path / "pi"))
+    eps, cands, summary = se.build_episodes(inputs(tmp_path, [s], project(tmp_path)))
+    assert cands == [] and len(eps) == 1
+    e = eps[0]
+    assert e["id"] == se.episode_id("pi", pi_call("00000004", "call_1"), "ai-000001")
+    assert e["session_key"] == f"pi:{PI_SID}" and e["anchor_source"] == "result"
+    assert e["source_refs"][0] == f"pi:{PI_SID}:{s.path}#L5"
+    assert e["ended_at"] == ms(60) and e["next_human_at"] == ms(700) and e["status_question"] is True
+    assert summary["files"] == {"pi": 1} and summary["turns"]["completed"] == 1
+
+
+def test_pi_call_ids_are_qualified_by_their_entry(tmp_path):
+    """Providers reuse short call ids across responses; the entry id tells them apart."""
+    s = se.read_pi(pi_file(tmp_path / "pi", [
+        p_user("00000001", None, 0, "go"),
+        p_assistant("00000002", "00000001", 1, calls=[p_bash("call_0", "ls")]),
+        p_result("00000003", "00000002", 2, "call_0", "a"),
+        p_assistant("00000004", "00000003", 3, calls=[p_bash("call_0", "pwd")]),
+        p_result("00000005", "00000004", 4, "call_0", "/w"),
+    ]))
+    assert [(e.call_id, e.text) for e in s.events if e.kind == "tool_result"] == [
+        (pi_call("00000002", "call_0"), "a"), (pi_call("00000004", "call_0"), "/w")]
+
+
+def test_pi_aborted_response_is_an_interrupted_turn(tmp_path):
+    s = se.read_pi(pi_file(tmp_path / "pi", [
+        p_user("00000001", None, 0, "go"),
+        p_assistant("00000002", "00000001", 5, calls=[p_bash("call_1", "tasks start ai-000001")]),
+        p_result("00000003", "00000002", 6, "call_1", OK),
+        p_assistant("00000004", "00000003", 9, stop="aborted"),
+    ]))
+    assert se.turn_after(s, anchor_at(s, pi_call("00000002", "call_1"))).outcome == "interrupted"
+
+
+def test_pi_error_response_is_an_unknown_turn(tmp_path):
+    s = se.read_pi(pi_file(tmp_path / "pi", [
+        p_user("00000001", None, 0, "go"),
+        p_assistant("00000002", "00000001", 5, calls=[p_bash("call_1", "tasks start ai-000001")]),
+        p_result("00000003", "00000002", 6, "call_1", OK),
+        p_assistant("00000004", "00000003", 9, stop="error"),
+    ]))
+    assert se.turn_after(s, anchor_at(s, pi_call("00000002", "call_1"))).outcome == "unknown"
+
+
+def test_pi_branch_jump_ends_the_turn_where_the_branch_left_off(tmp_path):
+    """pi appends every branch to one file; an entry whose parent is not the line before it
+    starts another branch, so the turn before it ends there."""
+    s = se.read_pi(pi_file(tmp_path / "pi", [
+        p_user("00000001", None, 0, "go"),
+        p_assistant("00000002", "00000001", 5, calls=[p_bash("call_1", "tasks start ai-000001")]),
+        p_result("00000003", "00000002", 6, "call_1", OK),
+        p_assistant("00000004", "00000003", 9, calls=[p_bash("call_2", "make")]),
+        p_entry("branch_summary", "00000005", "00000001", 20, summary="Abandoned the make.", fromId="00000004"),
+        p_user("00000006", "00000005", 30, "try another way"),
+    ]))
+    anchor = anchor_at(s, pi_call("00000002", "call_1"))
+    turn = se.turn_after(s, anchor)
+    assert turn.outcome == "unknown" and turn.ended_at == ms(9)
+    assert [e.kind for e in s.events[turn.end_index + 1:]] == ["branch", "human"]
+    assert se.next_human_after(s, turn.end_index).text == "try another way"
+
+
+def test_pi_injected_entries_are_not_the_human(tmp_path):
+    s = se.read_pi(pi_file(tmp_path / "pi", [
+        p_message("00000001", None, 0, "system", "", sections={"preamble": "You are pi."}),
+        p_entry("custom_message", "00000002", "00000001", 1, customType="x", content="from an extension",
+                display=True),
+        p_message("00000003", "00000002", 2, "bashExecution", None, command="ls", output="a"),
+        p_entry("compaction", "00000004", "00000003", 3, summary="Earlier work.", tokensBefore=10,
+                firstKeptEntryId="00000003"),
+        p_user("00000005", "00000004", 4, "the person"),
+    ]))
+    assert [(e.kind, e.text) for e in s.events] == [("human", "the person")]
+
+
+def test_pi_fork_copy_keeps_call_names_and_continues_the_original(tmp_path):
+    root = tmp_path / "pi"
+    original = se.read_pi(pi_story(root))
+    copy_entries = [json.loads(l) for l in original.path.read_text().splitlines()[1:]]
+    fork = se.read_pi(pi_file(root, copy_entries, sid="01a18264-0000-7000-8000-00000000f0f0",
+                              header=p_header("01a18264-0000-7000-8000-00000000f0f0",
+                                              parentSession=str(original.path))))
+    eps, _, summary = se.build_episodes(inputs(tmp_path, [original, fork], project(tmp_path)))
+    assert len(eps) == 1 and summary["files"] == {"pi": 2}
+
+
+@pytest.mark.parametrize("first", ["not json", json.dumps({"type": "message", "id": "x"}),
+                                   json.dumps({"type": "session", "version": 2, "id": PI_SID, "cwd": "/w"})])
+def test_pi_file_without_a_session_header_stops_the_run_naming_pi(tmp_path, first):
+    p = tmp_path / "pi" / "--w--" / f"x_{PI_SID}.jsonl"
+    p.parent.mkdir(parents=True)
+    p.write_text(first + "\n" + json.dumps(p_user("00000001", None, 0, "go")) + "\n")
+    for read in (se.pi_header, se.read_pi):
+        with pytest.raises(SystemExit) as error:
+            read(p)
+        assert "pi" in str(error.value.code) and f"{p}:1" in str(error.value.code)
+
+
+def test_pi_unfinished_last_line_counts_as_malformed(tmp_path):
+    s = se.read_pi(pi_file(tmp_path / "pi", [p_user("00000001", None, 0, "go")], raw=['{"type":"message","id"']))
+    assert s.malformed == 1 and [e.kind for e in s.events] == ["human"]
+
+
+def test_pi_bash_call_without_a_command_string_stops_the_run(tmp_path):
+    p = pi_file(tmp_path / "pi", [p_user("00000001", None, 0, "go"),
+                                  p_assistant("00000002", "00000001", 1, calls=[("call_1", "bash", {"cmd": "ls"})])])
+    with pytest.raises(SystemExit) as error:
+        se.read_pi(p)
+    assert f"{p}:3" in str(error.value.code) and "command" in str(error.value.code)
+
+
+def pi_env(tmp_path, roots):
+    env = cli_env(tmp_path, roots)
+    env["SESSION_LOGS_PI"] = str(tmp_path / "pi")
+    return env
+
+
+def test_extract_harness_pi_reads_only_pi_and_show_dispatches_its_refs(tmp_path):
+    codex_story(tmp_path)
+    pi_story(tmp_path / "pi")
+    env = pi_env(tmp_path, project(tmp_path))
+    out = tmp_path / "episodes.jsonl"
+    code, _, err = run_cli(["extract", "--harness", "pi", "--out", str(out)], env)
+    assert code == 0, err
+    summary = json.loads(err)
+    assert summary["roots"] == {"pi": str(tmp_path / "pi")} and summary["files"] == {"pi": 1}
+    assert summary["episodes"] == 1
+    ep = json.loads(out.read_text().splitlines()[0])
+    code, stdout, err = run_cli(["show", ep["id"], "--episodes", str(out)], env)
+    assert code == 0, err
+    assert stdout.split("-- anchor commands\n")[1].split("-- result")[0].strip() == "tasks start ai-000001"
+    assert "Started ai-000001." in stdout and "Is it still running?" in stdout
+
+
+def test_default_extract_never_reads_pi(tmp_path):
+    codex_story(tmp_path)
+    env = cli_env(tmp_path, project(tmp_path))
+    out = tmp_path / "ep" / "episodes.jsonl"
+
+    def run():
+        code, stdout, stderr = run_cli(["extract", "--out", str(out)], env)
+        assert code == 0, stderr
+        return stdout, stderr, out.read_bytes()
+
+    without = run()
+    pi_story(tmp_path / ".pi" / "agent" / "sessions")
+    assert run() == without
+    code, _, err = run_cli(["extract", "--harness", "pi", "--out", str(tmp_path / "pi-only.jsonl")], env)
+    assert code == 0 and json.loads(err)["roots"] == {"pi": str(tmp_path / ".pi" / "agent" / "sessions")}
+    assert json.loads(err)["anchors_seen"] == 1
