@@ -7,7 +7,8 @@ and [capabilities](../harness-capabilities.md) for native/adapter/policy boundar
 `relay/package.json` selects v0.5.0; `relay/package-lock.json` fixes its commit to
 `1f1c28da62e7867caf3acaddf16ba13079a37e85`. The declared home launcher resolves to
 `relay/bin/relay`, which reads that pin and runs the versioned installation under
-`$HOME/.local/share/relay/`. Node and npm come from `/usr/bin`.
+`$HOME/.local/share/relay/` (falling back to the account's passwd home when
+`HOME` is overridden and `RELAY_INSTALL_ROOT` is unset). Node and npm come from `/usr/bin`.
 
 After approval for a live rollout, run `just relay-install` from the reviewed
 checkout before merging its pin into main. This installs the new runtime in its

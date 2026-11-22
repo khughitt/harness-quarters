@@ -44,6 +44,37 @@ def test_launcher_refuses_a_missing_install(tmp_path):
     )
 
 
+def test_launcher_falls_back_to_passwd_home_when_home_is_overridden(tmp_path):
+    fake_home = tmp_path / "sandbox-home"
+    fake_home.mkdir()
+    real_home = tmp_path / "passwd-home"
+    runtime = real_home / ".local" / "share" / "relay" / "v0.5.0" / "node_modules" / "relay" / "bin" / "relay.js"
+    runtime.parent.mkdir(parents=True)
+    runtime.write_text('console.log(process.argv.slice(2).join("\\n"));\n')
+    stub_bin = tmp_path / "bin"
+    stub_bin.mkdir()
+    getent = stub_bin / "getent"
+    getent.write_text(f"#!/bin/sh\nprintf 'fixture:x:1000:1000::%s:/bin/sh\\n' {str(real_home)!r}\n")
+    getent.chmod(0o755)
+    env = {"PATH": f"{stub_bin}:{os.defpath}", "HOME": str(fake_home)}
+
+    result = subprocess.run([str(LAUNCHER), "whoami", "--json"], env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == ["whoami", "--json"]
+
+    # Explicit RELAY_INSTALL_ROOT stays isolated and never falls back to passwd home.
+    isolated = subprocess.run(
+        [str(LAUNCHER), "--version"],
+        env=env | {"RELAY_INSTALL_ROOT": str(tmp_path / "empty-install")},
+        capture_output=True,
+        text=True,
+    )
+    assert isolated.returncode == 127
+    assert isolated.stderr.strip() == (
+        "relay v0.5.0 is not installed: run just relay-install in the hq checkout"
+    )
+
+
 def test_install_recipe_allows_only_root_git_and_keeps_frozen_inputs(tmp_path):
     # The npm on PATH is whatever a version manager put first; an nvm npm 11.9 refuses
     # the direct Git dependency under --allow-git=root. The recipe must never call it.
