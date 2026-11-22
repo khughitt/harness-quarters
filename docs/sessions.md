@@ -604,7 +604,7 @@ SESSION_LOGS_AGY and SESSION_LOGS_PI (pi's `sessions/` directory) select isolate
 roots. A non-empty pi file without a version-3 session header first stops the run;
 an empty file holds no events; a later line that is not an entry counts as
 malformed, as pi itself skips it. A bash call pi saved with empty arguments because
-its response was aborted or failed has no command; elsewhere a bash call without a
+its response was aborted, failed or hit the output limit has no command; elsewhere a bash call without a
 command string stops the run. A `/skill:NAME args` message, which pi stores with
 the skill file expanded in a `<skill …>` block, is read as the command the person
 typed. A pi call is

@@ -2235,10 +2235,10 @@ def test_default_extract_never_reads_pi(tmp_path):
     assert json.loads(err)["anchors_seen"] == 1
 
 
-def test_pi_bash_call_cut_off_by_an_abort_or_error_has_no_command(tmp_path):
+def test_pi_bash_call_cut_off_by_an_abort_error_or_length_has_no_command(tmp_path):
     """pi saves a call the model was still writing with empty arguments when the response is
-    aborted or fails; that is pi's own output, not a format change."""
-    for stop in ("aborted", "error"):
+    aborted, fails or hits the output limit; that is pi's own output, not a format change."""
+    for stop in ("aborted", "error", "length"):
         s = se.read_pi(pi_file(tmp_path / stop, [
             p_user("00000001", None, 0, "go"),
             p_assistant("00000002", "00000001", 1, calls=[("call_1", "bash", {})], stop=stop),

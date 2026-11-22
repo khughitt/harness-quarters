@@ -496,8 +496,8 @@ def read_pi(path: Path) -> Session:
                     command = (b.get("arguments") or {}).get("command")
                     if isinstance(command, str):
                         commands = (command,)
-                    # pi keeps a call cut off mid-generation with empty arguments
-                    elif not (command is None and message.get("stopReason") in ("aborted", "error")):
+                    # pi keeps a call cut off mid-generation with empty arguments (and fails it, not runs it)
+                    elif not (command is None and message.get("stopReason") in ("aborted", "error", "length")):
                         raise SystemExit(f"session-episodes: pi session {path}:{line} has a bash call "
                                          "without a command string")
                 names[b["id"]] = name
