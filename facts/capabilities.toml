@@ -1212,10 +1212,10 @@ description = "A shell command inside a tool call can resolve its session's acti
 [facts.thread-id-rollout-model.harness.codex]
 status = "probed"
 value = true
-version = "0.162.1"
-date = 2026-10-14
-evidence = "hq-1bd166"
-note = "Probed under codex exec in 2 top-level turns (before and after exec resume -m model switch) and 2 multi-agent v2 child turns spawned on another model (14 turns across all probed rollouts): CODEX_THREAD_ID names the calling agent's own rollout under ${CODEX_HOME:-$HOME/.codex}/sessions/*/*/*/rollout-*-<thread>.jsonl (whereas CODEX_SESSION_ID in a child names the root session and resolves the parent's model), and the rollout's last turn_context.payload.model matches the running model in every tool call (session_meta base_instructions.provenance.model is creation-time and stale after a switch or in a child). Valid only inside a tool call after the turn's turn_context is written, not from SessionStart or UserPromptSubmit hooks in the post-switch window, and archived rollouts sit under archived_sessions/."
+version = "0.171.0"
+date = 2026-11-21
+evidence = "relay-bf0a62; records@cdfcefb6af2190088ee65d1407b93976a65a911b:relay/docs/notes/2026-11-15-provenance-resolver-qualification.md"
+note = "With a private scripted provider, relay model --harness codex verified the model from turn_context.payload.model in the rollout keyed by CODEX_THREAD_ID for fresh sandboxed app-server and TUI tool calls, after an app-server per-turn model switch, in a spawn_agent worker on another catalog model, and in an inner codex exec. The catalog-model worker ran in code mode, with nested exec_command supplying the shell. Relay returned earlier-turn without a verified model for a shell kept from an earlier turn and its later children. A TUI ! user escape resolved the session model. The reparented unsandboxed setsid job had no Codex ancestor, and the sandboxed variant did not run. The earlier 0.162.1 probe is recorded in hq-1bd166."
 
 [facts.thread-id-rollout-model.harness.claude-code]
 status = "unknown"

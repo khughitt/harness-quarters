@@ -444,13 +444,20 @@ def test_the_shipped_file_is_valid_and_holds_the_three_facts():
         ("hook-payload-model", True),
         ("hook-child-thread-id", True),
         ("model-env-var", False),
-        ("thread-id-rollout-model", True),
     ):
         entry = facts.lookup(fact, "codex")
         assert entry["value"] is expected
         assert entry["version"] == "0.162.1"
         assert entry["date"] == "2026-10-14"
         assert entry["evidence"] == "hq-1bd166"
+    entry = facts.lookup("thread-id-rollout-model", "codex")
+    assert entry["value"] is True
+    assert entry["version"] == "0.171.0"
+    assert entry["date"] == "2026-11-21"
+    assert entry["evidence"] == (
+        "relay-bf0a62; records@cdfcefb6af2190088ee65d1407b93976a65a911b:"
+        "relay/docs/notes/2026-11-15-provenance-resolver-qualification.md"
+    )
     assert facts.lookup("hook-payload-model", "claude-code")["value"] is False
     assert facts.lookup("hook-child-thread-id", "claude-code")["value"] is True
     assert facts.lookup("model-env-var", "claude-code")["status"] == "unknown"
