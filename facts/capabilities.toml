@@ -303,6 +303,14 @@ note = "claude -p offers AskUserQuestion only with --permission-prompt-tool; the
 status = "unknown"
 note = "Codex hooks have no defer decision, codex exec lists both question tools; only the async one was called, and it returned accepted and let the run end, so the answer could only arrive as a new turn on resume, an inference not probed. The blocking tool under exec was not probed."
 
+[facts.answer-defer-managed.harness.pi-durable]
+status = "probed"
+value = false
+version = "1.1.0"
+date = 2026-11-22
+evidence = "ops-fbc3d9; records@2a08672135cd4f62d621b78fda1157fcd8899623:ops/docs/reports/2026-11-22-pi-durable-recovery-probe.md"
+note = "SDK over sqlite storage with a loopback provider: pi-durable 1.1.0 ships no built-in question tool and no mid-tool-call defer/resume hook. Pausing for a delayed human answer ends the turn via control: { terminate: true } and delivers the answer as a new turn (answer-async-question) rather than resuming the same pending tool call."
+
 [facts.answer-server-terminal]
 type = "boolean"
 description = "In an interactive terminal session, an outside client of the harness's own session server receives a pending question, and its answer continues the same turn."
@@ -379,6 +387,14 @@ date = 2026-10-11
 evidence = "hq-d85ede"
 note = "request_user_input_async is recorded as an agentMessage with delivery async and its questions, and the turn ends. An outside client's turn/start on the thread appeared in the TUI and the model answered from it. Probed in an interactive TUI session. Nothing ties the answer to the question; that the card cannot be withdrawn rests on hq-5e63d9, not on this probe."
 
+[facts.answer-async-question.harness.pi-durable]
+status = "probed"
+value = true
+version = "1.1.0"
+date = 2026-11-22
+evidence = "ops-fbc3d9; records@2a08672135cd4f62d621b78fda1157fcd8899623:ops/docs/reports/2026-11-22-pi-durable-recovery-probe.md"
+note = "SDK over sqlite storage with a loopback provider: an integrator ask_question tool using pi-durable's control: { terminate: true } and a conversation-scoped Chord document ended the turn cleanly (status done, 0 live tasks) and survived a 125 s process shutdown with 0 live processes. A fresh process reopened sqlite with transcript, pi.provider sessionId and pi.usage intact, settled the document, and submitted the typed answer via root.submit with requestId answer:<questionId> as a new turn carrying the full prior transcript; a second answer was rejected at the document and deduplicated at requestId. pi CLI/RPC was not probed for async questions."
+
 [facts.subagent-write-refused]
 type = "set"
 description = "The file basenames, as case-insensitive globs, for which the harness's file-write tool refuses a write by a subagent while the main agent may write them."
@@ -453,8 +469,12 @@ evidence = "hq-57132d"
 note = "RPC mode with the server in the agent directory's mcp.json and exposure direct: the model called mcp__probe__secret_word once and replied with the nonce only the server knew. The default exposure, codemode, was not probed. The probe server answers the revision pi requests, 2025-11-25; a server speaking only 2026-07-28 does not connect (mcp-stdio-revisions). The probe passed no --tools list: a list of plain names declares no MCP tool that none of its entries matches (such as mcp__<server>__*), and at exposure direct that tool is then unreachable even from codemode (hq-501726; earendil-works/pi#10634)."
 
 [facts.mcp-stdio.harness.pi-durable]
-status = "unknown"
-note = "Not probed. The pi-durable README and exports name no MCP client; connecting one would be an extension of the integrator's, for example over pi-mcp."
+status = "probed"
+value = false
+version = "1.1.0"
+date = 2026-11-22
+evidence = "ops-fbc3d9; records@2a08672135cd4f62d621b78fda1157fcd8899623:ops/docs/reports/2026-11-22-pi-durable-recovery-probe.md"
+note = "SDK over sqlite storage with a loopback provider: pi-durable 1.1.0 has no built-in MCP client or configuration. Wiring @earendil-works/pi-mcp 1.1.0 directly to science mcp serve (which speaks only 2026-07-28) failed handshake with McpError -32602 (Request _meta is required) because pi-mcp 1.1.0 caps at 2025-11-25. Custom integrator extensions speaking MCP 2026-07-28 over stdio (against science mcp serve) or actor.v1 over Unix socket (inside autonomy run) connected and invoked science tools."
 
 [facts.mcp-stdio-revisions]
 type = "set"
@@ -508,9 +528,9 @@ description = "Submitting an input again under the same request id returns the e
 status = "probed"
 value = false
 version = "1.1.0"
-date = 2026-10-11
-evidence = "hq-57132d"
-note = "Two RPC prompt commands with the same id in one process, the second sent after the first settled, were both accepted as started and ran two agent runs. The RPC id only correlates a response with its command."
+date = 2026-11-22
+evidence = "hq-57132d; ops-fbc3d9; records@2a08672135cd4f62d621b78fda1157fcd8899623:ops/docs/reports/2026-11-22-pi-durable-recovery-probe.md"
+note = "RPC mode: two prompt commands with the same id in one process, the second sent after the first settled, were both accepted as started and ran two agent runs (hq-57132d). After SIGKILL mid-tool-call and reopen with --session (same sessionId, loopback provider, ops-fbc3d9), resending prompt with the same RPC id also returned disposition started, issued a second model request and appended a second user message. Neither RPC id nor sessionId deduplicates submissions."
 
 [facts.idempotent-submission.harness.pi-durable]
 status = "probed"
@@ -559,6 +579,22 @@ version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
 note = "The process was SIGKILLed 0.5 s into a 30 s tool call. On reopen the tool task was pending and the submission placed; after resume() the run answered with no new input. A tool not declared replay safe did not rerun: the model got an error result, Tool slow was interrupted and may have partially run (code interrupted). A replay-safe tool reran in the new process and its result reached the answer."
+
+[facts.mid-generation-resumes-after-kill]
+type = "boolean"
+description = "After the process is SIGKILLed while a model response is still streaming, reopening the session persists any flushed partial response as aborted and automatically replays a fresh model request for the same submission."
+
+[facts.mid-generation-resumes-after-kill.harness.pi]
+status = "unknown"
+note = "Mid-generation streaming SIGKILL was not separately probed on pi CLI/RPC; SIGKILL mid-tool-call does not resume on reopen (turn-resumes-after-kill)."
+
+[facts.mid-generation-resumes-after-kill.harness.pi-durable]
+status = "probed"
+value = true
+version = "1.1.0"
+date = 2026-11-22
+evidence = "ops-fbc3d9; records@2a08672135cd4f62d621b78fda1157fcd8899623:ops/docs/reports/2026-11-22-pi-durable-recovery-probe.md"
+note = "SDK over sqlite storage with a loopback SSE provider: text streamed past the 100 ms partialIntervalMs flush survived in LiveDoc.generation.message while the unflushed tail was dropped on SIGKILL. On reopen and harness.resume(), GenerationTask committed the partial as a pi.assistant entry with stopReason aborted and replayed a fresh model request for the same submission; resubmitting the same requestId returned the existing submission id with one user entry."
 
 [facts.usage-reported]
 type = "set"
