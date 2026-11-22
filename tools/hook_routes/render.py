@@ -1,10 +1,13 @@
 """Encode hook bindings in each harness's tracked settings format."""
+from dataclasses import replace
+from hashlib import sha256
 import json
 from pathlib import Path
 
-from .table import Finding, Table
+from .rules import validate
+from .table import Finding, SubscriberFile, Table, load_candidate
 
-__all__ = ["render_live", "splice_claude_hooks", "check_live"]
+__all__ = ["render_live", "render_next", "render_candidate", "splice_claude_hooks", "check_live"]
 
 
 def _space(text, index):
@@ -67,7 +70,7 @@ def _quote(value):
 
 
 def _command(table, binding, line, harness, home):
-    if line.runtime is None:
+    if line.kind in ("native", "bridge"):
         return line.command
     runtime = table.runtimes[line.runtime]
     subscribers = table.subscriber_files[line.subscriber_file]
@@ -83,6 +86,8 @@ def _hooks(table, settings, home):
     agy = settings.harness == "agy"
     events = {"enabled": True} if agy else {}
     for binding in settings.bindings:
+        if not binding.lines:
+            continue
         hooks = []
         for line in binding.lines:
             hook = {"type": "command", "command": _command(table, binding, line, settings.harness, home)}
@@ -98,7 +103,7 @@ def _hooks(table, settings, home):
     return events
 
 
-def _subscriber_file(table, source):
+def _subscriber_file(table, source, home=None):
     subscribers = []
     for entry in source.subscribers:
         name = entry.name
@@ -112,13 +117,16 @@ def _subscriber_file(table, source):
                 result[key] = value
         if subscriber.privateFields:
             result["privateFields"] = subscriber.privateFields
-        result["argv"] = [f"@HOME@/{arg[2:]}" if arg.startswith("~/") else arg for arg in subscriber.argv]
+        argv = [f"@HOME@/{arg[2:]}" if arg.startswith("~/") else arg for arg in subscriber.argv]
+        if home is not None:
+            argv = [arg.replace("@HOME@", str(home)) for arg in argv]
+        result["argv"] = argv
         result["timeoutMs"] = subscriber.timeoutMs
         subscribers.append(result)
     return _json_file({"schema": 2, "subscribers": subscribers})
 
 
-def render_live(table: Table, home: Path) -> dict[str, bytes]:
+def _settings(table, home):
     files = {}
     for settings in table.homes.values():
         hooks = _hooks(table, settings, home)
@@ -131,9 +139,57 @@ def render_live(table: Table, home: Path) -> dict[str, bytes]:
         else:
             data = _json_file({"hq" if settings.harness == "agy" else "hooks": hooks})
         files[settings.path] = data
+    return files
+
+
+def render_live(table: Table, home: Path) -> dict[str, bytes]:
+    files = _settings(table, home)
     for source in table.subscriber_files.values():
         files[source.output] = _subscriber_file(table, source)
     return files
+
+
+def _render_target(table, home, *, records):
+    findings = validate(table, records=records)
+    if findings:
+        details = "\n".join(f"{item.where}: {item.code}: {item.message}" for item in findings)
+        raise ValueError(details)
+
+    source_names = {
+        line.subscriber_file
+        for _, _, _, binding in table.bindings() for line in binding.target
+        if line.subscriber_file in table.target_files
+    }
+    if table.reconciliation_next in table.target_files:
+        source_names.add(table.reconciliation_next)
+    targets = {}
+    files = {}
+    for name in sorted(source_names):
+        source = table.target_files[name]
+        data = _subscriber_file(table, source, home)
+        address = f"{source.runtime}-{sha256(data).hexdigest()[:12]}/relay/subscribers.json"
+        if address in files and files[address] != data:
+            raise ValueError(f"digest address collision: {address}")
+        targets[name] = SubscriberFile(f"~/.config/relay/{address}", address, source.subscribers)
+        files[address] = data
+    homes = {
+        name: replace(settings, bindings=tuple(replace(binding, lines=binding.target) for binding in settings.bindings))
+        for name, settings in table.homes.items()
+    }
+    effective = replace(table, homes=homes, subscriber_files=table.subscriber_files | targets)
+    live_templates = {source.output: _subscriber_file(table, source) for source in table.subscriber_files.values()}
+    settings = _settings(effective, home)
+    if files.keys() & (live_templates.keys() | settings.keys()):
+        raise ValueError("candidate output would replace a tracked output")
+    return settings | live_templates | files
+
+
+def render_next(table: Table, home: Path) -> dict[str, bytes]:
+    return _render_target(table, home, records=True)
+
+
+def render_candidate(table: Table, candidate: Path, home: Path) -> dict[str, bytes]:
+    return _render_target(load_candidate(table, candidate), home, records=False)
 
 
 def check_live(table: Table, home: Path) -> list[Finding]:
