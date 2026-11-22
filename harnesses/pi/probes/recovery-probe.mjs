@@ -21,6 +21,7 @@ const PREFIX = "flushed prefix";
 const TAIL = " unflushed tail";
 const COMPLETE = "completed reply";
 const MCP_VERSION = "2026-07-28";
+const LEGACY_MCP_VERSION = "2025-11-25";
 const MCP_NS = "io.modelcontextprotocol/";
 const QUESTION = { id: "choice-1", options: ["left", "right"] };
 const ANSWER = { choice: "left" };
@@ -196,6 +197,24 @@ function textOf(message) {
   return content?.filter((block) => block.type === "text").map((block) => block.text).join("");
 }
 
+function observeGenerationTail(models) {
+  const streamSimple = models.streamSimple.bind(models);
+  models.streamSimple = (...args) => {
+    const stream = streamSimple(...args);
+    return {
+      result: () => stream.result(),
+      async *[Symbol.asyncIterator]() {
+        for await (const event of stream) {
+          const hasTail = textOf(event.partial) === PREFIX + TAIL;
+          yield event;
+          // The durable generation reader has processed the event before requesting the next one.
+          if (hasTail) say("tail-consumed");
+        }
+      },
+    };
+  };
+}
+
 async function durableWorker(phase, scenario, baseUrl, originalId) {
   const { BACKGROUND_CONTEXT: context, withCancel } = await import("@earendil-works/chord/context");
   const { Type } = await import("@earendil-works/pi-ai");
@@ -217,6 +236,7 @@ async function durableWorker(phase, scenario, baseUrl, originalId) {
     models: Object.values(ANTHROPIC_MODELS).map((model) => ({ ...model, baseUrl })),
     api: anthropicMessagesApi(),
   }));
+  if (phase === "begin" && scenario === "generation") observeGenerationTail(models);
   const questionDoc = defineDoc({
     kind: "probe.question", version: 1, scope: "conversation", history: "latest",
     fork: "initial", initial: () => ({ pending: null, history: [] }),
@@ -386,7 +406,7 @@ async function probeDurable(scenario) {
       await first.read("durable partial before SIGKILL", (msg) => msg.event === "interrupt");
       if (generation) {
         sendTail();
-        await delay(40);
+        await first.read("generation reader to consume the tail", (msg) => msg.event === "tail-consumed");
       }
       await first.finish("SIGKILL");
       assert.equal(calls.length, 1, "Model calls before reopening");
@@ -436,9 +456,10 @@ async function probeQuestion() {
   });
 }
 
-async function serveMcp() {
+async function serveMcp(trace) {
   for await (const line of createInterface({ input: process.stdin })) {
     const request = JSON.parse(line);
+    if (trace) writeFileSync(trace, `${line}\n`, { flag: "a" });
     const envelope = { jsonrpc: "2.0", id: request.id };
     let response;
     const meta = request.params?._meta;
@@ -476,8 +497,9 @@ async function probeMcp() {
     await fixture.cleanup();
   }
   const client = new McpClient({ name: "recovery-probe", version: "1", requestTimeoutMs: DEADLINE_MS });
+  const trace = resolve("mcp-handshake.jsonl");
   const transport = new StdioTransport({
-    command: process.execPath, args: [SCRIPT, "mcp-server"], cwd: process.cwd(),
+    command: process.execPath, args: [SCRIPT, "mcp-server", trace], cwd: process.cwd(),
     env: { PATH: process.env.PATH, HOME: process.env.HOME, LANG: "C.UTF-8" }, inheritEnv: false,
   });
   try {
@@ -487,6 +509,12 @@ async function probeMcp() {
   } finally {
     await transport.close();
   }
+  const requests = readFileSync(trace, "utf8").trimEnd().split("\n").map((line) => JSON.parse(line));
+  assert.equal(requests.length, 1);
+  const [request] = requests;
+  assert.equal(request.method, "initialize");
+  assert.equal(request.params.protocolVersion, LEGACY_MCP_VERSION);
+  assert(!Object.hasOwn(request.params, "_meta"), "Legacy initialize unexpectedly carries stateless metadata");
 }
 
 async function probeRpc(cli) {
@@ -590,6 +618,6 @@ switch (mode) {
   case undefined: runIsolated(); break;
   case "run": await run(...args); break;
   case "durable": await durableWorker(...args); break;
-  case "mcp-server": await serveMcp(); break;
+  case "mcp-server": await serveMcp(...args); break;
   default: throw new Error(`Unexpected probe mode: ${mode}`);
 }
