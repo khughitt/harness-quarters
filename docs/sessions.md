@@ -27,12 +27,29 @@ schema types fail visibly instead of producing an empty list.
 | claude | Home history.jsonl | projects/*/SESSION.jsonl; child files under subagents/ |
 | codex | Home state_5.sqlite threads | sessions/ or archived_sessions/ rollout JSONL |
 | agy | conversation_summaries.db | brain/CONVERSATION/.system_generated/logs/transcript_full.jsonl |
+| pi | each file's `session` header | sessions/CWD-SLUG/TIMESTAMP_SESSION.jsonl under ~/.pi/agent |
 
-Personal/work homes are distinct; agy has one home. A work resume sets the selected
-harness's home variable, while a personal resume clears both Claude/Codex overrides.
+Personal/work homes are distinct; agy and pi have one home each. A work resume sets
+the selected harness's home variable, while a personal resume clears every adapter's
+override (CLAUDE_CONFIG_DIR, CODEX_HOME and PI_CODING_AGENT_DIR).
 Agy's workspace/title/parent identity comes from its summaries database, not its
-step transcript. Pi, OpenCode and Crush session-store parity remains intended work,
+step transcript. OpenCode and Crush session-store parity remains intended work,
 not current support in this registry.
+
+Pi keeps no index: the list reads the files pi's own picker reads, `*.jsonl` directly
+inside each directory under `sessions/`, and a missing `sessions/` lists nothing.
+An empty file, which pi creates just before writing the header and which a kill can
+leave behind, is counted as excluded (`empty`) rather than listed.
+The first line must be a version-3 `session` header with an id, a zoned
+timestamp and an absolute cwd; anything else stops the list, naming the file. The
+label is pi's own: the latest `session_info` name (an empty name clears it), else the
+first user message's text. Recency is the file's mtime, the time of its last
+appended entry; pi's picker orders by the last message instead. The id column shows
+the random tail of the UUIDv7. Resume runs `pi --session FILE`, which opens that file
+whatever its cwd directory. Every pi session is listed: the header does not say
+whether a run was interactive (`session-metadata-marks-headless` is false), and pi
+has no child conversations. Sessions pi wrote elsewhere (`--session-dir`,
+PI_CODING_AGENT_SESSION_DIR or a `sessionDir` setting) are not listed.
 
 Filters include harness, home, here and archived Codex threads. Missing interactive
 previews and native non-interactive sessions are excluded as the adapters specify;
@@ -580,10 +597,22 @@ show/confirm, review status-question positives and a sample of negatives, then
 re-extract before handing over. Passing a byte search is not enough for escaped
 JSON text; an expected successful command's output must belong to that call.
 
-The tool's default stores cover Claude Code and Codex. Agy is an explicit harness
-selection during the current trial period; do not change that measured default
-as a documentation cleanup. SESSION_LOGS_CLAUDE, SESSION_LOGS_CODEX and
-SESSION_LOGS_AGY select isolated roots. The tool resolves its hq helpers from its
+The tool's default stores cover Claude Code and Codex. Agy and pi are explicit
+harness selections during the current trial period; do not change that measured
+default as a documentation cleanup. SESSION_LOGS_CLAUDE, SESSION_LOGS_CODEX,
+SESSION_LOGS_AGY and SESSION_LOGS_PI (pi's `sessions/` directory) select isolated
+roots. A non-empty pi file without a version-3 session header first stops the run;
+an empty file holds no events; a later line that is not an entry counts as
+malformed, as pi itself skips it. A bash call pi saved with empty arguments because
+its response was aborted, failed or hit the output limit has no command; elsewhere a bash call without a
+command string stops the run. A `/skill:NAME args` message, which pi stores with
+the skill file expanded in a `<skill …>` block, is read as the command the person
+typed. A pi call is
+named `ENTRY:CALL` (its assistant entry's id, then the provider's call id), which a
+`--fork` copy keeps. A pi turn ends at the next human message, at an aborted
+response (interrupted), or where the next entry's parent is not the entry before it:
+the person moved to another branch. A turn whose last response is an error is
+unknown; an error pi retried past is not. The tool resolves its hq helpers from its
 real path and refuses a detached copy without them. Episode references are private
 local locators even though records contain no transcript text.
 

@@ -1133,7 +1133,7 @@ def test_tracked_launch_config_matches_the_users_aliases():
     codex = ["--no-daemon", "--dangerously-bypass-approvals-and-sandbox"]
     assert {home: entry["flags"] for home, entry in data["homes"].items()} == {
         "claude": claude, "claude-work": claude, "codex": codex, "codex-work": codex,
-        "agy": ["--dangerously-skip-permissions"]}
+        "agy": ["--dangerously-skip-permissions"], "pi": []}
 
 
 # --- agy ----------------------------------------------------------------------------------
@@ -1268,7 +1268,7 @@ def test_absent_agy_home_is_named_not_an_error(env):
     claude_session(env.home / ".claude", SID, project)
     result = env.run("sessions")
     assert len(rows(result)) == 1
-    assert footer(result).endswith("absent: agy")
+    assert footer(result).endswith("absent: agy, pi")
 
 
 def test_launch_agy_passes_flags_and_conversation_id(env):
@@ -1287,6 +1287,207 @@ def test_filter_harness_agy(env):
     agy_db(home, [agy_row(home, AID, env.project("alpha"), title="agy-one")])
     assert labels(env.run("sessions", "--harness", "agy")) == {"agy-one"}
     assert "agy-one" in labels(env.run("sessions"))
+
+
+# --- pi -------------------------------------------------------------------------------------
+
+PID = "01a18264-30aa-73b5-bec6-de3594e99d2c"
+PID2 = "01a1826b-117c-716d-9cc9-24dd84c07ce0"
+PI_STUB = """#!{python}
+import json, os, sys
+print(json.dumps({{"tool": "pi", "argv": sys.argv[1:], "cwd": os.getcwd(),
+                  "PI_CODING_AGENT_DIR": os.environ.get("PI_CODING_AGENT_DIR"),
+                  "CLAUDE_CONFIG_DIR": os.environ.get("CLAUDE_CONFIG_DIR")}}))
+"""
+
+
+def pi_home(env) -> Path:
+    path = env.home / ".pi" / "agent"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def pi_stamp(age_s: float = 0) -> str:
+    moment = datetime.fromtimestamp(time.time() - age_s, timezone.utc)
+    return moment.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def pi_user(text: str, entry_id: str = "00000001", parent: str | None = None, blocks: bool = True) -> dict:
+    """A user message; pi writes content as text blocks, and older entries as a bare string."""
+    content = [{"type": "text", "text": text}] if blocks else text
+    return {"type": "message", "id": entry_id, "parentId": parent, "timestamp": pi_stamp(),
+            "message": {"role": "user", "content": content, "timestamp": NOW_MS}}
+
+
+def pi_name(name: str, entry_id: str = "00000009") -> dict:
+    return {"type": "session_info", "id": entry_id, "parentId": None, "timestamp": pi_stamp(), "name": name}
+
+
+def pi_session(home: Path, sid: str, cwd, *records, age_s: float = 0, header: dict | None = None,
+               slug: str | None = None, tail: str = "") -> Path:
+    """A session file as pi writes it: `sessions/<cwd-slug>/<timestamp>_<id>.jsonl`, the header
+    first, one compact JSON object per line."""
+    head = {"type": "session", "version": 3, "id": sid, "timestamp": pi_stamp(age_s), "cwd": str(cwd),
+            **(header or {})}
+    slug = slug or "--" + str(cwd).strip("/").replace("/", "-") + "--"
+    path = home / "sessions" / slug / f"{pi_stamp(age_s).replace(':', '-').replace('.', '-')}_{sid}.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [json.dumps(r, separators=(",", ":")) for r in (head, *records)]
+    path.write_text("".join(line + "\n" for line in lines) + tail)
+    stamp = time.time() - age_s
+    os.utime(path, (stamp, stamp))
+    return path
+
+
+def test_pi_row_shows_harness_tail_id_cwd_and_first_prompt(env):
+    home, project = pi_home(env), env.project("alpha")
+    pi_session(home, PID, project, pi_user("first words"), pi_user("later words", "00000002", "00000001"))
+    [row] = rows(env.run("sessions", "--harness", "pi"))
+    assert row.split()[:3] == ["pi", "personal", PID[-8:]]
+    assert str(project) in row and row.endswith("first words")
+
+
+def test_pi_string_content_prompt_is_the_label(env):
+    home = pi_home(env)
+    pi_session(home, PID, env.project("alpha"), pi_user("typed as a string", blocks=False))
+    assert rows(env.run("sessions", "--harness", "pi"))[0].endswith("typed as a string")
+
+
+def test_pi_label_is_the_latest_session_name_and_a_cleared_name_falls_back(env):
+    home, project = pi_home(env), env.project("alpha")
+    pi_session(home, PID, project, pi_user("the prompt"), pi_name("first name"), pi_name("renamed", "0000000a"))
+    pi_session(home, PID2, project, pi_user("other prompt"), pi_name("named"), pi_name("  ", "0000000a"),
+               age_s=60)
+    assert [row.rsplit("  ", 1)[-1] for row in rows(env.run("sessions", "--harness", "pi"))] == [
+        "renamed", "other prompt"]
+
+
+def test_pi_newest_first_by_file_mtime(env):
+    home, project = pi_home(env), env.project("alpha")
+    pi_session(home, PID, project, pi_user("older"), age_s=7200)
+    pi_session(home, PID2, project, pi_user("newer"), age_s=60)
+    assert [row.rsplit("  ", 1)[-1] for row in rows(env.run("sessions", "--harness", "pi"))] == ["newer", "older"]
+
+
+def test_pi_truncated_last_line_is_ignored(env):
+    home = pi_home(env)
+    pi_session(home, PID, env.project("alpha"), pi_name("kept"),
+               tail='{"type":"session_info","id":"0000000b","parentId":"00000009","name":"lo')
+    assert rows(env.run("sessions", "--harness", "pi"))[0].endswith("kept")
+
+
+def test_pi_header_without_a_final_newline_is_read_as_pi_reads_it(env):
+    home = pi_home(env)
+    path = pi_session(home, PID, env.project("alpha"))
+    path.write_text(path.read_text().rstrip("\n"))
+    assert rows(env.run("sessions", "--harness", "pi"))[0].split()[:3] == ["pi", "personal", PID[-8:]]
+
+
+def test_pi_home_without_a_sessions_directory_lists_nothing(env):
+    pi_home(env)
+    result = env.run("sessions", "--harness", "pi")
+    assert rows(result) == [] and "absent" not in footer(result)
+
+
+def test_pi_ignores_what_pi_itself_does_not_list(env):
+    home, project = pi_home(env), env.project("alpha")
+    pi_session(home, PID, project, pi_user("listed"))
+    (home / "sessions" / "stray.jsonl").write_text("not a session\n")
+    (home / "sessions" / "--x--").mkdir()
+    (home / "sessions" / "--x--" / "notes.txt").write_text("not a session\n")
+    assert [row.rsplit("  ", 1)[-1] for row in rows(env.run("sessions", "--harness", "pi"))] == ["listed"]
+
+
+@pytest.mark.parametrize("header, problem", [
+    ({"type": "message"}, "header"),
+    ({"version": 2}, "version"),
+    ({"id": ""}, "id"),
+    ({"cwd": "relative/dir"}, "cwd"),
+    ({"timestamp": "yesterday"}, "timestamp"),
+])
+def test_pi_header_drift_is_an_error_naming_the_file(env, header, problem):
+    home = pi_home(env)
+    path = pi_session(home, PID, env.project("alpha"), pi_user("x"), header=header)
+    result = env.run("sessions", "--harness", "pi")
+    assert result.returncode != 0
+    assert str(path) in result.stderr and problem in result.stderr
+    assert "pi's session format changed" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize("text", ["\n", "{not json\n", '{"type":"session","version":3'])
+def test_pi_file_without_a_header_is_an_error_naming_the_file(env, text):
+    home = pi_home(env)
+    path = home / "sessions" / "--x--" / f"2026-01-01T00-00-00-000Z_{PID}.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text(text)
+    result = env.run("sessions", "--harness", "pi")
+    assert result.returncode != 0
+    assert str(path) in result.stderr and "Traceback" not in result.stderr
+
+
+def test_pi_empty_file_is_counted_not_listed(env):
+    """pi creates a session file before writing its header; a kill can leave it empty, and
+    pi's own picker skips it."""
+    home = pi_home(env)
+    pi_session(home, PID, env.project("alpha"), pi_user("listed"))
+    empty = home / "sessions" / "--x--" / f"2026-01-01T00-00-00-000Z_{PID2}.jsonl"
+    empty.parent.mkdir()
+    empty.write_text("")
+    result = env.run("sessions", "--harness", "pi")
+    assert [row.rsplit("  ", 1)[-1] for row in rows(result)] == ["listed"]
+    assert "excluded: pi 1 empty" in footer(result)
+
+
+def test_pi_unreadable_sessions_directory_is_an_error_naming_it(env):
+    home = pi_home(env)
+    pi_session(home, PID, env.project("alpha"), pi_user("x"))
+    directory = next((home / "sessions").iterdir())
+    directory.chmod(0)
+    try:
+        result = env.run("sessions", "--harness", "pi")
+    finally:
+        directory.chmod(0o700)
+    assert result.returncode != 0
+    assert str(directory) in result.stderr and "Traceback" not in result.stderr
+
+
+def test_absent_pi_home_is_named_not_an_error(env):
+    result = env.run("sessions", "--harness", "pi")
+    assert rows(result) == [] and footer(result).endswith("absent: pi")
+
+
+def test_launch_pi_resumes_the_file_and_unsets_an_inherited_agent_dir(env):
+    env.script("pi", PI_STUB.format(python=sys.executable))
+    home, project = pi_home(env), env.project("my proj")
+    path = pi_session(home, PID, project, pi_user("resume me"))
+    result = env.run("sessions", "-i", "--harness", "pi", input="1\n", PI_CODING_AGENT_DIR="/z",
+                     CLAUDE_CONFIG_DIR="/x")
+    assert launched(result) == {"tool": "pi", "argv": ["--session", str(path)], "cwd": str(project),
+                                "PI_CODING_AGENT_DIR": None, "CLAUDE_CONFIG_DIR": None}
+
+
+def test_launch_claude_personal_also_unsets_the_pi_agent_dir(env):
+    env.script("claude", PI_STUB.replace('"pi"', '"claude"').format(python=sys.executable))
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    out = launched(env.run("sessions", "-i", input="1\n", PI_CODING_AGENT_DIR="/z"))
+    assert out["tool"] == "claude" and out["PI_CODING_AGENT_DIR"] is None
+
+
+def test_launch_refuses_a_pi_session_whose_file_went_after_listing(env):
+    env.script("pi", PI_STUB.format(python=sys.executable))
+    path = pi_session(pi_home(env), PID, env.project("alpha"), pi_user("x"))
+    env.script("fzf", FZF_STUB.format(python=sys.executable))
+    result = env.run("sessions", "-i", "--harness", "pi", FZF_PICK="1", FZF_DELETE=str(path))
+    assert result.returncode != 0
+    assert str(path) in result.stderr and '"tool"' not in result.stdout
+
+
+def test_filter_harness_pi(env):
+    populate_all(env)
+    pi_session(pi_home(env), PID, env.project("alpha"), pi_user("pi-one"))
+    assert labels(env.run("sessions", "--harness", "pi")) == {"pi-one"}
+    assert "pi-one" in labels(env.run("sessions"))
 
 
 # --- colour ----------------------------------------------------------------------------

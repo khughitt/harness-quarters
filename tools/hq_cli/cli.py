@@ -38,7 +38,7 @@ def parser() -> argparse.ArgumentParser:
     commands = top.add_subparsers(dest="command", required=True)
     listing = commands.add_parser(
         "sessions", help="list recent agent sessions; -i resumes one",
-        description="Recent Claude Code, Codex and agy sessions across personal and work homes, newest first.")
+        description="Recent Claude Code, Codex, agy and pi sessions across personal and work homes, newest first.")
     listing.add_argument("-i", "--interactive", action="store_true",
                          help="pick a session (fzf when on PATH, else a numbered prompt) and resume it")
     listing.add_argument("--harness", choices=tuple(adapter.alias for adapter in harness_stores.ADAPTERS))

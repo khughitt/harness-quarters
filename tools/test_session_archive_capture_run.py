@@ -378,3 +378,44 @@ def test_agy_brain_vanishing_after_capture_aborts(home, archive):
     result = run_tool("capture", home=home)
     assert result.returncode == 2
     assert "brain" in result.stderr
+
+
+PI = ".pi/agent"
+PI_FILE = "2026-10-28T12-02-46-572Z_01a18264-30aa-73b5-bec6-de3594e99d2c.jsonl"
+
+
+def pi_fixture(home):
+    root = home / PI
+    write(root / "sessions" / "--work-alpha--" / PI_FILE, b'{"type":"session"}\n')
+    write(root / "sessions" / "--work-alpha--" / "notes.txt", b"not a session")
+    write(root / "sessions" / "--work-alpha--" / "deeper" / PI_FILE, b"not where pi writes")
+    write(root / "sessions" / "stray.jsonl", b"pi lists only cwd directories")
+    write(root / "auth.json", b"{}")
+    write(root / "models-store.json", b"{}")
+    return root
+
+
+def test_pi_capture_takes_only_session_files_in_cwd_directories(home, archive, manifest):
+    pi_fixture(home)
+    report, ok = capture_run(archive, manifest, table(home))
+    assert ok
+    assert mirrored(archive, "pi") == [f"--work-alpha--/{PI_FILE}"]
+    assert report["pi"]["copied"] == 1
+
+
+def test_pi_rewritten_session_keeps_the_old_version(home, archive, manifest):
+    """pi rewrites a file only when it migrates an older format on open; the archive keeps
+    the earlier bytes as a diverged version rather than losing them."""
+    root = pi_fixture(home)
+    capture_run(archive, manifest, table(home))
+    write(root / "sessions" / "--work-alpha--" / PI_FILE, b'{"type":"session","version":3}\n')
+    report, ok = capture_run(archive, manifest, table(home))
+    assert ok and report["pi"]["diverged"] == 1
+
+
+def test_never_run_pi_home_is_skipped(home, archive):
+    (home / PI / "sessions").rmdir()
+    write_config(home, archive)
+    result = run_tool("capture", home=home)
+    assert result.returncode == 0, result.stderr
+    assert "skipped" in json.loads(result.stdout)["pi"]

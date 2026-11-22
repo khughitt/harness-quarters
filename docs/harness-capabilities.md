@@ -24,9 +24,11 @@ reader, refusal channel, durable runtime or automatic controller wake.
 Crush is not currently declared in harnesses.toml. Pi CLI and pi-durable are
 separate fact columns: an SDK recovery guarantee never applies to the CLI merely
 because they share a package version. Current session adapters cover Claude,
-Codex and agy; parity for other stores is intended work. Agy transcripts lack
-workspace/title/parent metadata and stable call IDs; summaries and positional
-pairing are required. Its archive is not a complete capture of every private file.
+Codex, agy and the pi CLI (not pi-durable); parity for other stores is intended
+work. Agy transcripts lack workspace/title/parent metadata and stable call IDs;
+summaries and positional pairing are required. Its archive is not a complete
+capture of every private file. A pi session file carries its own cwd, but nothing
+in it marks a headless run, and the pi archive misses spilled bash output.
 
 Relay's adapter docs define normalized events, refusal/context support and budgets.
 Installed wiring lives in harness settings/hooks and relay/subscribers.template.json.
@@ -177,9 +179,28 @@ Run the picker-extension probe in its scratch agent directory, starting with
 --check P1a, then its remaining cases. That local dummy-provider probe makes no
 API calls. The separate loopback driver attached to hq-f1aff0 covers the RPC
 exit status, session directory, extension API and context-file reporting facts
-with synthetic credentials. The general RPC and durable probes for model
-behavior need a real model key and paid calls. Documentation and a pin change
-do not authorize that spend. MCP protocol revisions require
+with synthetic credentials.
+
+With the checkout's pinned install in place, run the offline recovery probe
+from the checkout root:
+
+```sh
+node harnesses/pi/probes/recovery-probe.mjs
+```
+
+The probe honors `PI_INSTALL_ROOT` and checks the installed lock against the
+checkout. It requires Linux with Bubblewrap's network and PID namespace support.
+It uses a temporary home and a loopback Anthropic Messages fixture with a
+synthetic key. A passing run checks pi-durable generation replay and request ID
+deduplication after SIGKILL, safe and unsafe tool replay, and a delayed answer
+delivered as a new turn after the question process exits. It also checks the
+bundled `pi-mcp` client's handshake rejection against a stateless MCP 2026-07-28
+fixture, and verifies that reopening a Pi RPC session preserves its session ID
+while a repeated RPC prompt ID starts a second turn. Each case reports a verdict
+and any failure exits nonzero.
+
+The general RPC and durable probes for model behavior need a real model key and
+paid calls. Documentation and a pin change do not authorize that spend. MCP protocol revisions require
 checking the pinned client construction too; the probe server's acceptance alone
 does not establish the requested revision. Changes to the external analyst
 runtime/tool epoch need their owning project's requalification independently.
