@@ -38,7 +38,7 @@ not current support in this registry.
 
 Pi keeps no index: the list reads the files pi's own picker reads, `*.jsonl` directly
 inside each directory under `sessions/`, and a missing `sessions/` lists nothing.
-The first line must be a complete version-3 `session` header with an id, a zoned
+The first line must be a version-3 `session` header with an id, a zoned
 timestamp and an absolute cwd; anything else stops the list, naming the file. The
 label is pi's own: the latest `session_info` name (an empty name clears it), else the
 first user message's text. Recency is the file's mtime, the time of its last

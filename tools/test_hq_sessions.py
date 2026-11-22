@@ -1371,8 +1371,16 @@ def test_pi_newest_first_by_file_mtime(env):
 
 def test_pi_truncated_last_line_is_ignored(env):
     home = pi_home(env)
-    pi_session(home, PID, env.project("alpha"), pi_user("kept"), tail='{"type":"message","id":"000')
+    pi_session(home, PID, env.project("alpha"), pi_name("kept"),
+               tail='{"type":"session_info","id":"0000000b","parentId":"00000009","name":"lo')
     assert rows(env.run("sessions", "--harness", "pi"))[0].endswith("kept")
+
+
+def test_pi_header_without_a_final_newline_is_read_as_pi_reads_it(env):
+    home = pi_home(env)
+    path = pi_session(home, PID, env.project("alpha"))
+    path.write_text(path.read_text().rstrip("\n"))
+    assert rows(env.run("sessions", "--harness", "pi"))[0].split()[:3] == ["pi", "personal", PID[-8:]]
 
 
 def test_pi_home_without_a_sessions_directory_lists_nothing(env):
@@ -1408,7 +1416,7 @@ def test_pi_header_drift_is_an_error_naming_the_file(env, header, problem):
 
 
 @pytest.mark.parametrize("text", ["", "\n", "{not json\n", '{"type":"session","version":3'])
-def test_pi_file_without_a_complete_header_is_an_error_naming_the_file(env, text):
+def test_pi_file_without_a_header_is_an_error_naming_the_file(env, text):
     home = pi_home(env)
     path = home / "sessions" / "--x--" / f"2026-01-01T00-00-00-000Z_{PID}.jsonl"
     path.parent.mkdir(parents=True)

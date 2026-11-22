@@ -47,10 +47,8 @@ def parse_time(path: Path, value) -> int:
 
 
 def read_header(path: Path, first: bytes) -> dict:
-    """The first line, complete and a version-3 `session` record with an id, a timestamp and
-    an absolute cwd; anything else stops the listing."""
-    if not first.endswith(b"\n"):
-        raise SourceError(f"{path}: no complete header line; {DRIFT}")
+    """The first line, a version-3 `session` record with an id, a timestamp and an absolute
+    cwd; anything else stops the listing."""
     try:
         header = json.loads(first)
     except (json.JSONDecodeError, UnicodeDecodeError):
