@@ -69,7 +69,6 @@ def test_bridge_references_every_delegate():
     ("claim-guard", "binding", "codex:Stop"),
     ("claude-sessionstart", "binding", "claude:SessionStart"),
     ("capture-notice", "binding", "codex:SessionStart"),
-    ("claude-posttooluse", "binding", "claude:PostToolUse"),
     ("relay-guard", "subscriber-file", "claude:PreToolUse"),
 ])
 def test_today_ops_references(donor, kind, binding):
@@ -88,6 +87,12 @@ def test_agy_notice_bridge_releases_both_donor_references():
         refs = donor_references(table, donor)
         assert any(ref.where.startswith("claude:SessionStart") for ref in refs)
         assert not any(ref.where.startswith("agy:") for ref in refs)
+
+
+def test_claude_posttooluse_donor_has_no_references():
+    from hook_routes.references import donor_references
+
+    assert donor_references(load(TABLE), _ops_donor("claude-posttooluse")) == []
 
 
 @pytest.fixture
