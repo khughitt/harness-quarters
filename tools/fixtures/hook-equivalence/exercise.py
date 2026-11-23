@@ -175,12 +175,24 @@ def exercise(side):
     problems = [s for s in result.stderr.splitlines() if not s.startswith(("SESSION_HANDLE_UNAVAILABLE:", "PROCESS_UNAVAILABLE:"))]
     failures = {}
     global_errors = []
+    composition_errors = []
     selected = CASE["selected"]
+    config = json.loads((ROOT / "candidate/subscribers.json").read_bytes())
+    forwarding_observers = {s["name"] for s in config["subscribers"]
+                            if s["name"] in selected and s["role"] == "observer" and not s.get("privateFields")}
     for diagnostic in problems:
         prefix, _, detail = diagnostic.partition(": ")
         name = detail.partition(" ")[0]
         if prefix in {"NOTICE_FAILED", "NOTICE_DROPPED", "SUBSCRIBER_FAILED", "SUBSCRIBER_SKIPPED"} and name in selected:
             failures[name] = diagnostic
+        elif prefix == "registry" and detail:
+            # Publication follows notice collection. Its failure can accompany a delivered reply.
+            composition_errors.append(diagnostic)
+        elif prefix in forwarding_observers and detail:
+            if prefix in failures:
+                failures[prefix] += "\n" + diagnostic
+            else:
+                composition_errors.append(diagnostic)
         else:
             global_errors.append(diagnostic)
     if result.returncode or global_errors:
@@ -204,9 +216,9 @@ def exercise(side):
     if delivered:
         delivered_ok = delivered_ok and reply["hookSpecificOutput"]["hookEventName"] == CASE["event"]
     answers = {}
-    other_failures = [msg for name, msg in failures.items() if selected[name] not in CASE["policies"]]
-    if other_failures:
-        answers["_composition"] = other_failures
+    composition_errors.extend(msg for name, msg in failures.items() if selected[name] not in CASE["policies"])
+    if composition_errors:
+        answers["_composition"] = composition_errors
     for policy in CASE["policies"]:
         policy_failures = [msg for name, msg in failures.items() if selected[name] == policy]
         if policy_failures:

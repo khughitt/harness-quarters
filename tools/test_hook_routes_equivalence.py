@@ -345,3 +345,37 @@ def test_evidence_identifies_local_event_and_synthetic_changes(portable_replay, 
     assert "stop_hook_active changed from true to false" in stops["codex"]["changes"]
     assert stops["claude-code"]["payload"]["background_tasks"] == []
     assert "session_crons omitted" in stops["claude-code"]["changes"]
+
+
+@pytest.mark.parametrize("diagnostics, delivered, code, profile_status", [
+    (["registry: DEADLINE_EXCEEDED registry publication did not finish before the deadline",
+      "SUBSCRIBER_SKIPPED: familiar skipped after registry failure"], True, 0, "passed"),
+    (["SUBSCRIBER_FAILED: familiar exited exit 4", "familiar: fixture observer write failed"], True, 0, "passed"),
+    (["registry: DEADLINE_EXCEEDED registry publication did not finish before the deadline",
+      "SUBSCRIBER_SKIPPED: familiar skipped after registry failure"], False, 0, "failed"),
+    (["registry: DEADLINE_EXCEEDED registry publication did not finish before the deadline",
+      "SUBSCRIBER_SKIPPED: familiar skipped after registry failure"], True, 2, "failed"),
+], ids=["publication", "observer-stderr", "undelivered", "unsuccessful-exit"])
+def test_observer_failure_preserves_independent_delivery(portable_replay, tmp_path, monkeypatch,
+                                                         diagnostics, delivered, code, profile_status):
+    from hook_routes import cli
+    familiar = Path.home() / "d/familiar"
+    for directory in ("src", "bin", "node_modules"):
+        (familiar / directory).mkdir(parents=True)
+    (familiar / "package.json").write_text("{}")
+    observer = {"name": "familiar", "role": "observer", "registry": "snapshot",
+                "argv": ["env", str(familiar / "bin/familiar"), "observe"],
+                "kinds": ["session-start"], "harnesses": ["claude-code"], "timeoutMs": 2000}
+    review = candidate(tmp_path / "review", [notice(["lore", "hook", "profile-notice"]), observer])
+    monkeypatch.setattr(cli, "load", lambda path: TABLE)
+    monkeypatch.setattr(equivalence, "DEFAULT_CASES", cases(tmp_path, ["clean-checkout"]))
+    portable_replay.update(stderr="\n".join(diagnostics) + "\n", code=code)
+    if not delivered:
+        portable_replay["stdout"] = ""
+    evidence = tmp_path / "evidence.txt"
+    assert cli.main(["equivalence", "--next", str(review), "--out", str(evidence)]) == 1
+    lines = evidence.read_text().splitlines()
+    assert any(s.startswith(f"policyEquivalence {profile_status} ") and "policy=profile " in s for s in lines), lines
+    if code == 0:
+        composition, = [s for s in lines if s.startswith("composition failed ")]
+        assert all(message in composition for message in diagnostics)

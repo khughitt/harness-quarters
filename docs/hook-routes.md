@@ -198,7 +198,9 @@ Each line identifies the local event template file and its SHA-256, the digest
 of the exact payload sent to both commands, its upstream fixture ancestry and
 the synthetic substitutions. A difference or failed dispatch exits 1 and includes
 the native and relay observations. A failed notice or observer retains its own
-diagnostic. Delivered siblings are compared independently. A failure belonging to
+diagnostic, including stderr forwarded by the failed observer. Registry publication
+follows notice collection, so a publication failure marks the composition failed
+while an independently confirmed notice can still pass. A failure belonging to
 a subscriber outside the policies compared by that case produces a separate
 failed composition line and a nonzero command exit. The destination must be new.
 
