@@ -129,7 +129,7 @@ jobs:
           for file in package.json package-lock.json; do
             git show "$hook_pin:relay/$file" > "$hook_install/$file"
           done
-          /usr/bin/npm ci --prefix "$hook_install" --ignore-scripts --allow-git=root --no-fund --no-audit
+          "$RELAY_NPM" ci --prefix "$hook_install" --ignore-scripts --allow-git=root --no-fund --no-audit
           /usr/bin/node "$hook_install/node_modules/relay/bin/relay.js" --version >> "$HQ_TEST_ARTIFACT_DIR/setup-report.txt"
           RELAY_INSTALL_ROOT="$relay_root" just relay-install
           RELAY_INSTALL_ROOT="$relay_root" relay/bin/relay --version >> "$HQ_TEST_ARTIFACT_DIR/setup-report.txt"

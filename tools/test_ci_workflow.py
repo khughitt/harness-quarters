@@ -133,8 +133,8 @@ def test_missing_job_force_refuses_real_ci_entry(world):
     assert world.markers() == []
 
 
-def preparation_script():
-    step = workflow().split("      - name: Prepare isolated configuration and evidence\n", 1)[1]
+def step_script(name):
+    step = workflow().split(f"      - name: {name}\n", 1)[1]
     step = step.split("\n      - name:", 1)[0]
     return textwrap.dedent(step.split("        run: |\n", 1)[1])
 
@@ -193,7 +193,7 @@ def test_preparation_pilot(world, tmp_path, failure):
     preparation_env = dict(world.env)
     preparation_env.update({"RUNNER_TEMP": str(runner_temp), "GITHUB_ENV": str(github_env),
                             "GITHUB_SHA": "1" * 40})
-    subprocess.run(["bash", "-c", preparation_script()], cwd=world.root, env=preparation_env,
+    subprocess.run(["bash", "-c", step_script("Prepare isolated configuration and evidence")], cwd=world.root, env=preparation_env,
                    check=True, text=True, capture_output=True)
     exported = dict(line.split("=", 1) for line in github_env.read_text().splitlines())
     assert set(exported) == {"HQ_TEST_ARTIFACT_DIR", "HQ_TEST_EVIDENCE_DIR", "GIT_CONFIG_GLOBAL"}
@@ -225,3 +225,42 @@ def test_preparation_pilot(world, tmp_path, failure):
     assert all(row["kind"] != "budget" for row in world.markers())
     print(json.dumps({"tasks": version, "expected_failure": failure, "collected": coverage["collected"],
                       "reported": coverage["reported"], "artifact": str(artifact)}))
+
+
+def test_relay_installs_use_ci_selected_npm(tmp_path):
+    home, binaries, artifact = (tmp_path / name for name in ("home", "bin", "artifact"))
+    for directory in (home, binaries, artifact):
+        directory.mkdir()
+    for name in ("just", "bash", "cp", "dirname", "readlink", "mkdir", "mktemp"):
+        (binaries / name).symlink_to(Path("/usr/bin") / name)
+    for relative in ("justfile", "relay/package.json", "relay/package-lock.json", "relay/bin/relay"):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / relative, destination)
+    # Only installer selection is under test. Supply historical manifests without using a host repository.
+    git = binaries / "git"
+    git.write_text("#!/bin/sh\n[ \"$1\" = show ] && printf '{}\\n'\n")
+    git.chmod(0o700)
+    # The runner need not have any system npm. Prevent a regression from contacting a registry.
+    bootstrap = tmp_path / "no-system-npm.bash"
+    bootstrap.write_text("function /usr/bin/npm { echo 'unexpected system npm' >&2; return 127; }\n")
+    npm = tmp_path / "selected npm"
+    npm.write_text("""#!/usr/bin/python3
+from pathlib import Path
+import sys
+assert sys.argv[1] == "ci" and "--allow-git=root" in sys.argv and "--ignore-scripts" in sys.argv
+prefix = Path(sys.argv[sys.argv.index("--prefix") + 1])
+assert (prefix / "package-lock.json").is_file() and (prefix / "package.json").is_file()
+launcher = prefix / "node_modules/relay/bin/relay.js"
+launcher.parent.mkdir(parents=True)
+launcher.write_text(f"console.log('fixture {prefix.name}')")
+""")
+    npm.chmod(0o700)
+    result = subprocess.run(["/usr/bin/bash", "-c", step_script("Prepare the pinned relay runtimes for hook tests")],
+                            cwd=tmp_path, env={"HOME": str(home), "PATH": str(binaries), "BASH_ENV": str(bootstrap),
+                                               "RELAY_NPM": str(npm), "RUNNER_TEMP": str(tmp_path),
+                                               "GITHUB_ENV": str(tmp_path / "github-env"),
+                                               "HQ_TEST_ARTIFACT_DIR": str(artifact)},
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+    assert (artifact / "setup-report.txt").read_text().splitlines() == ["fixture v0.5.0", "fixture v0.6.0"]

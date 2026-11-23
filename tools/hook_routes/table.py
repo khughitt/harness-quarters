@@ -282,6 +282,8 @@ def _validate_structure(table, *, required_outputs):
                         raise ValueError(f"{where}: bridge command must contain only the launcher")
                     if any(not argv[0] or "/" in argv[0] for argv in line.delegates):
                         raise ValueError(f"{where}: bridge delegates must name commands on PATH")
+                    if len(set(line.delegates)) != len(line.delegates):
+                        raise ValueError(f"{where}: duplicate delegate command")
                     if binding.event == "Stop" and len(line.delegates) != 1:
                         raise ValueError(f"{where}: Stop bridge requires one guard command on PATH")
                 elif (line.runtime not in table.runtimes or line.subscriber_file not in files

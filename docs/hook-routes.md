@@ -155,10 +155,12 @@ ordered contexts to `combine`. Both operations use the v0.6.0 public exports.
 
 An agy SessionStart bridge line supplies the launcher in `command`. The renderer
 adds `SessionStart --runtime PACKAGE` and one `--delegate` per declared argv in
-order. The bridge heals detached settings first, then runs each owner on PATH
+order. Duplicate delegate argv are rejected before any owner runs. The bridge
+heals detached settings first, then runs each owner on PATH
 with its projected envelope and a ten-second timeout. It injects one system
 message with the combined context, or replies `{}` when every notice is empty.
-A failed owner contributes a diagnostic. A failed profile or event projection
+A failed owner contributes a diagnostic. If the diagnostic does not fit in the
+combined context, the bridge writes the same failure to stderr. A failed profile or event projection
 keeps the visible `profile: unresolved` line. The shipped SessionStart binding
 still calls its positional delegates.
 

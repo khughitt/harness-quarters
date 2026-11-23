@@ -53,7 +53,7 @@ with (Path.home() / 'calls').open('a') as log:
 """)
 
 
-def invoke(notice_home, runtime, *, raw=None, argv=None):
+def run_bridge(notice_home, runtime, *, raw=None, argv=None):
     home, workspace, binaries = notice_home
     if argv is None:
         argv = [HOOK, "SessionStart", "--runtime", runtime]
@@ -62,10 +62,14 @@ def invoke(notice_home, runtime, *, raw=None, argv=None):
     if raw is None:
         raw = json.dumps(dict(conversationId="session-1", workspacePaths=[str(workspace)],
                               transcriptPath=str(workspace / "session.jsonl"))).encode()
-    result = subprocess.run(argv, input=raw, cwd=home,
-                            env={"PATH": str(binaries), "HOME": str(home),
-                                 "CLAUDE_ENV_FILE": str(home / "unexpected")},
-                            capture_output=True, timeout=30)
+    return subprocess.run(argv, input=raw, cwd=home,
+                          env={"PATH": str(binaries), "HOME": str(home),
+                               "CLAUDE_ENV_FILE": str(home / "unexpected")},
+                          capture_output=True, timeout=30)
+
+
+def invoke(notice_home, runtime, **options):
+    result = run_bridge(notice_home, runtime, **options)
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
 
@@ -75,7 +79,7 @@ def message(reply):
     return step["systemMessage"]["systemMessage"]
 
 
-def test_profile_and_capture_reach_one_inject_step_in_order(notice_home, runtime, tmp_path):
+def render_session_start(tmp_path, runtime, home, delegates):
     table = load(ROOT / "harnesses/hook-routes.toml")
     agy = table.homes["agy"]
     index = next(i for i, b in enumerate(agy.bindings) if b.event == "SessionStart" and
@@ -89,19 +93,47 @@ binding = {index}
 [[moves.lines]]
 policies = ["claude-profile", "capture-notice", "agy-healing"]
 runtime = "v0.6.0"
-delegates = [["lore", "hook", "profile-notice"], ["mindful", "notice", "session-start"]]
+delegates = {json.dumps([shlex.split(command) for command in delegates])}
 command = {json.dumps(shlex.quote(str(HOOK)))}
 ''' + "".join(f'[moves.lines.states.{name}]\nstate = "bridge"\nevidence = "fixture"\n'
               for name in ("claude-profile", "capture-notice", "agy-healing")))
-    image = render_candidate(table, candidate, notice_home[0])
+    image = render_candidate(table, candidate, home)
     [entry] = [e for e in json.loads(image[agy.path])["hq"]["SessionStart"] if str(HOOK) in e["command"]]
-    argv = shlex.split(entry["command"])
+    return shlex.split(entry["command"])
+
+
+def test_profile_and_capture_reach_one_inject_step_in_order(notice_home, runtime, tmp_path):
+    argv = render_session_start(tmp_path, runtime, notice_home[0], DELEGATES)
     assert argv == [str(HOOK), "SessionStart", "--runtime", str(runtime),
                     "--delegate", DELEGATES[0], "--delegate", DELEGATES[1]]
     install_owner(notice_home, DELEGATES[0], """print('{"context":"profile: personal"}')""")
     install_owner(notice_home, DELEGATES[1], """print('{"context":"captures: 3"}')""")
     assert message(invoke(notice_home, runtime, argv=argv)) == "profile: personal\ncaptures: 3"
     assert (notice_home[0] / "calls").read_text().splitlines() == ["lore", "mindful"]
+
+
+def test_candidate_refuses_a_repeated_notice_owner(notice_home, runtime, tmp_path):
+    with pytest.raises(ValueError, match="duplicate delegate"):
+        render_session_start(tmp_path, runtime, notice_home[0], (*DELEGATES, DELEGATES[1]))
+
+
+def test_duplicate_cli_delegate_refused_before_owners_run(notice_home, runtime):
+    for delegate in DELEGATES:
+        install_owner(notice_home, delegate, "print('{}')")
+    argv = [HOOK, "SessionStart", "--runtime", runtime, "--delegate", DELEGATES[0],
+            "--delegate", DELEGATES[1], "--delegate", "mindful notice 'session-start'"]
+    result = run_bridge(notice_home, runtime, argv=argv)
+    assert result.returncode == 2 and b"duplicate delegate" in result.stderr
+    assert not (notice_home[0] / "calls").exists()
+
+
+def test_full_profile_keeps_capture_failure_visible(notice_home, runtime):
+    install_owner(notice_home, DELEGATES[0], "print(json.dumps({'context': 'x' * 10000}))")
+    install_owner(notice_home, DELEGATES[1], "sys.exit(7)")
+    result = run_bridge(notice_home, runtime)
+    assert result.returncode == 0 and message(json.loads(result.stdout)) == "x" * 10000
+    [diagnostic] = result.stderr.decode().splitlines()
+    assert "mindful" in diagnostic and "exited 7" in diagnostic
 
 
 def test_empty_replies_produce_nothing(notice_home, runtime):

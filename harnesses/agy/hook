@@ -461,7 +461,7 @@ def _run_owner(argv, envelope, env, *, cwd=None):
 
 
 def _owner_argv(command):
-    argv = shlex.split(command)
+    argv = tuple(shlex.split(command))
     if not argv or not argv[0] or "/" in argv[0]:
         raise ValueError("expected an owner command on PATH")
     return argv
@@ -479,7 +479,7 @@ def _owner_notices(stdin, runtime, delegates, env):
                "invokingCwd": os.getcwd(), "registry": {"status": "not-requested"}}
     child_env = {k: v for k, v in env.items() if k != "CLAUDE_ENV_FILE"}
     contexts = []
-    sources = []
+    dropped_diagnostics = []
     for argv in delegates:
         label = shlex.join(argv)
         envelope = relay_runtime.call(runtime, "project", {
@@ -491,17 +491,19 @@ def _owner_notices(stdin, runtime, delegates, env):
                 raise ValueError(f"exited {done.returncode}")
             reply = relay_runtime.call(runtime, "parse-notice", {"output": done.stdout.decode("utf-8")})
             context = reply.get("context")
+            dropped = f"agy-hook SessionStart: {label} exceeded the combined notice limit"
         except (OSError, ValueError, subprocess.TimeoutExpired) as error:
             detail = " ".join(str(error).splitlines())
             context = f"agy-hook SessionStart: {label} failed ({detail})"
-            if argv == ["lore", "hook", "profile-notice"]:
+            if argv == ("lore", "hook", "profile-notice"):
                 context = _profile_failure_line(context)
+            dropped = context
         if context:
             contexts.append(context)
-            sources.append(label)
+            dropped_diagnostics.append(dropped)
     combined = relay_runtime.call(runtime, "combine", {"contexts": contexts})
     for index in combined["dropped"]:
-        print(f"agy-hook SessionStart: {sources[index]} exceeded the combined notice limit", file=sys.stderr)
+        print(dropped_diagnostics[index], file=sys.stderr)
     return _inject(combined.get("context"))
 
 
@@ -556,6 +558,8 @@ def main(argv, stdin, stdout, env):
         parser.add_argument("--delegate", required=True, type=_owner_argv, action="append")
         try:
             args = parser.parse_args(argv[1:])
+            if len(set(args.delegate)) != len(args.delegate):
+                parser.error("duplicate delegate command")
         except SystemExit:
             return 2
         try:
