@@ -8,7 +8,7 @@ import tomllib
 
 import pytest
 
-from test_relay_wiring import expected_agy_bridge
+from test_relay_wiring import expected_agy_bridge, parse_relay_command
 
 ROOT = Path(__file__).resolve().parents[1]
 HOOK = ROOT / "harnesses/agy" / "hook"
@@ -59,16 +59,7 @@ def test_hooks_json_declares_session_start_pre_tool_use_and_stop():
     def assert_relay_handler(entry, expected_event):
         assert entry["type"] == "command"
         assert entry["timeout"] == 60
-        argv = shlex.split(entry["command"])
-        assert len(argv) == 10
-        assert argv[0] == "/usr/bin/node"
-        assert Path(argv[1]).is_absolute()
-        assert argv[1].endswith("/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js")
-        assert argv[2:7] == ["hook", "--harness", "agy", "--outer-ms", "60000"]
-        assert argv[7] == "--subscribers"
-        assert Path(argv[8]).is_absolute()
-        assert argv[8].endswith("/.config/relay/v0.5.0/relay/subscribers.json")
-        assert argv[9] == expected_event
+        assert parse_relay_command(entry["command"], "v0.5.0") == ("agy", 60000, expected_event)
 
     session_start = hq["SessionStart"]
     assert len(session_start) == 2
@@ -141,24 +132,20 @@ def test_pre_tool_use_emits_empty_stdout_noop_and_rejects_extra_args(tmp_path):
     assert "usage: harnesses/agy/hook PreToolUse" in extra.stderr
 
 
-def test_relay_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard(tmp_path):
-    xdg = os.environ.get("XDG_CONFIG_HOME")
-    reg_path = (Path(xdg) if xdg else Path.home() / ".config") / "tasks" / "projects.toml"
-    if not reg_path.is_file():
-        pytest.skip("no tasks project registry on this machine")
-    projects = tomllib.loads(reg_path.read_text()).get("projects", {})
-    ops_root = projects.get("ops")
-    if not ops_root or not (Path(ops_root).expanduser() / "hooks" / "relay-guard").is_file():
-        pytest.skip("ops checkout not registered on this machine")
-    # The installed runtime the hook images name, not a development checkout.
-    relay_js = Path.home() / ".local/share/relay/v0.5.0/node_modules/relay/bin/relay.js"
+def test_relay_agy_dispatch_with_rendered_subscribers(tmp_path):
+    from hook_routes.deploy import deploy, live_files
+    from hook_routes.table import load
+
+    install_root = os.environ.get("HQ_TEST_RELAY_ROOT")
+    runtime = Path(install_root) if install_root else Path.home() / ".local/share/relay"
+    relay_js = runtime / "v0.5.0/node_modules/relay/bin/relay.js"
     if not relay_js.is_file():
+        if install_root:
+            pytest.fail(f"missing required pinned relay test installation: {relay_js}")
         pytest.skip("relay v0.5.0 is not installed on this machine")
 
     home = tmp_path / "home"
     home.mkdir()
-    (home / "d").mkdir()
-    (home / "d" / "ops").symlink_to(Path(ops_root).expanduser())
     (home / "d" / "familiar" / "bin").mkdir(parents=True)
     familiar_log = tmp_path / "familiar-events.jsonl"
     write_script(
@@ -172,11 +159,8 @@ with Path({str(familiar_log)!r}).open("a") as f:
 """,
     )
 
-    subscribers = home / ".config" / "relay" / "v0.5.0" / "relay" / "subscribers.json"
-    subscribers.parent.mkdir(parents=True, mode=0o700)
-    rendered = (ROOT / "relay" / "subscribers.template.json").read_text().replace("@HOME@", str(home))
-    subscribers.write_text(rendered)
-    subscribers.chmod(0o600)
+    table = load(ROOT / "harnesses/hook-routes.toml")
+    subscribers, = deploy(live_files(table, home), home)
 
     relay_state = tmp_path / "relay-state"
     relay_state.mkdir(mode=0o700)
@@ -258,39 +242,8 @@ sys.exit(res.returncode)
             "toolCall": {"name": "run_command", "args": {}},
         },
     )
-    assert missing_cmd.returncode == 0
-    denied_missing = json.loads(missing_cmd.stdout)
-    assert denied_missing["decision"] == "deny"
-    assert "no command string" in denied_missing["reason"]
-
-    blocked = invoke_relay(
-        "PreToolUse",
-        {
-            "conversationId": CONV_ID,
-            "workspacePaths": [str(workspace)],
-            "toolCall": {
-                "name": "run_command",
-                "args": {
-                    "CommandLine": 'git commit -m "feat: x" --trailer "Co-Authored-By: Claude <noreply@anthropic.com>"'
-                },
-            },
-        },
-    )
-    assert blocked.returncode == 0
-    denied_policy = json.loads(blocked.stdout)
-    assert denied_policy["decision"] == "deny"
-    assert "relay-guard:" in denied_policy["reason"]
-
-    missing_ws = invoke_relay(
-        "PreToolUse",
-        {
-            "conversationId": CONV_ID,
-            "workspacePaths": [],
-            "toolCall": {"name": "run_command", "args": {"CommandLine": "ls"}},
-        },
-    )
-    assert missing_ws.returncode == 0
-    assert json.loads(missing_ws.stdout)["decision"] == "deny"
+    assert missing_cmd.returncode == 0, missing_cmd.stderr
+    assert missing_cmd.stdout == ""
 
     st = invoke_relay("Stop", {
         "conversationId": CONV_ID, "executionNum": 0, "fullyIdle": True,
@@ -308,11 +261,13 @@ sys.exit(res.returncode)
         ("familiar-agy", "session-start", "agy"),
         ("familiar-agy", "before-tool", "agy"),
         ("familiar-agy", "before-tool", "agy"),
+        ("familiar-agy", "before-tool", "agy"),
         ("familiar-agy", "turn-end", "agy"),
     ]
     assert [row["event"]["tool"]["name"]["value"] for row in observed if row["event"]["kind"] == "before-tool"] == [
         "Bash",
         "read_file",
+        "Bash",
     ]
 
 

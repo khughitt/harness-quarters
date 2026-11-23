@@ -133,7 +133,8 @@ Static checks use the versions in the records. Host version probes run in
   for rollback.
 - `tools/hook-routes preflight [--next DIR]` resolves the commands, checks the
   installed runtimes, budgets and subscriber selections, and reads the deployed
-  subscriber bytes. Each consuming runtime loads the deployed file through relay's
+  subscriber bytes. Live preflight first checks the checked-in hooks and template
+  against the current home's render. Each consuming runtime loads the deployed file through relay's
   public config reader, including the standalone pin for reconciliation. Preflight
   checks the interpreter and script or observer behind the shipped `env` wrappers
   and the executables in each agy bridge line’s declared delegate argv. Existing

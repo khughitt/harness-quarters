@@ -30,8 +30,8 @@ The focused route preserves arguments and runner status through the host budget.
 Both partitions run serially. Local `just test` runs through `host-budget`, and the suite
 validates a positive integer `PYTEST_XDIST_AUTO_NUM_WORKERS`. `just ci-test` shares the suite
 and never sets `TT_FORCE`. The workflow sets both at job scope (`PYTEST_XDIST_AUTO_NUM_WORKERS="2"`)
-and retains setup and suite artifacts. Accepted hosted coverage has exactly the two local
-integration omissions listed in docs/test-execution.md; none excludes a module.
+and retains setup and suite artifacts. Accepted hosted coverage has one local
+integration omission listed in docs/test-execution.md.
 Both pre-push routes run mandatory `just check-hygiene` followed by `just test`; no outer
 composite is timed. The hook declares origin branches covered for the workflow and warns
 on uncovered pushes when local policy skips tests; the declaration is not remote evidence.

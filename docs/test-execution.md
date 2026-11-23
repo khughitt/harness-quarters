@@ -110,15 +110,13 @@ setup-report.txt records setup; the initially empty suite/ child is
 HQ_TEST_EVIDENCE_DIR and holds the inventory, coverage and two reports. A failed
 setup or partial run retains available evidence and remains unverified.
 
-The accepted hosted omissions are these exact local integration checks:
-
-- tools/test_agy_hooks.py::test_relay_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard
-- tools/test_harness_links.py::test_registered_owner_targets_match_portable_fixture_shapes
+The accepted hosted omission is
+`tools/test_harness_links.py::test_registered_owner_targets_match_portable_fixture_shapes`.
 
 Portable owner fixtures exercise link behavior without private checkouts. The local
-integration check also copies the real registered targets and compares their shapes.
-Both listed checks need the local project registry. The hosted suite includes the
-pinned budget check in `tools/test_hook_routes_relay.py` and the qualification and
+integration check uses the local project registry to copy real owner targets and
+compare their shapes. The hosted suite includes agy relay dispatch, the pinned
+budget check in `tools/test_hook_routes_relay.py`, and the qualification and
 preflight cases. No module is excluded. The local preparation pilot exercises
 two miniature partitions and failure retention.
 The separate mods and live capability probes are outside just test.

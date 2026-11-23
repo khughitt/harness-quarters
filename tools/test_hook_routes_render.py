@@ -96,6 +96,17 @@ def test_claude_check_ignores_live_keys(checkout):
     assert CLAUDE in result.stderr and 'SessionStart' in result.stderr
 
 
+def test_promoted_preflight_refuses_settings_rendered_for_another_home(checkout):
+    repo, home = checkout
+    other_home = home.with_name('other-home')
+    other_home.mkdir()
+    result = subprocess.run([sys.executable, str(repo / 'tools/hook-routes'), 'preflight'],
+                            env={'PATH': os.defpath, 'HOME': str(other_home)},
+                            cwd=repo, capture_output=True, text=True)
+    assert result.returncode == 1
+    assert CODEX in result.stderr and 'hook-drift' in result.stderr
+
+
 def test_check_reports_codex_drift(checkout):
     path = checkout[0] / CODEX
     settings = json.loads(path.read_bytes())

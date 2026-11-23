@@ -21,9 +21,10 @@ version is installed there. Other hosts cannot see this host's worktrees, so run
 
 On each host, `just relay-subscribers` runs `tools/hook-routes deploy live`.
 It installs each subscriber file named by the live route table and its reconciliation
-file. Today's base is `~/.config/relay/v0.5.0`. Different bytes at an existing
-destination cause a refusal. The v0.3.0 schema-1 rollback file stays at
-`~/.config/relay/subscribers.json`. Run `just relay-reap` for reconciliation.
+file. The active base is `~/.config/relay/v0.5.0-<digest-prefix>`. Different bytes
+at an existing destination cause a refusal. The previous v0.5.0 file stays in
+`~/.config/relay/v0.5.0` for rollback, and the v0.3.0 schema-1 rollback file
+stays at `~/.config/relay/subscribers.json`. Run `just relay-reap` for reconciliation.
 It points `XDG_CONFIG_HOME` at the live table's `reconciliation_file` base.
 
 Prepare each hook cutover on every host that shares the settings before
@@ -36,17 +37,17 @@ sequence that matches the reviewed table:
   and `tools/hook-routes preflight --next DIR` against the same output on each host.
 - For a reviewed branch that already promotes the target to live bindings, run
   `tools/hook-routes deploy live` and `tools/hook-routes preflight` from that
-  exact branch revision on each host before merging it into main.
+  exact branch revision on each host before merging it into main. Preflight
+  rejects checked-in hooks that would select different paths from that host's render.
 
 Record each host's result. A missing runtime, failed preflight or unreachable host
 holds activation. Keep earlier installations and files until rollback is released.
 See [hook routes](../hook-routes.md).
 
 Schema 2 resolves each subscriber's `argv[0]` on `PATH` and passes later arguments
-literally. The template names `env` there, followed by the same absolute interpreter and
-checkout paths the schema-1 file used, so a session whose `PATH` starts inside a
-repository (an activated in-repo `.venv`) still runs the guard rather than failing it
-`EXECUTABLE_FORBIDDEN`.
+literally. The active template uses `env` followed by familiar's checkout path
+and the `observe` command. The previous configurations also contain the ops
+command guard for rollback.
 
 For an isolated rehearsal, set `RELAY_INSTALL_ROOT` to a private scratch directory
 for both `just relay-install` and the worktree's explicit `relay/bin/relay` path.
@@ -80,8 +81,8 @@ paths, and each harness's hook images move under their own approval. Claude Code
 name v0.5.0 and its subscriber file. Each binding selects its own runtime and subscriber file. Claude Code's SessionStart and PostModelSwitch relay routes carry relay's
 built-in task provenance (`TASKS_AGENT`/`TASKS_MODEL`), which replaced ops
 `hooks/claude-provenance`; never wire both. In `harnesses/agy/hooks.json`, each relay handler
-raises `"timeout": 60` paired with `--outer-ms 60000` so `ops-guard` (30 s) and
-`familiar-agy` (2 s) fit inside relay's 37 s subscriber budget. `tools/test_relay_wiring.py`
+sets `"timeout": 60` paired with `--outer-ms 60000`. The `familiar-agy` observer
+has a 2 s timeout. `tools/test_relay_wiring.py`
 holds each file's version. Keep every installation a hook image names.
 
 Root retirement assumes one active Codex root per process. TUIs launched with
