@@ -71,9 +71,10 @@ class _SubscriberSelection:
 
 @dataclass(frozen=True)
 class SubscriberFile:
-    path: str
+    path: str | None
     output: str
     subscribers: tuple[_SubscriberSelection, ...]
+    runtime: str | None = None
 
 
 @dataclass(frozen=True)
@@ -209,8 +210,10 @@ def _selections(subscribers, where):
     return tuple(selections)
 
 
-def _subscriber_file(path, output, subscribers):
-    return SubscriberFile(path, output, _selections(subscribers, output))
+def _subscriber_file(output, subscribers, *, path=None, runtime=None):
+    if (path is None) == (runtime is None):
+        raise ValueError(f"{output}: subscriber file needs exactly one of path or runtime")
+    return SubscriberFile(path, output, _selections(subscribers, output), runtime)
 
 
 def _target_file(runtime, subscribers):
@@ -289,10 +292,10 @@ def _validate_structure(table, *, required_outputs):
                 elif (line.runtime not in table.runtimes or line.subscriber_file not in files
                       or line.delegates or not (line.outer_ms and line.timeout)):
                     raise ValueError(f"{where}: relay line needs a known runtime and subscriber file, budget and timeout")
-                elif (line.subscriber_file in table.target_files
-                      and line.subscriber_file not in table.subscriber_files
-                      and line.runtime != table.target_files[line.subscriber_file].runtime):
-                    raise ValueError(f"{where}: relay runtime differs from its target subscriber file runtime")
+                else:
+                    file_runtime = files[line.subscriber_file].runtime
+                    if file_runtime is not None and line.runtime != file_runtime:
+                        raise ValueError(f"{where}: relay runtime differs from its subscriber file runtime")
 
     for name, subscriber in table.subscribers.items():
         if subscriber.policy not in all_policies:
@@ -301,7 +304,9 @@ def _validate_structure(table, *, required_outputs):
         for entry in source.subscribers:
             if entry.name not in table.subscribers:
                 raise ValueError(f"subscriber_files.{name}: unknown subscriber {entry.name!r}")
-    for name, source in table.target_files.items():
+    for name, source in (table.subscriber_files | table.target_files).items():
+        if source.runtime is None:
+            continue
         if source.runtime not in table.runtimes:
             raise ValueError(f"target_files.{name}: unknown runtime {source.runtime!r}")
         if Path(source.runtime).name != source.runtime or source.runtime == "..":

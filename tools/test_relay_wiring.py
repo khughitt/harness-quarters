@@ -1,4 +1,5 @@
 """Committed hook images retain their approved runtime independently of the CLI pin."""
+from hashlib import sha256
 import json
 import shlex
 from pathlib import Path
@@ -30,8 +31,11 @@ def parse_relay_command(command, version):
     assert argv[5] == '--outer-ms'
     assert argv[7] == '--subscribers'
     assert Path(argv[8]).is_absolute()
-    # Each relay version reads its own subscriber file, so the prior pair stays runnable.
-    assert argv[8].endswith(f'/.config/relay/{version}/relay/subscribers.json')
+    # The runtime and expanded subscriber bytes determine the deployed address.
+    root = next(parent.parent for parent in Path(argv[1]).parents if parent.name == '.local')
+    template = (ROOT / 'relay/subscribers.template.json').read_bytes()
+    digest = sha256(template.replace(b'@HOME@', str(root).encode())).hexdigest()[:12]
+    assert Path(argv[8]) == root / '.config/relay' / f'{version}-{digest}' / 'relay/subscribers.json'
     return argv[4], int(argv[6]), argv[9]
 
 

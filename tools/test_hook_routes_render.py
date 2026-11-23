@@ -61,13 +61,13 @@ def checkout(tmp_path):
     home = tmp_path / 'home'
     home.mkdir()
     repo = tmp_path / 'checkout'
-    tracked_home = os.fsencode(_tracked_home())
     for path in (CLAUDE, CODEX, CODEX_WORK, AGY, SUBSCRIBERS):
         dest = repo / path
         dest.parent.mkdir(parents=True, exist_ok=True)
-        data = (ROOT / path).read_bytes()
-        dest.write_bytes(data.replace(tracked_home, os.fsencode(home)))
+        shutil.copyfile(ROOT / path, dest)
     shutil.copy(TABLE, repo / 'harnesses')
+    for path, data in render_live(load(repo / 'harnesses/hook-routes.toml'), home).items():
+        (repo / path).write_bytes(data)
     shutil.copytree(ROOT / 'tools/hook_routes', repo / 'tools/hook_routes',
                     ignore=shutil.ignore_patterns('__pycache__'))
     shutil.copy(ROOT / 'tools/hook-routes', repo / 'tools')
@@ -154,14 +154,14 @@ def test_check_requires_the_legacy_subscriber_destination(checkout):
 def test_check_rejects_a_subscriber_role_override(checkout):
     root, _ = checkout
     path = root / 'harnesses/hook-routes.toml'
-    path.write_text(path.read_text().replace('{ name = "ops-guard",',
-                                             '{ name = "ops-guard", role = "observer",'))
+    path.write_text(path.read_text().replace('{ name = "familiar",',
+                                             '{ name = "familiar", role = "guard",'))
     template_path = root / SUBSCRIBERS
     template = json.loads(template_path.read_bytes())
-    template['subscribers'][0]['role'] = 'observer'
+    template['subscribers'][0]['role'] = 'guard'
     template_path.write_text(json.dumps(template, indent=2) + '\n')
 
     result = _check(checkout)
 
     assert result.returncode == 1
-    assert 'ops-guard' in result.stderr and 'role' in result.stderr
+    assert 'familiar' in result.stderr and 'role' in result.stderr

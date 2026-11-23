@@ -16,16 +16,32 @@ def _ops_donor(name):
     return f"~/{Path('d', 'ops', 'hooks', name)}"
 
 
-def test_shared_file_reference_survives_partial_move():
-    from hook_routes.references import donor_references
+@pytest.fixture
+def shared_guard_table():
+    from hook_routes.table import Subscriber
 
     table = load(TABLE)
+    name = table.reconciliation_file
+    source = table.subscriber_files[name]
+    entry = replace(source.subscribers[0], name="fixture-guard", kinds=["before-tool"], tools=["Bash"])
+    guard = Subscriber("fixture-guard", "guard", ("env", "/usr/bin/python3", _ops_donor("relay-guard")), 500)
+    return replace(
+        table,
+        subscribers={**table.subscribers, entry.name: guard},
+        subscriber_files={**table.subscriber_files, name: replace(source, subscribers=(entry, *source.subscribers))},
+    )
+
+
+def test_shared_file_reference_survives_partial_move(shared_guard_table):
+    from hook_routes.references import donor_references
+
+    table = shared_guard_table
     claude = table.homes["claude"]
     relay_pretool = next(binding for binding in claude.bindings
                          if binding.event == "PreToolUse" and binding.lines[0].runtime)
     moved = replace(relay_pretool.lines[0], subscriber_file="no-guard")
-    file = table.subscriber_files["shared-v0.5.0"]
-    moved_file = replace(file, subscribers=tuple(entry for entry in file.subscribers if entry.name != "ops-guard"))
+    file = table.subscriber_files[table.reconciliation_file]
+    moved_file = replace(file, subscribers=tuple(entry for entry in file.subscribers if entry.name != "fixture-guard"))
     bindings = tuple(replace(binding, lines=(moved,)) if binding == relay_pretool else binding
                      for binding in claude.bindings)
     table = replace(table, homes={"claude": replace(claude, bindings=bindings)},
@@ -34,16 +50,16 @@ def test_shared_file_reference_survives_partial_move():
     refs = donor_references(table, _ops_donor("relay-guard"))
 
     assert any(ref.kind == "subscriber-file" and "claude:Notification" in ref.where and
-               "shared-v0.5.0" in ref.where for ref in refs)
+               table.reconciliation_file in ref.where for ref in refs)
     assert not any(ref.kind == "subscriber-file" and "claude:PreToolUse" in ref.where for ref in refs)
 
 
-def test_rollback_base_counts_until_dropped():
+def test_rollback_base_counts_until_dropped(shared_guard_table):
     from hook_routes.references import donor_references
     from hook_routes.table import RollbackBase
 
-    table = load(TABLE)
-    table = replace(table, rollback_bases={"prior": RollbackBase(subscriber_files=("shared-v0.5.0",))})
+    table = shared_guard_table
+    table = replace(table, rollback_bases={"prior": RollbackBase(subscriber_files=(table.reconciliation_file,))})
 
     assert any(ref.kind == "rollback-base" and "prior" in ref.where
                for ref in donor_references(table, _ops_donor("relay-guard")))
@@ -69,7 +85,6 @@ def test_bridge_references_every_delegate():
     ("claim-guard", "binding", "codex:Stop"),
     ("claude-sessionstart", "binding", "claude:SessionStart"),
     ("capture-notice", "binding", "codex:SessionStart"),
-    ("relay-guard", "subscriber-file", "claude:PreToolUse"),
 ])
 def test_today_ops_references(donor, kind, binding):
     from hook_routes.references import donor_references
@@ -169,11 +184,15 @@ def test_changed_codex_entries_covers_shifted_and_removed_positions(codex_base):
 
 def test_retained_schema_one_commands_survive_without_live_callers():
     from hook_routes.references import donor_references
+    from hook_routes.table import RollbackBase
 
     table = load(TABLE)
     empty = replace(table.subscriber_files[table.reconciliation_file], subscribers=())
-    table = replace(table, homes={}, subscriber_files={table.reconciliation_file: empty})
-    for donor in (_ops_donor("relay-guard"), str(Path("~", "d", "familiar", "bin", "familiar"))):
+    donors = (_ops_donor("relay-guard"), str(Path("~", "d", "familiar", "bin", "familiar")))
+    base = RollbackBase(commands=(f"/usr/bin/python3 {donors[0]}", f"{donors[1]} observe"))
+    table = replace(table, homes={}, subscriber_files={table.reconciliation_file: empty},
+                    rollback_bases={"schema-one": base})
+    for donor in donors:
         refs = donor_references(table, donor)
         assert len(refs) == 1 and refs[0].kind == "rollback-base"
 
