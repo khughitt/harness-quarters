@@ -49,7 +49,6 @@ def qualified_table(tmp_path, runtime):
                     subscriber_files={"file": source})
     from hook_routes.render import subscriber_bytes
     digest = sha256(subscriber_bytes(table, source, tmp_path)).hexdigest()
-    table.subscriber_files["file"] = replace(source, path=f"~/.config/relay/{pin}-{digest[:12]}/relay/subscribers.json")
     record_dir = tmp_path / "harnesses/qualification"
     record_dir.mkdir(parents=True)
     fixture = json.loads((runtime / "package.json").read_text())["exports"]["./fixtures/hook-qualification.json"]
@@ -142,5 +141,5 @@ def test_qualify_refuses_legacy_address(tmp_path, runtime):
     from hook_routes.qualification import check_binding
     table, binding, directory = qualified_table(tmp_path, runtime)
     table.subscriber_files["file"] = replace(table.subscriber_files["file"],
-                                            path="~/.config/relay/v0.5.0/relay/subscribers.json")
+                                            path="~/.config/relay/v0.5.0/relay/subscribers.json", runtime=None)
     assert "digest-addressed" in str(check_binding(table, binding, directory))

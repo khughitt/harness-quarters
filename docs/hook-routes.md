@@ -12,7 +12,7 @@ hook wiring and the relay subscriber template.
 | `states` | Policy defaults. A line's `states` map can replace a policy's metadata for that binding. Native routes name an owner and reason. Existing relay routes name an owner and the grant for the current deployment. Relay routes cite qualification `records`. Bridge routes cite fixture `evidence`. `activation` names the user grant task note that made a former target live. |
 | `runtimes` | Each version names the command, runtime script and relay commit in that runtime's lock. |
 | `subscribers` | Each subscriber names its policy, role, argv and `timeoutMs`. Observers can declare a registry and event-specific `privateFields`. |
-| `subscriber_files` | Each file names its deployed path, repository-relative template output and ordered named selections. A selection can carry `harnesses`, `kinds`, `tools` and `nativeEvents` filters. `reconciliation_file` names the shared file for reconciliation. |
+| `subscriber_files` | Each file names a runtime for digest addressing or a literal deployed path, a repository-relative template output and ordered named selections. A selection can carry `harnesses`, `kinds`, `tools` and `nativeEvents` filters. `reconciliation_file` names the shared file for reconciliation. |
 | `target_files` | New compositions name a runtime version and ordered subscriber selections. `reconciliation_next` selects a target composition for reconciliation. |
 | `removals` | Each retirement names a subscriber and the authorizing owner task. Move every binding whose file contains that subscriber, and move reconciliation if it uses the file. |
 | `rollback_bases` | Retained subscriber file names and literal commands that still count as donor references. |
@@ -121,8 +121,9 @@ Static checks use the versions in the records. Host version probes run in
 `preflight` and in the default `status` report for qualified routes.
 
 - `tools/hook-routes deploy live` installs the subscriber files used by live
-  bindings and reconciliation. The existing deployment uses its version-only
-  directory. Files have mode 0600 and relay config directories have mode 0700.
+  bindings and reconciliation. For a file that names a runtime, render and
+  deploy use the same version and expanded-byte digest in its address.
+  Files have mode 0600 and relay config directories have mode 0700.
   Repeating the deployment keeps identical files and refuses different content.
 - `tools/hook-routes deploy next DIR` checks the review directory from
   `render next` against the effective target for this home and installs its
@@ -132,7 +133,8 @@ Static checks use the versions in the records. Host version probes run in
   for rollback.
 - `tools/hook-routes preflight [--next DIR]` resolves the commands, checks the
   installed runtimes, budgets and subscriber selections, and reads the deployed
-  subscriber bytes. Each consuming runtime loads the deployed file through relay's
+  subscriber bytes. Live preflight first checks the checked-in hooks and template
+  against the current home's render. Each consuming runtime loads the deployed file through relay's
   public config reader, including the standalone pin for reconciliation. Preflight
   checks the interpreter and script or observer behind the shipped `env` wrappers
   and the executables in each agy bridge line’s declared delegate argv. Existing
@@ -175,7 +177,8 @@ An owner allowance becomes `{}`. On a transport failure, agy's own termination
 reasons and positive safe-integer refires allow the turn to end. Other failures
 produce a one-line `continue` reason. Stop loads v0.5.0 and calls the guard once.
 The separate native Stop refresh still heals settings. All three agy relay
-bindings use their original v0.5.0 runtime and subscriber file.
+bindings use v0.5.0 and the digest-addressed file shared with Claude Code,
+both Codex homes, and reconciliation.
 
 The activation reference `hq-a83688:agy-owner-activation` reserves a note on
 hq-a83688 for the user's grant. On a candidate branch, the reference alone

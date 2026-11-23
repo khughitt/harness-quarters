@@ -88,11 +88,13 @@ def _command(table, binding, line, harness, home):
         return line.command
     command, script = table.runtimes[line.runtime].argv(home)
     subscribers = table.subscriber_files[line.subscriber_file]
+    address = subscriber_address(subscribers, subscriber_bytes(table, subscribers, home), home)
+    subscriber_path = home / ".config/relay" / address
     event = binding.event if line.relay_event is None else line.relay_event
     return (
         f"{_quote(command)} {_quote(script)}"
         f" hook --harness {harness} --outer-ms {line.outer_ms}"
-        f" --subscribers {_quote(expand_path(subscribers.path, home))} {event}"
+        f" --subscribers {_quote(str(subscriber_path))} {event}"
     )
 
 
@@ -141,7 +143,7 @@ def subscriber_bytes(table, source, home=None):
 
 
 def subscriber_address(source, data, home):
-    if isinstance(source, SubscriberFile):
+    if isinstance(source, SubscriberFile) and source.path is not None:
         return Path(expand_path(source.path, home)).relative_to(home / ".config/relay").as_posix()
     return f"{source.runtime}-{sha256(data).hexdigest()[:12]}/relay/subscribers.json"
 

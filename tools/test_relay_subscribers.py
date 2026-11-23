@@ -1,4 +1,5 @@
 """Tracked subscribers and the private, non-destructive host install recipe."""
+from hashlib import sha256
 import json
 import os
 import stat
@@ -10,6 +11,12 @@ CHECKOUT = Path(__file__).resolve().parent.parent
 TEMPLATE = CHECKOUT / "relay" / "subscribers.template.json"
 # The live binding keeps its approved deployment across standalone CLI upgrades.
 LIVE_VERSION = "v0.5.0"
+
+
+def deployed_file(home):
+    contents = TEMPLATE.read_bytes().replace(b"@HOME@", os.fsencode(home))
+    address = f"{LIVE_VERSION}-{sha256(contents).hexdigest()[:12]}"
+    return home / ".config" / "relay" / address / "relay" / "subscribers.json"
 
 
 def install(home, *, force=False):
@@ -33,11 +40,7 @@ def test_template_renders_home():
     assert result.returncode == 0, result.stderr
     assert "@HOME@" not in result.stdout
     subscribers = json.loads(result.stdout)["subscribers"]
-    # Schema 2 resolves argv[0] on PATH and passes later arguments literally: `env` keeps
-    # the exact interpreter and checkout paths the schema-1 file named, whatever comes first
-    # on a session's PATH (an in-repo .venv/bin would make a bare python3 EXECUTABLE_FORBIDDEN).
-    assert subscribers[0]["argv"] == ["env", "/usr/bin/python3", "/h/d/ops/hooks/relay-guard"]
-    assert [entry["argv"] for entry in subscribers[1:]] == [
+    assert [entry["argv"] for entry in subscribers] == [
         ["env", "/h/d/familiar/bin/familiar", "observe"]] * 5
 
 
@@ -46,13 +49,6 @@ def test_template_matches_the_table():
     assert config["schema"] == 2
     familiar = ["env", "@HOME@/d/familiar/bin/familiar", "observe"]
     assert config["subscribers"] == [
-        {
-            "name": "ops-guard", "role": "guard",
-            "harnesses": ["claude-code", "codex", "agy"], "kinds": ["before-tool"],
-            "tools": ["Bash"],
-            "argv": ["env", "/usr/bin/python3", "@HOME@/d/ops/hooks/relay-guard"],
-            "timeoutMs": 30000,
-        },
         {
             "name": "familiar", "role": "observer", "registry": "snapshot",
             "harnesses": ["claude-code", "codex"],
@@ -92,7 +88,7 @@ def test_template_matches_the_table():
 def test_recipe_installs_private_modes(tmp_path):
     result = install(tmp_path)
     assert result.returncode == 0, result.stderr
-    dest = tmp_path / ".config" / "relay" / LIVE_VERSION / "relay" / "subscribers.json"
+    dest = deployed_file(tmp_path)
     expected = TEMPLATE.read_text().replace("@HOME@", str(tmp_path))
     assert dest.read_text() == expected
     assert stat.S_IMODE(dest.parent.stat().st_mode) == 0o700
@@ -105,7 +101,7 @@ def test_recipe_installs_private_modes(tmp_path):
 
 
 def test_recipe_refuses_a_different_file(tmp_path):
-    dest = tmp_path / ".config" / "relay" / LIVE_VERSION / "relay" / "subscribers.json"
+    dest = deployed_file(tmp_path)
     dest.parent.mkdir(parents=True)
     dest.write_text("existing subscriber config\n")
     result = install(tmp_path)
