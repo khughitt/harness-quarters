@@ -320,17 +320,17 @@ def test_preflight_checks_wrapped_guard_and_observer(tmp_path, deployed_host):
         assert any(f.code == "missing-command" and str(path) in f.message for f in findings)
 
 
-def test_preflight_checks_native_agy_session_start_delegates(tmp_path, monkeypatch):
+def test_preflight_checks_configured_agy_owner_commands(tmp_path, monkeypatch):
     from hook_routes.preflight import run
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("RELAY_INSTALL_ROOT", str(tmp_path / "standalone"))
     table = load(TABLE)
     agy = table.homes["agy"]
-    binding = next(b for b in agy.bindings if b.event == "SessionStart" and b.lines[0].kind == "native")
-    table = replace(table, homes={"agy": replace(agy, bindings=(binding,))})
+    bindings = tuple(b for b in agy.bindings if b.lines[0].kind == "bridge")
+    table = replace(table, homes={"agy": replace(agy, bindings=bindings)})
     findings = run(table, home=tmp_path, path_env="", next_dir=None)
-    for name in ("claude-profile", "capture-notice"):
-        assert any(f.code == "missing-command" and f.message.endswith(name) for f in findings)
+    for name in ("lore", "mindful", "tasks"):
+        assert any(f.code == "missing-command" and f.message == f"cannot execute {name}" for f in findings)
 
 
 def test_review_accepts_claude_live_pick_and_refuses_hook_change(tmp_path):

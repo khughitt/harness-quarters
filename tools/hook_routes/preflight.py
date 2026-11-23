@@ -77,12 +77,7 @@ def run(table, *, home: Path, path_env: str, next_dir: Path | None) -> list[Find
         for line in (*active, *previous):
             commands = [*line.delegates]
             if line.command:
-                argv = shlex.split(line.command)
-                commands.append(argv)
-                if line.kind == "native" and argv[1:2] == ["SessionStart"]:
-                    agy_hook = home / "d" / "hq" / "harnesses/agy/hook"
-                    if Path(expand_path(argv[0], home)) == agy_hook:
-                        commands.extend((delegate,) for delegate in argv[2:])
+                commands.append(shlex.split(line.command))
             if line.runtime:
                 runtime = table.runtimes[line.runtime]
                 commands.append(runtime.argv(home))

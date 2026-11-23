@@ -135,7 +135,7 @@ Static checks use the versions in the records. Host version probes run in
   subscriber bytes. Each consuming runtime loads the deployed file through relay's
   public config reader, including the standalone pin for reconciliation. Preflight
   checks the interpreter and script or observer behind the shipped `env` wrappers
-  and the executables passed to the native agy SessionStart adapter. Existing
+  and the executables in each agy bridge line’s declared delegate argv. Existing
   routes also undergo the host selection check. With
   `--next` it checks the review directory and the live relay selections that the
   cutover relies on for subscriber retention. A qualified binding needs
@@ -161,8 +161,8 @@ with its projected envelope and a ten-second timeout. It injects one system
 message with the combined context, or replies `{}` when every notice is empty.
 A failed owner contributes a diagnostic. If the diagnostic does not fit in the
 combined context, the bridge writes the same failure to stderr. A failed profile or event projection
-keeps the visible `profile: unresolved` line. The shipped SessionStart binding
-still calls its positional delegates.
+keeps the visible `profile: unresolved` line. SessionStart loads v0.6.0 and calls
+`lore hook profile-notice` followed by `mindful notice session-start`.
 
 The agy Stop bridge accepts `Stop --runtime PACKAGE --guard 'tasks hook claim-guard'`.
 A Stop bridge line supplies only the launcher in `command`. The renderer derives
@@ -173,5 +173,14 @@ seconds to reply. On Linux the bridge adopts and reaps any descendants the guard
 leaves, including its separately grouped facts reader. An owner denial becomes agy's `continue` with the owner's reason.
 An owner allowance becomes `{}`. On a transport failure, agy's own termination
 reasons and positive safe-integer refires allow the turn to end. Other failures
-produce a one-line `continue` reason. The shipped Stop line still uses the local
-claim check.
+produce a one-line `continue` reason. Stop loads v0.5.0 and calls the guard once.
+The separate native Stop refresh still heals settings. All three agy relay
+bindings use their original v0.5.0 runtime and subscriber file.
+
+The activation reference `hq-a83688:agy-owner-activation` reserves a note on
+hq-a83688 for the user's grant. On a candidate branch, the reference alone
+conveys no authority. Before merging the candidate, record the grant, ensure
+the owner commands and runtimes pass preflight on each host, and close all agy
+sessions. Running sessions cache command strings for the retired invocation
+forms. To roll back after activation, revert the merge with
+`git revert -m 1 <merge>` and restart agy sessions.

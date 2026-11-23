@@ -1,12 +1,11 @@
-"""The personal Claude Code, Codex and agy homes run ops's capture notice at session start."""
+"""The personal Claude Code, Codex and agy homes register the capture notice once."""
 import json
 from pathlib import Path
 
-from test_relay_wiring import HOOK_VERSIONS, parse_relay_command
+from test_relay_wiring import HOOK_VERSIONS, expected_agy_bridge, parse_relay_command
 
 ROOT = Path(__file__).resolve().parents[1]
 COMMAND = '~/d/ops/hooks/capture-notice'
-AGY_SESSION_START = '~/d/hq/harnesses/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice'
 
 
 def session_start(path):
@@ -38,5 +37,5 @@ def test_agy_registers_profile_and_capture_notice_once():
     hooks = json.loads((ROOT / 'harnesses/agy' / 'hooks.json').read_text())['hq']
     commands = [h['command'] for h in hooks['SessionStart'] if h.get('type') == 'command']
     assert len(commands) == 2
-    assert commands[0] == AGY_SESSION_START
+    assert commands[0] == expected_agy_bridge('SessionStart')
     assert parse_relay_command(commands[1], HOOK_VERSIONS['harnesses/agy/hooks.json']) == ('agy', 60000, 'SessionStart')

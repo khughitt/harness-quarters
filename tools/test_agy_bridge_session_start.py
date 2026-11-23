@@ -1,7 +1,6 @@
 """Run the rendered SessionStart bridge with real relay and isolated notice owners."""
 from dataclasses import replace
 import json
-import os
 from pathlib import Path
 import shlex
 import subprocess
@@ -11,15 +10,14 @@ import pytest
 
 from hook_routes.render import render_candidate
 from hook_routes.table import load
-from test_agy_hooks import HOOK, ROOT, make_agy_checkout, write_script
+from test_agy_hooks import HOOK, ROOT, make_agy_checkout, notice_runtime, write_script
 
 DELEGATES = ("lore hook profile-notice", "mindful notice session-start")
 
 
 @pytest.fixture
 def runtime():
-    root = os.environ.get("HQ_TEST_RELAY_ROOT")
-    package = (Path(root) if root else Path.home() / ".local/share/relay") / "v0.6.0/node_modules/relay"
+    package = notice_runtime()
     assert (package / "package.json").is_file(), f"missing required SessionStart relay installation {package}"
     return package
 
@@ -175,7 +173,6 @@ def test_notice_exceeding_combined_limit_is_dropped_whole(notice_home, runtime):
 
 def test_detached_settings_healing_still_runs(tmp_path, runtime):
     repo, home, link, env = make_agy_checkout(tmp_path)
-    (repo / "tools").symlink_to(ROOT / "tools", target_is_directory=True)
     detached = json.loads(link.read_bytes())
     detached["model"] = "test-pick"
     link.unlink()
@@ -188,7 +185,7 @@ print(json.dumps({{"context": "profile: healed"}}))
     result = subprocess.run([repo / "harnesses/agy/hook", "SessionStart", "--runtime", runtime,
                              "--delegate", DELEGATES[0]],
                             input=json.dumps({"workspacePaths": [str(repo)], "conversationId": "healing"}),
-                            cwd=home, env={**env, "PATH": f"{tmp_path}:{os.defpath}"},
+                            cwd=home, env=env,
                             text=True, capture_output=True, timeout=15)
     assert result.returncode == 0, result.stderr
     assert message(json.loads(result.stdout)) == "profile: healed"

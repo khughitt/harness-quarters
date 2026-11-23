@@ -95,14 +95,11 @@ def test_rendered_stop_bridge_invokes_declared_guard(runtime, sandbox):
 home = "agy"
 binding = {index}
 [[moves.lines]]
-policies = ["claim-guard", "agy-healing"]
+policies = ["claim-guard"]
 runtime = "v0.5.0"
 delegates = [["tasks","hook","claim-guard"]]
 command = {json.dumps(command)}
 [moves.lines.states.claim-guard]
-state = "bridge"
-evidence = "fixture"
-[moves.lines.states.agy-healing]
 state = "bridge"
 evidence = "fixture"
 ''')
