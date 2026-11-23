@@ -74,14 +74,17 @@ def _quote(value):
 
 
 def _command(table, binding, line, harness, home):
-    if line.kind == "bridge" and binding.event == "Stop":
+    if line.kind == "bridge":
         [launcher] = shlex.split(line.command)
-        [guard] = line.delegates
         package = table.runtimes[line.runtime].package_dir(home)
         # Keep ~/ relative to the eventual shell's home, as in the native bridge.
         launcher = ("~/" + shlex.quote(launcher[2:]) if launcher.startswith("~/") else shlex.quote(launcher))
-        return launcher + " " + shlex.join(["Stop", "--runtime", str(package), "--guard", shlex.join(guard)])
-    if line.kind in ("native", "bridge"):
+        args = [binding.event, "--runtime", str(package)]
+        option = "--guard" if binding.event == "Stop" else "--delegate"
+        for delegate in line.delegates:
+            args.extend([option, shlex.join(delegate)])
+        return launcher + " " + shlex.join(args)
+    if line.kind == "native":
         return line.command
     command, script = table.runtimes[line.runtime].argv(home)
     subscribers = table.subscriber_files[line.subscriber_file]

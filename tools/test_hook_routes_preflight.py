@@ -272,9 +272,12 @@ def deployed_host(tmp_path, runtime):
 
     table = today(tmp_path)
     # The standalone launcher uses the checkout pin independently of the hook's runtime.
-    installation = tmp_path / ".local/share/relay/v0.5.0"
-    installation.parent.mkdir(parents=True)
-    installation.symlink_to(runtime.parents[1], target_is_directory=True)
+    installs = tmp_path / ".local/share/relay"
+    installs.mkdir(parents=True)
+    for version in ("v0.5.0", "v0.6.0"):
+        source = runtime.parents[2] / version
+        assert source.is_dir(), f"missing relay installation for preflight: {source}"
+        (installs / version).symlink_to(source, target_is_directory=True)
     source = table.subscriber_files[table.reconciliation_file]
     digest = sha256(subscriber_bytes(table, source, tmp_path)).hexdigest()[:12]
     reconcile = replace(source, path=f"~/.config/relay/v0.5.0-{digest}/relay/subscribers.json")
@@ -387,10 +390,10 @@ def test_target_agy_session_start_bridge_checks_only_declared_commands(tmp_path,
     adapter.parent.mkdir(parents=True)
     for executable in (adapter, tmp_path / "lore", tmp_path / "mindful", tmp_path / "env"):
         executable.touch(mode=0o700)
-    runtime_dir = tmp_path / ".local/share/relay/v0.5.0/node_modules/relay"
-    command = (f"~/{transport} SessionStart --runtime '{runtime_dir}' "
-               "--delegate 'lore hook profile-notice' --delegate 'mindful notice session-start'")
-    line = Line(("claude-profile", "capture-notice"), runtime="v0.5.0", command=command,
+    table.runtimes["v0.6.0"] = replace(table.runtimes["v0.5.0"],
+                                       script="~/.local/share/relay/v0.6.0/node_modules/relay/bin/relay.js",
+                                       commit="9078727105f06b4a17ccbf177821806d7eed93be")
+    line = Line(("claude-profile", "capture-notice"), runtime="v0.6.0", command=f"~/{transport}",
                 delegates=(("lore", "hook", "profile-notice"), ("mindful", "notice", "session-start")),
                 states={name: RouteState("bridge", evidence="fixture") for name in ("claude-profile", "capture-notice")})
     agy = replace(load(TABLE).homes["agy"], bindings=(Binding("SessionStart", None, (), next=(line,)),))

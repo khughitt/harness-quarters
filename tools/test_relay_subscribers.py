@@ -8,8 +8,8 @@ from pathlib import Path
 
 CHECKOUT = Path(__file__).resolve().parent.parent
 TEMPLATE = CHECKOUT / "relay" / "subscribers.template.json"
-PIN_VERSION = json.loads((CHECKOUT / "relay" / "package.json").read_text())[
-    "dependencies"]["relay"].split("#")[1]
+# The live binding keeps its approved deployment across standalone CLI upgrades.
+LIVE_VERSION = "v0.5.0"
 
 
 def install(home, *, force=False):
@@ -92,7 +92,7 @@ def test_template_matches_the_table():
 def test_recipe_installs_private_modes(tmp_path):
     result = install(tmp_path)
     assert result.returncode == 0, result.stderr
-    dest = tmp_path / ".config" / "relay" / PIN_VERSION / "relay" / "subscribers.json"
+    dest = tmp_path / ".config" / "relay" / LIVE_VERSION / "relay" / "subscribers.json"
     expected = TEMPLATE.read_text().replace("@HOME@", str(tmp_path))
     assert dest.read_text() == expected
     assert stat.S_IMODE(dest.parent.stat().st_mode) == 0o700
@@ -105,7 +105,7 @@ def test_recipe_installs_private_modes(tmp_path):
 
 
 def test_recipe_refuses_a_different_file(tmp_path):
-    dest = tmp_path / ".config" / "relay" / PIN_VERSION / "relay" / "subscribers.json"
+    dest = tmp_path / ".config" / "relay" / LIVE_VERSION / "relay" / "subscribers.json"
     dest.parent.mkdir(parents=True)
     dest.write_text("existing subscriber config\n")
     result = install(tmp_path)

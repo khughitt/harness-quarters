@@ -150,6 +150,17 @@ The bridge can call `relay_runtime.call(package, "project", payload)` with
 `harness`, `event`, raw native JSON text in `raw`, `invokingCwd`, `subscriber`
 and `registry`. The result is relay's subscriber envelope. The `parse-guard`
 operation takes reply text in `output` and returns relay's parsed guard reply.
+The SessionStart bridge uses `parse-notice` on each owner's stdout and passes the
+ordered contexts to `combine`. Both operations use the v0.6.0 public exports.
+
+An agy SessionStart bridge line supplies the launcher in `command`. The renderer
+adds `SessionStart --runtime PACKAGE` and one `--delegate` per declared argv in
+order. The bridge heals detached settings first, then runs each owner on PATH
+with its projected envelope and a ten-second timeout. It injects one system
+message with the combined context, or replies `{}` when every notice is empty.
+A failed owner contributes a diagnostic. A failed profile or event projection
+keeps the visible `profile: unresolved` line. The shipped SessionStart binding
+still calls its positional delegates.
 
 The agy Stop bridge accepts `Stop --runtime PACKAGE --guard 'tasks hook claim-guard'`.
 A Stop bridge line supplies only the launcher in `command`. The renderer derives

@@ -117,11 +117,20 @@ jobs:
             git -C .ci-tools/tasks-src rev-parse HEAD
           } >> "$HQ_TEST_ARTIFACT_DIR/setup-report.txt"
 
-      - name: Prepare the pinned relay for qualification tests
+      - name: Prepare the pinned relay runtimes for hook tests
         shell: bash
         run: |
           set -euo pipefail
           relay_root=$(mktemp -d "$RUNNER_TEMP/hq-relay.XXXXXX")
+          # The deployed hook bindings retain the frozen v0.5.0 lock from this hq revision.
+          hook_pin=0bfce24bdc62a91e0376dd39123f074f354310e8
+          hook_install="$relay_root/v0.5.0"
+          mkdir "$hook_install"
+          for file in package.json package-lock.json; do
+            git show "$hook_pin:relay/$file" > "$hook_install/$file"
+          done
+          /usr/bin/npm ci --prefix "$hook_install" --ignore-scripts --allow-git=root --no-fund --no-audit
+          /usr/bin/node "$hook_install/node_modules/relay/bin/relay.js" --version >> "$HQ_TEST_ARTIFACT_DIR/setup-report.txt"
           RELAY_INSTALL_ROOT="$relay_root" just relay-install
           RELAY_INSTALL_ROOT="$relay_root" relay/bin/relay --version >> "$HQ_TEST_ARTIFACT_DIR/setup-report.txt"
           printf 'HQ_TEST_RELAY_ROOT=%s\n' "$relay_root" >> "$GITHUB_ENV"

@@ -26,10 +26,13 @@ EXEMPT = sorted({json.loads(case["native"])["terminationReason"] for case in CAS
 
 
 @pytest.fixture
-def runtime(monkeypatch):
+def runtime():
+    table = load(ROOT / "harnesses/hook-routes.toml")
+    version = "v0.5.0"
     if install := os.environ.get("HQ_TEST_RELAY_ROOT"):
-        monkeypatch.setenv("RELAY_INSTALL_ROOT", install)
-    return relay_runtime.standalone_package(ROOT, Path.home())
+        script = Path(install) / version / "node_modules/relay/bin/relay.js"
+        table.runtimes[version] = replace(table.runtimes[version], script=str(script))
+    return relay_runtime.package_for(table, version, Path.home())
 
 
 @pytest.fixture

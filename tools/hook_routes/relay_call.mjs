@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 async function run(runtime, op, payload) {
-  if (!['load', 'budget', 'qualify', 'project', 'parse-guard'].includes(op)) {
+  if (!['load', 'budget', 'qualify', 'project', 'parse-guard', 'parse-notice', 'combine'].includes(op)) {
     throw new Error(`unsupported operation: ${op}`);
   }
   const manifest = join(runtime, 'package.json');
@@ -29,6 +29,8 @@ async function run(runtime, op, payload) {
     return relay.projectEnvelope(normalized, payload.subscriber, payload.registry);
   }
   if (op === 'parse-guard') return relay.parseReply(payload.output);
+  if (op === 'parse-notice') return relay.parseNoticeReply(payload.output);
+  if (op === 'combine') return relay.combineContext([], payload.contexts);
   const subscribers = relay.validateSubscribers(payload.config);
   if (op === 'qualify') {
     const { parseQualification, qualifyInstall } = await api('./qualification');

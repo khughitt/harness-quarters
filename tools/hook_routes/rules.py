@@ -141,12 +141,8 @@ def _repository_tokens(table, binding, line, home, render_home):
         command = shlex.split(line.command)
         if line.kind == "bridge" and home.harness == "agy" and command:
             # The bridge shell expands a leading ~/ in the literal command it receives.
-            if binding.event == "Stop":
-                args.append(str(table.runtimes[line.runtime].package_dir(render_home)))
-                uses_shell_home = command[0].startswith("~/")
-            else:
-                uses_shell_home = line.command.lstrip().startswith("~/")
-            transport_home = Path.home() if uses_shell_home else render_home
+            args.append(str(table.runtimes[line.runtime].package_dir(render_home)))
+            transport_home = Path.home() if command[0].startswith("~/") else render_home
             if _repository_paths(command[0], transport_home) == {_AGY_BRIDGE}:
                 command = command[1:]
         args.extend(command)

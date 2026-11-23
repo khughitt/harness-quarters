@@ -277,11 +277,13 @@ def _validate_structure(table, *, required_outputs):
                             or not line.command or line.runtime not in table.runtimes
                             or not line.delegates or line.subscriber_file is not None):
                         raise ValueError(f"{where}: agy bridge needs a command, ordered delegates and a known runtime")
-                    if binding.event == "Stop":
-                        launcher = shlex.split(line.command)
-                        if (len(launcher) != 1 or not launcher[0] or len(line.delegates) != 1
-                                or not line.delegates[0][0] or "/" in line.delegates[0][0]):
-                            raise ValueError(f"{where}: Stop bridge requires one launcher and one guard command on PATH")
+                    launcher = shlex.split(line.command)
+                    if len(launcher) != 1 or not launcher[0]:
+                        raise ValueError(f"{where}: bridge command must contain only the launcher")
+                    if any(not argv[0] or "/" in argv[0] for argv in line.delegates):
+                        raise ValueError(f"{where}: bridge delegates must name commands on PATH")
+                    if binding.event == "Stop" and len(line.delegates) != 1:
+                        raise ValueError(f"{where}: Stop bridge requires one guard command on PATH")
                 elif (line.runtime not in table.runtimes or line.subscriber_file not in files
                       or line.delegates or not (line.outer_ms and line.timeout)):
                     raise ValueError(f"{where}: relay line needs a known runtime and subscriber file, budget and timeout")

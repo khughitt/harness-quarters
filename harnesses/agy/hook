@@ -6,7 +6,7 @@ directory containing hooks.json) for hq-owned state and hooks not yet covered by
 - SessionStart: heals any detached `~/.gemini/antigravity-cli/settings.json` regular file
   through `.githooks/harness-state-refresh`, runs profile and capture-notice delegates in
   workspacePaths[0], and wraps their combined text in agy's injectSteps.systemMessage
-  envelope.
+  envelope. With --runtime it uses relay to project the event and combine owner notice replies.
 - PreToolUse: heals any detached `~/.gemini/antigravity-cli/settings.json` regular file
   and emits empty stdout (agy's no-op, preserving agy's permission flow while relay v0.5.0
   dispatches before-tool events to ops-guard and familiar-agy).
@@ -114,6 +114,10 @@ def refresh_detached_settings(env):
         sys.stderr.write(f"agy-hook: {detail}\n")
 
 
+def _inject(text):
+    return {"injectSteps": [{"systemMessage": {"systemMessage": text}}]} if text else {}
+
+
 def handle_session_start(delegates, stdin_text, env):
     refresh_detached_settings(env)
     blocks = []
@@ -181,9 +185,7 @@ def handle_session_start(delegates, stdin_text, env):
         elif out:
             blocks.append(out)
 
-    if not blocks:
-        return {}
-    return {"injectSteps": [{"systemMessage": {"systemMessage": "\n\n".join(blocks)}}]}
+    return _inject("\n\n".join(blocks))
 
 
 def handle_pre_tool_use(env):
@@ -435,20 +437,20 @@ def _owner_failure_exempt(raw):
     )
 
 
-def _run_owned_guard(argv, envelope, env):
-    # This bridge process supervises one guard. Linux reparents the guard's
-    # separately grouped facts reader and its children here if the guard exits.
+def _run_owner(argv, envelope, env, *, cwd=None):
+    # Adopt descendants (including a guard's separately grouped facts reader)
+    # when the direct owner command exits or times out.
     children = Path("/proc/thread-self/children")
     with children.open("rb") as owned:
         libc = ctypes.CDLL(None, use_errno=True)
         if libc.prctl(36, 1, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER
-            raise OSError(ctypes.get_errno(), "cannot supervise guard descendants")
+            raise OSError(ctypes.get_errno(), "cannot supervise owner descendants")
         signal.signal(signal.SIGCHLD, signal.SIG_DFL)
         try:
-            return subprocess.run(argv, input=json.dumps(envelope).encode(), env=env,
+            return subprocess.run(argv, input=json.dumps(envelope).encode(), env=env, cwd=cwd,
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=TIMEOUT_S)
         finally:
-            # run() has reaped the direct guard. Each PID here is now our own
+            # run() has reaped the direct owner. Each PID here is now our own
             # unreaped child. Reaping one parent can reveal a further generation.
             while children_left := owned.read().split():
                 for value in children_left:
@@ -456,6 +458,51 @@ def _run_owned_guard(argv, envelope, env):
                     os.kill(pid, signal.SIGKILL)
                     os.waitpid(pid, 0)
                 owned.seek(0)
+
+
+def _owner_argv(command):
+    argv = shlex.split(command)
+    if not argv or not argv[0] or "/" in argv[0]:
+        raise ValueError("expected an owner command on PATH")
+    return argv
+
+
+def _owner_notices(stdin, runtime, delegates, env):
+    refresh_detached_settings(env)
+    sys.path.insert(0, str(ROOT / "tools"))
+    from hook_routes import relay_runtime
+
+    native = stdin.buffer.read(MAX_NATIVE_BYTES + 1)
+    if len(native) > MAX_NATIVE_BYTES:
+        raise ValueError("SessionStart input exceeds 4 MiB")
+    project = {"harness": "agy", "event": "SessionStart", "raw": native.decode("utf-8"),
+               "invokingCwd": os.getcwd(), "registry": {"status": "not-requested"}}
+    child_env = {k: v for k, v in env.items() if k != "CLAUDE_ENV_FILE"}
+    contexts = []
+    sources = []
+    for argv in delegates:
+        label = shlex.join(argv)
+        envelope = relay_runtime.call(runtime, "project", {
+            **project, "subscriber": {"name": argv[0], "role": "notice"},
+        })
+        try:
+            done = _run_owner(argv, envelope, child_env, cwd=envelope["event"]["cwd"])
+            if done.returncode:
+                raise ValueError(f"exited {done.returncode}")
+            reply = relay_runtime.call(runtime, "parse-notice", {"output": done.stdout.decode("utf-8")})
+            context = reply.get("context")
+        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+            detail = " ".join(str(error).splitlines())
+            context = f"agy-hook SessionStart: {label} failed ({detail})"
+            if argv == ["lore", "hook", "profile-notice"]:
+                context = _profile_failure_line(context)
+        if context:
+            contexts.append(context)
+            sources.append(label)
+    combined = relay_runtime.call(runtime, "combine", {"contexts": contexts})
+    for index in combined["dropped"]:
+        print(f"agy-hook SessionStart: {sources[index]} exceeded the combined notice limit", file=sys.stderr)
+    return _inject(combined.get("context"))
 
 
 def owner_stop(stdin, runtime, guard, env):
@@ -483,7 +530,7 @@ def owner_stop(stdin, runtime, guard, env):
         stage = f"invoke {argv[0]}"
         child_env = {key: env[key] for key in ("PATH", "HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME")
                      if key in env}
-        done = _run_owned_guard(argv, envelope, child_env)
+        done = _run_owner(argv, envelope, child_env)
         if done.returncode:
             raise ValueError(f"exited {done.returncode}")
         stage = "parse guard reply"
@@ -503,6 +550,22 @@ def main(argv, stdin, stdout, env):
         sys.stderr.write("usage: harnesses/agy/hook <SessionStart|PreToolUse|Stop> ...\n")
         return 2
     sub = argv[0]
+    if sub == "SessionStart" and any(arg.split("=", 1)[0] in ("--runtime", "--delegate") for arg in argv[1:]):
+        parser = argparse.ArgumentParser(prog="harnesses/agy/hook SessionStart")
+        parser.add_argument("--runtime", required=True, type=Path)
+        parser.add_argument("--delegate", required=True, type=_owner_argv, action="append")
+        try:
+            args = parser.parse_args(argv[1:])
+        except SystemExit:
+            return 2
+        try:
+            reply = _owner_notices(stdin, args.runtime, args.delegate, env)
+        except (ImportError, OSError, ValueError) as error:
+            detail = " ".join(str(error).splitlines())
+            reply = _inject(_profile_failure_line(f"agy-hook SessionStart failed ({detail})"))
+        stdout.write(json.dumps(reply))
+        return 0
+
     if sub != "Stop":
         raw = stdin.read()
 
