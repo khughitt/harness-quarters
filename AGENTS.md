@@ -87,8 +87,8 @@ The generated global Projects block is checked by lore.
 - `facts/capabilities.toml` and `tools/harness-facts`: what each harness has been shown
   to do, with the record behind each value. The tool is the only reader; it takes the
   declared harness names from `[harnesses]` in `harnesses.toml`.
-- `agents/skills/session-logs/`: session-store guidance. `agents/bin/` keeps
-  session-episodes, wake-judge and their tests.
+- `palette.toml` and `tools/palette`: guild harness, model-family and status colours (docs/palette.md).
+- `agents/skills/session-logs/`: session-store guidance. `agents/bin/` keeps session-episodes, wake-judge and their tests.
 - `harnesses/pi/`: the pinned pi install (`just pi-install`), its launcher, the `settings.json`
   its home links to, the pick-preserving `harnesses/pi/extensions/harness-state.ts`, and the probes
   behind the `pi` and `pi-durable` facts. A version change reruns the probes (docs/harness-capabilities.md).
