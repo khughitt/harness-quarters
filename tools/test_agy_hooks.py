@@ -15,10 +15,10 @@ CONV_ID = "1e9adf4a-ae3b-4261-896c-648dd48c3388"
 SUB_ID = "abb9b545-1003-45c7-9ddf-07a269c1ff5c"
 
 
-def clean_env(**overrides):
+def clean_env(*, HOME, **overrides):
     env = {
         "PATH": os.environ["PATH"],
-        "HOME": str(overrides.pop("HOME", "/nonexistent")),
+        "HOME": str(HOME),
         "PYTHONDONTWRITEBYTECODE": "1",
     }
     for key, value in overrides.items():

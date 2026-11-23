@@ -12,18 +12,20 @@ directory containing hooks.json) for hq-owned state and hooks not yet covered by
   dispatches before-tool events to ops-guard and familiar-agy).
 - Stop: enforces a one-shot live task claim check for agy:<conversationId> (allowing
   in-flight waking children when controller-wake is probed true and fullyIdle is false)
-  until ops-33cef9 adds native agy support to claim-guard.
+  or, with --runtime and --guard, projects the native event for the owner command.
 """
 import argparse
 import json
 import os
 from pathlib import Path
+import shlex
 import stat
 import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 TIMEOUT_S = 10
+MAX_NATIVE_BYTES = 4 * 1024 * 1024
 CLAIM_FIELDS = ("id", "prefix", "session", "live", "host", "worktree")
 NON_BLOCKING_REASONS = frozenset({
     "ERROR",
@@ -372,12 +374,73 @@ def _is_retry(stdin_text):
     return (type(exec_num) is int and exec_num > 0) or event.get("terminationReason") in NON_BLOCKING_REASONS
 
 
+def _invalid_json_constant(value):
+    raise ValueError(f"invalid JSON constant {value}")
+
+
+def _owner_failure_exempt(raw):
+    # Relay reads JavaScript numbers, including integral decimal and exponent forms.
+    try:
+        event = json.loads(raw, parse_int=float, parse_constant=_invalid_json_constant)
+    except (ValueError, RecursionError):
+        return False
+    if not isinstance(event, dict):
+        return False
+    reason = event.get("terminationReason")
+    count = event.get("executionNum")
+    return (isinstance(reason, str) and reason in NON_BLOCKING_REASONS) or (
+        type(count) is float and 0 < count <= 2**53 - 1 and count.is_integer()
+    )
+
+
+def owner_stop(stdin, runtime, guard, env):
+    raw = ""
+    stage = "read Stop input"
+    try:
+        data = stdin.buffer.read(MAX_NATIVE_BYTES + 1)
+        if len(data) > MAX_NATIVE_BYTES:
+            raise ValueError("native input exceeds 4 MiB")
+        raw = data.decode("utf-8-sig")
+        stage = "project Stop input"
+        # The original bridge modes also run in standalone settings-healing fixtures.
+        sys.path.insert(0, str(ROOT / "tools"))
+        from hook_routes import relay_runtime
+
+        envelope = relay_runtime.call(runtime, "project", {
+            "harness": "agy", "event": "Stop", "raw": raw, "invokingCwd": os.getcwd(),
+            "subscriber": {"name": "claim-guard", "role": "guard"},
+            "registry": {"status": "not-requested"},
+        })
+        stage = "invoke guard"
+        argv = shlex.split(guard)
+        if not argv or not argv[0] or "/" in argv[0]:
+            raise ValueError("expected a guard command on PATH")
+        stage = f"invoke {argv[0]}"
+        child_env = {key: env[key] for key in ("PATH", "HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME")
+                     if key in env}
+        done = subprocess.run(argv, input=json.dumps(envelope).encode(), env=child_env,
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=TIMEOUT_S)
+        if done.returncode:
+            raise ValueError(f"exited {done.returncode}")
+        stage = "parse guard reply"
+        reply = relay_runtime.call(runtime, "parse-guard", {"output": done.stdout.decode("utf-8")})
+        if reply["decision"] == "deny":
+            return {"decision": "continue", "reason": reply["reason"]}
+        return {}
+    except (ImportError, OSError, ValueError, subprocess.TimeoutExpired) as error:
+        if _owner_failure_exempt(raw):
+            return {}
+        detail = " ".join(str(error).splitlines())
+        return {"decision": "continue", "reason": f"agy claim-guard: could not {stage} ({detail})"}
+
+
 def main(argv, stdin, stdout, env):
     if not argv:
         sys.stderr.write("usage: harnesses/agy/hook <SessionStart|PreToolUse|Stop> ...\n")
         return 2
     sub = argv[0]
-    raw = stdin.read()
+    if sub != "Stop":
+        raw = stdin.read()
 
     if sub == "SessionStart":
         if len(argv) < 2:
@@ -412,10 +475,18 @@ def main(argv, stdin, stdout, env):
         parser = argparse.ArgumentParser(prog="harnesses/agy/hook Stop")
         parser.add_argument("--tasks", default="tasks")
         parser.add_argument("--facts-file", default=None)
+        parser.add_argument("--runtime", type=Path)
+        parser.add_argument("--guard")
         try:
             args = parser.parse_args(argv[1:])
+            if (args.runtime is None) != (args.guard is None):
+                parser.error("--runtime and --guard must be supplied together")
         except SystemExit:
             return 2
+        if args.guard is not None:
+            stdout.write(json.dumps(owner_stop(stdin, args.runtime, args.guard, env)))
+            return 0
+        raw = stdin.read()
         try:
             verdict = decide_stop(
                 raw,

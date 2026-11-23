@@ -150,3 +150,12 @@ The bridge can call `relay_runtime.call(package, "project", payload)` with
 `harness`, `event`, raw native JSON text in `raw`, `invokingCwd`, `subscriber`
 and `registry`. The result is relay's subscriber envelope. The `parse-guard`
 operation takes reply text in `output` and returns relay's parsed guard reply.
+
+The agy Stop bridge accepts `Stop --runtime PACKAGE --guard 'tasks hook claim-guard'`.
+The package is the relay installation named by the bridge line. The bridge reads up
+to 4 MiB of native UTF-8 input, projects it for the guard and gives the owner ten
+seconds to reply. An owner denial becomes agy's `continue` with the owner's reason.
+An owner allowance becomes `{}`. On a transport failure, agy's own termination
+reasons and positive safe-integer refires allow the turn to end. Other failures
+produce a one-line `continue` reason. The shipped Stop line still uses the local
+claim check.
