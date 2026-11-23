@@ -101,8 +101,10 @@ def manifest_problems(data):
             continue
         for key in sorted(set(entry) - {"live_state"}):
             out.append(f"{where}: unknown key {key}")
-        if "live_state" in entry and not isinstance(entry["live_state"], dict):
-            out.append(f"{where}.live_state: must be a table")
+        live_state = entry.get("live_state", {})
+        if not (isinstance(live_state, dict)
+                or (isinstance(live_state, list) and all(isinstance(item, dict) for item in live_state))):
+            out.append(f"{where}.live_state: must be a table or an array of tables")
     return out
 
 

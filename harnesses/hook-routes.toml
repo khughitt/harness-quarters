@@ -154,6 +154,22 @@ bindings = [
   { event = "SubagentStart", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code SubagentStart", timeout = 5 }] },
 ]
 
+[homes.claude-work]
+harness = "claude-code"
+path = "harnesses/claude/work/settings.json"
+bindings = [
+  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["claude-profile"], command = "~/d/lore/hooks/claude-profile" }] },
+  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["relay-provenance", "familiar"], runtime = "v0.5.0", relay_kind = "session-start", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600 }] },
+  { event = "UserPromptSubmit", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "prompt", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600 }] },
+  { event = "PreToolUse", matcher = "*", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "before-tool", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600 }] },
+  { event = "Notification", matcher = "idle_prompt", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "needs-input", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600, relay_event = "Notification:idle_prompt" }] },
+  { event = "Notification", matcher = "permission_prompt", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "needs-approval", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600, relay_event = "Notification:permission_prompt" }] },
+  { event = "Stop", lines = [{ policies = ["harness-state-refresh"], command = "~/.local/bin/harness-state-refresh" }] },
+  { event = "Stop", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "turn-end", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600 }] },
+  { event = "StopFailure", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "turn-error", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600 }] },
+  { event = "SessionEnd", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "session-end", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 60000, timeout = 60 }] },
+]
+
 [homes.codex]
 harness = "codex"
 path = "harnesses/codex/hooks.json"

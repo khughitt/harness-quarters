@@ -153,7 +153,7 @@ class LiveStateSpec:
 class HarnessManifest:
     schema: int
     harnesses: tuple[str, ...]
-    by_harness: dict[str, LiveStateSpec | None]
+    by_harness: dict[str, tuple[LiveStateSpec, ...]]
     live_state: tuple[LiveStateSpec, ...]
 
 
@@ -263,8 +263,7 @@ def _parse_toml_rules(value, label, problems):
     return tuple(rules) if ok else None
 
 
-def _parse_live_state(name, table, problems):
-    label = f"harnesses.{name}.live_state"
+def _parse_live_state(name, table, label, problems):
     if not isinstance(table, dict):
         problems.append(f"{label} must be a table")
         return None
@@ -385,17 +384,26 @@ def load_manifest(path=None):
             problems.append(f"harness name {name!r} must match [a-z][a-z0-9-]*")
             continue
         names.append(name)
-        by_harness[name] = None
+        by_harness[name] = ()
         if not isinstance(entry, dict):
             problems.append(f"harnesses.{name} must be a table")
             continue
         for key in sorted(set(entry) - {"live_state"}):
             problems.append(f"harnesses.{name} has unknown key {key!r}")
         if "live_state" in entry:
-            spec = _parse_live_state(name, entry["live_state"], problems)
-            if spec:
-                by_harness[name] = spec
-                specs.append(spec)
+            # One table, or an array of tables for a harness with several live configs.
+            raw = entry["live_state"]
+            label = f"harnesses.{name}.live_state"
+            if isinstance(raw, list):
+                if not raw:
+                    problems.append(f"{label} must not be an empty array")
+                labelled = [(f"{label}[{i}]", item) for i, item in enumerate(raw)]
+            else:
+                labelled = [(label, raw)]
+            parsed = [spec for item_label, item in labelled
+                      if (spec := _parse_live_state(name, item, item_label, problems))]
+            by_harness[name] = tuple(parsed)
+            specs.extend(parsed)
 
     for field in ("config", "filter_glob"):
         seen = {}

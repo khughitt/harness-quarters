@@ -79,8 +79,10 @@ def seed_records(root):
 
 def test_declared_layout_and_filters(tmp_path):
     manifest = tomllib.loads((ROOT / 'harnesses.toml').read_text())
-    assert {h['live_state']['config'] for h in manifest['harnesses'].values() if 'live_state' in h} == {
-        'harnesses/' + c for c in CONFIGS}
+    entries = [h['live_state'] for h in manifest['harnesses'].values() if 'live_state' in h]
+    declared = {item['config'] for entry in entries for item in (entry if isinstance(entry, list) else [entry])}
+    # The work Claude settings postdate the directory move these CONFIGS rehearse.
+    assert declared == {'harnesses/' + c for c in CONFIGS} | {'harnesses/claude/work/settings.json'}
     links = tomllib.loads((ROOT / 'links.toml').read_text())
     assert links['required']['~/.config/ponytail/config.json'] == 'external/ponytail/config.json'
     for old in ('claude', 'codex', 'agy', 'pi', 'ponytail'):

@@ -17,8 +17,8 @@ Run `just setup` once per checkout, and once on each host after pulling a change
 recipe; it is idempotent. The repository git config it writes (`filter.harness-state.*`
 included) lives in the synced checkout and is shared between hosts.
 It installs the git hooks and the harness-state filter (docs/live-state.md explains its three keys)
-and creates `local/codex/rules/`. Work settings under `local/` come from another
-configured host; setup creates directories, not private settings.
+and creates `local/codex/rules/`. The work Codex config under `local/` comes from
+another configured host; setup creates directories, not private settings.
 
 ## Gates
 
@@ -104,7 +104,7 @@ The generated global Projects block is checked by lore.
 - Change home routing in `links.toml`. Apply with `just link --apply` from main only;
   linking to a worktree would leave live harnesses dependent on temporary storage.
   Targets must exist in their registered owner checkouts before an apply.
-- Keep `local/` untracked. It contains work settings, rules and saved Codex trust;
+- Keep `local/` untracked. It contains the work Codex config, rules, saved picks and Codex trust;
   publishing it would expose host and work state.
 - Treat model picks, effort and Codex trust as live state. The clean filter and trust
   hooks preserve their contract; avoid stashing or overwriting main's harness configs

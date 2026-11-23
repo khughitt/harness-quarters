@@ -55,8 +55,11 @@ def repo(tmp_path):
     (repo / "harnesses/pi/settings.json").write_text('{"lastChangelogVersion": "1.1.0", "theme": "system"}\n')
     (repo / "harnesses/agy/settings.json").write_text('{"allowNonWorkspaceAccess": true}\n')
     (repo / "harnesses/claude" / "settings.json").write_text('{\n  "theme": "dark-ansi"\n}\n')
+    (repo / "harnesses/claude/work").mkdir()
+    (repo / "harnesses/claude/work" / "settings.json").write_text('{\n  "theme": "dark-ansi"\n}\n')
     (repo / "local" / "codex").mkdir(parents=True)
     (repo / ".gitattributes").write_text("harnesses/claude/settings*.json filter=harness-state\n"
+                                         "harnesses/claude/work/settings*.json filter=harness-state\n"
                                          "harnesses/codex/config*.toml filter=harness-state\n"
                                          "harnesses/pi/settings*.json filter=harness-state\n"
                                          "harnesses/agy/settings*.json filter=harness-state\n")

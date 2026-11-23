@@ -178,7 +178,7 @@ MANIFEST_REFUSALS = [
     ("bad-slug", GOOD_MANIFEST.replace("[harnesses.opencode]", "[harnesses.Claude]"), "manifest: harnesses.Claude: Claude is not a valid name"),
     ("non-table", "schema = 1\n[harnesses]\ncodex = 1\n", "manifest: harnesses.codex: must be a table"),
     ("unknown-harness-key", GOOD_MANIFEST.replace("[harnesses.opencode]", "[harnesses.opencode]\nconfig = 1"), "manifest: harnesses.opencode: unknown key config"),
-    ("live-state-not-table", "schema = 1\n[harnesses.codex]\nlive_state = 1\n", "manifest: harnesses.codex.live_state: must be a table"),
+    ("live-state-not-table", "schema = 1\n[harnesses.codex]\nlive_state = 1\n", "manifest: harnesses.codex.live_state: must be a table or an array of tables"),
 ]
 
 

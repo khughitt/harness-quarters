@@ -6,6 +6,7 @@ layout_allowed = [
   # shellPath, packages, extensions, skills, prompts or themes is not stripped by the
   # clean filter and would be committed if allowed here.
   "harnesses/claude/settings.json",
+  "harnesses/claude/work/settings.json",
   "harnesses/codex/config.toml",
   "harnesses/codex/hooks.json",
   "harnesses/codex/work/hooks.json",

@@ -119,7 +119,7 @@ def test_write_replaces_only_the_value_line(lore, tmp_path):
 
 def test_written_line_survives_the_clean_filter(lore, tmp_path):
     harness_state = tool.harness_state
-    spec = harness_state.load_manifest(ROOT / "harnesses.toml").by_harness["codex"]
+    (spec,) = harness_state.load_manifest(ROOT / "harnesses.toml").by_harness["codex"]
     config = write_config(tmp_path / "config.toml")
     tool.write_config(config, tool.render(lore))
     cleaned = harness_state.clean_for_spec(spec, config.read_text())
