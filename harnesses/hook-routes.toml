@@ -33,8 +33,8 @@ reason = "Keeps claim enforcement until the owner route is proved equivalent."
 
 [states.claude-posttooluse]
 state = "native"
-owner = "ops-1eb25b"
-reason = "The relay amendment retains native PostToolUse and PostToolUseFailure for the test counter."
+owner = "ops"
+reason = "The relay amendment retains native PostToolUse and PostToolUseFailure for the test counter; ops supplies tt's command on PATH."
 
 [states.agy-healing]
 state = "native"
@@ -152,9 +152,9 @@ bindings = [
   { event = "StopFailure", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "turn-error", subscriber_file = "shared-v0.5.0", outer_ms = 600000, timeout = 600 }] },
   { event = "SessionEnd", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "session-end", subscriber_file = "shared-v0.5.0", outer_ms = 60000, timeout = 60 }] },
   { event = "SessionEnd", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code SessionEnd", timeout = 5 }] },
-  { event = "PostToolUse", matcher = "Bash", lines = [{ policies = ["claude-posttooluse"], command = "~/d/ops/hooks/claude-posttooluse" }] },
+  { event = "PostToolUse", matcher = "Bash", lines = [{ policies = ["claude-posttooluse"], command = "tt-posttooluse" }] },
   { event = "PostToolUse", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code PostToolUse", timeout = 5 }] },
-  { event = "PostToolUseFailure", matcher = "Bash", lines = [{ policies = ["claude-posttooluse"], command = "~/d/ops/hooks/claude-posttooluse" }] },
+  { event = "PostToolUseFailure", matcher = "Bash", lines = [{ policies = ["claude-posttooluse"], command = "tt-posttooluse" }] },
   { event = "PostToolUseFailure", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code PostToolUseFailure", timeout = 5 }] },
   { event = "SubagentStop", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code SubagentStop", timeout = 5 }] },
   { event = "PreCompact", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code PreCompact", timeout = 5 }] },

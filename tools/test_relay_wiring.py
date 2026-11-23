@@ -127,8 +127,9 @@ def test_native_entries_kept_in_order(file):
                              '~/d/lore/hooks/claude-profile', '~/d/ops/hooks/capture-notice'],
             'Stop': ['~/d/ops/hooks/claim-guard --harness claude-code',
                      '~/.local/bin/harness-state-refresh'],
-            'PostToolUse': ['~/d/ops/hooks/claude-posttooluse'],
-            'PostToolUseFailure': ['~/d/ops/hooks/claude-posttooluse'],
+            # tt's native command counts test front-door use; ops owns it on PATH.
+            'PostToolUse': ['tt-posttooluse'],
+            'PostToolUseFailure': ['tt-posttooluse'],
         }
     elif file == FILES[3]:
         assert native == {
