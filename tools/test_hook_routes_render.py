@@ -15,6 +15,7 @@ from hook_routes.table import load
 ROOT = Path(__file__).resolve().parents[1]
 TABLE = ROOT / 'harnesses/hook-routes.toml'
 CLAUDE = 'harnesses/claude/settings.json'
+CLAUDE_WORK = 'harnesses/claude/work/settings.json'
 CODEX = 'harnesses/codex/hooks.json'
 CODEX_WORK = 'harnesses/codex/work/hooks.json'
 AGY = 'harnesses/agy/hooks.json'
@@ -36,9 +37,10 @@ def test_render_reproduces_codex_and_agy_files():
         assert rendered[path] == (ROOT / path).read_bytes()
 
 
-def test_render_reproduces_claude_hooks():
-    before = (ROOT / CLAUDE).read_bytes()
-    after = render_live(load(TABLE), _tracked_home())[CLAUDE]
+@pytest.mark.parametrize('path', [CLAUDE, CLAUDE_WORK])
+def test_render_reproduces_claude_hooks(path):
+    before = (ROOT / path).read_bytes()
+    after = render_live(load(TABLE), _tracked_home())[path]
     assert json.loads(after)['hooks'] == json.loads(before)['hooks']
     # The checked-in hooks already use the renderer's indentation.
     assert after == before
@@ -61,7 +63,7 @@ def checkout(tmp_path):
     home = tmp_path / 'home'
     home.mkdir()
     repo = tmp_path / 'checkout'
-    for path in (CLAUDE, CODEX, CODEX_WORK, AGY, SUBSCRIBERS):
+    for path in (CLAUDE, CLAUDE_WORK, CODEX, CODEX_WORK, AGY, SUBSCRIBERS):
         dest = repo / path
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / path, dest)

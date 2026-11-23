@@ -31,7 +31,9 @@ stat-only modified marker: that can drop the selection until restoration.
 
 The root has schema=1 and a nonempty harnesses table. Harness names are canonical
 slugs; a bare harness table declares a runtime without a managed live-state config.
-Each live_state entry defines:
+A harness's live_state is one table, or an array of tables (`[[harnesses.<name>.live_state]]`)
+when the harness has several tracked configs, such as Claude Code's personal and work
+settings. Each live_state entry defines:
 
 | Field | Meaning and constraints |
 | --- | --- |
@@ -56,7 +58,7 @@ full checks; staged-tree validation reads the staged files, not just working cop
 
 | Runtime | Removed from committed config | Preservation |
 | --- | --- | --- |
-| Claude Code | model, modelSettings, effortLevel | Model and effort are separate units in local/live-picks.json |
+| Claude Code (personal and work settings) | model, modelSettings, effortLevel | Model and effort are separate units in local/live-picks.json, one entry per config |
 | Codex | model, model_reasoning_effort; projects tables; selected TUI/marketplace bookkeeping | Model/effort unit in local/live-picks.json; trust separately in local/codex/trust.toml |
 | agy | model, effort, effortByBase, trustedWorkspaces, seasonalThemesOptIn | Separate units in local/live-picks-agy.json |
 | pi | defaultProvider, defaultModel, defaultThinkingLevel, deviceId, trackingId | Model/provider and thinking units in local/live-picks-pi.json; installation IDs are not restored |
@@ -64,7 +66,7 @@ full checks; staged-tree validation reads the staged files, not just working cop
 Codex bookkeeping comprises tui.screen_reader_detection_done,
 tui.model_availability_nux, and last_updated/last_revision in matching marketplace
 tables. Other harness-written configuration remains tracked. A fresh clone starts
-with harness defaults and no saved trust; private work settings are separate inputs.
+with harness defaults and no saved trust; the private work Codex config is a separate input.
 
 ## Saved pick records
 

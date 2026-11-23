@@ -1,0 +1,196 @@
+{
+  "cleanupPeriodDays": 90,
+  "env": {
+    "CLAUDE_CODE_SHELL": "/bin/bash"
+  },
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Bash(fd)",
+      "Bash(find)",
+      "Bash(git log:*)",
+      "Bash(jq)",
+      "Bash(ls)",
+      "Bash(mkdir)",
+      "Bash(npm run format)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint_fix)",
+      "Bash(npm run test:*)",
+      "Bash(npm run type-check)",
+      "Bash(ps)",
+      "Bash(rg)",
+      "Bash(uv run pytest)",
+      "Bash(uv run ruff)",
+      "Read(~/.zshrc)",
+      "Glob",
+      "Grep",
+      "LS",
+      "Read",
+      "Edit",
+      "MultiEdit",
+      "WebFetch",
+      "WebSearch",
+      "Write"
+    ],
+    "_denyRemovedNote": "permissions.deny (Bash(curl:*), Read(./.env), Read(./.env.*), Read(./secrets/**)) removed 2026-09-03: Claude Code 2.1.259 widened Read() deny-rule matching so any `cd DIR && grep -r`/`cp -r` compound now triggers a mandatory ask whenever ANY Read() deny rule exists, even when the target doesn't match the rule, and even under bypassPermissions/--dangerously-skip-permissions. Made routine cd+recursive-grep commands prompt constantly. Reported upstream (SendFeedback draft); re-add these rules once fixed."
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/lore/hooks/claude-profile"
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/v0.5.0-8b6b51ee070e/relay/subscribers.json' SessionStart",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/v0.5.0-8b6b51ee070e/relay/subscribers.json' UserPromptSubmit",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/v0.5.0-8b6b51ee070e/relay/subscribers.json' PreToolUse",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/v0.5.0-8b6b51ee070e/relay/subscribers.json' Notification:idle_prompt",
+            "timeout": 600
+          }
+        ]
+      },
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/v0.5.0-8b6b51ee070e/relay/subscribers.json' Notification:permission_prompt",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/bin/harness-state-refresh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/v0.5.0-8b6b51ee070e/relay/subscribers.json' Stop",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/v0.5.0-8b6b51ee070e/relay/subscribers.json' StopFailure",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 60000 --subscribers '/home/keith/.config/relay/v0.5.0-8b6b51ee070e/relay/subscribers.json' SessionEnd",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/d/familiar/bin/familiar statusline"
+  },
+  "enabledPlugins": {
+    "typescript-lsp@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": false,
+    "superpowers@superpowers-marketplace": true,
+    "github@claude-plugins-official": false,
+    "code-simplifier@claude-plugins-official": false,
+    "frontend-design@claude-plugins-official": false,
+    "code-review@claude-plugins-official": false,
+    "pulumi-migration@pulumi-agent-skills": true,
+    "pulumi@pulumi-agent-skills": true,
+    "ponytail@ponytail": true,
+    "slack@anthropic-plugin-directory": true
+  },
+  "extraKnownMarketplaces": {
+    "superpowers-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers-marketplace"
+      },
+      "autoUpdate": false
+    },
+    "pulumi-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "pulumi/agent-skills"
+      }
+    },
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
+    }
+  },
+  "alwaysThinkingEnabled": true,
+  "tui": "fullscreen",
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "dark-ansi",
+  "agentPushNotifEnabled": true,
+  "voiceEnabled": true
+}

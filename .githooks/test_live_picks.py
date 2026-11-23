@@ -18,6 +18,7 @@ HOOKS = Path(__file__).parent
 HOOK_FILES = ("harness-state-clean", "harness_state.py", "codex-trust", "live-picks",
               "harness-state-refresh", "post-checkout", "post-merge", "post-rewrite")
 CLAUDE = "harnesses/claude/settings.json"
+CLAUDE_WORK = "harnesses/claude/work/settings.json"
 CODEX = "harnesses/codex/config.toml"
 PI = "harnesses/pi/settings.json"
 AGY = "harnesses/agy/settings.json"
@@ -82,7 +83,7 @@ def repo(tmp_path, request, monkeypatch):
     if historical:
         # Keep pinned historical hooks and their layout authentic. These tests exercise
         # pick/manifest rollback; the separate layout rehearsal covers directory rollback.
-        for name in ("CLAUDE", "CODEX", "PI", "AGY"):
+        for name in ("CLAUDE", "CLAUDE_WORK", "CODEX", "PI", "AGY"):
             monkeypatch.setitem(globals(), name, globals()[name].removeprefix("harnesses/"))
     repo = tmp_path / "hq"
     git(tmp_path, "init", "-q", "-b", "main", str(repo))
@@ -92,10 +93,13 @@ def repo(tmp_path, request, monkeypatch):
     for name in HOOK_FILES:
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     shutil.copy2(HOOKS.parent / "harnesses.toml", repo / "harnesses.toml")
-    for config in (CLAUDE, CODEX, PI, AGY):
+    for config in (CLAUDE, CLAUDE_WORK, CODEX, PI, AGY):
         (repo / config).parent.mkdir(parents=True, exist_ok=True)
     (repo / "local" / "codex").mkdir(parents=True)
+    # The pinned pre-pi clean filter predates the work home, so its run leaves that file unrouted.
+    work_route = "" if historical else "harnesses/claude/work/settings*.json filter=harness-state\n"
     (repo / ".gitattributes").write_text("harnesses/claude/settings*.json filter=harness-state\n"
+                                         + work_route +
                                          "harnesses/codex/config*.toml filter=harness-state\n"
                                          "harnesses/pi/settings*.json filter=harness-state\n"
                                          "harnesses/agy/settings*.json filter=harness-state\n")
@@ -104,6 +108,7 @@ def repo(tmp_path, request, monkeypatch):
         for path in [repo / "harnesses.toml", repo / ".gitattributes", *[repo / ".githooks" / n for n in HOOK_FILES]]:
             path.write_text(path.read_text().replace("harnesses/", ""))
     write_claude(repo)
+    (repo / CLAUDE_WORK).write_text(json.dumps({"theme": "dark-ansi"}, indent=2) + "\n")
     (repo / CODEX).write_text(BASE)
     write_pi(repo)
     write_agy(repo)
@@ -1280,7 +1285,10 @@ def edit_manifest(repo, old, new):
     path.write_text(text.replace(old, new))
 
 
-CLAUDE_UNITS = 'pick_units = [["model", "modelSettings"], ["effortLevel"]]'
+# Anchored on the personal entry's glob: the work entry declares the same units.
+CLAUDE_UNITS = ('filter_glob = "harnesses/claude/settings*.json"\nformat = "json"\n'
+                'clean_keys = ["model", "modelSettings", "effortLevel"]\npicks_record = "local/live-picks.json"\n'
+                'pick_units = [["model", "modelSettings"], ["effortLevel"]]')
 PI_UNITS = 'pick_units = [["defaultProvider", "defaultModel"], ["defaultThinkingLevel"]]'
 AGY_UNITS = ('pick_units = [["model"], ["effort", "effortByBase"], ["trustedWorkspaces"], '
              '["seasonalThemesOptIn"]]')
@@ -1290,7 +1298,7 @@ CODEX_UNITS = 'pick_units = [["model", "model_reasoning_effort"]]'
 @pytest.mark.parametrize("old, new", [
     (PI_UNITS, 'pick_units = [["defaultProvider", "defaultModel"], ["defaultModel", "defaultThinkingLevel"]]'),
     (PI_UNITS, 'pick_units = [["defaultProvider", "defaultModel"], ["defaultThinkingLevel"], ["theme"]]'),
-    (CLAUDE_UNITS, 'pick_units = [["model", "modelSettings"]]'),
+    (CLAUDE_UNITS, CLAUDE_UNITS.replace(', ["effortLevel"]]', ']')),
     (AGY_UNITS, 'pick_units = [["model"], ["effort", "effortByBase"], ["trustedWorkspaces"]]'),
     (CODEX_UNITS, 'pick_units = [["model"]]'),
 ], ids=["pi-overlap", "pi-unfiltered", "claude-missing", "agy-missing", "codex-missing"])

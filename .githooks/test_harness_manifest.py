@@ -96,7 +96,7 @@ def test_shipped_manifest_loads_and_matches_gitattributes_and_git_check_attr(tmp
     manifest = hs.load_manifest()
     assert manifest.schema == 1
     assert manifest.harnesses == ("agy", "claude-code", "codex", "opencode", "pi", "pi-durable")
-    assert manifest.by_harness["opencode"] is None and manifest.by_harness["pi-durable"] is None
+    assert manifest.by_harness["opencode"] == () and manifest.by_harness["pi-durable"] == ()
     expected = {
         "agy": (("model", "effort", "effortByBase", "trustedWorkspaces", "seasonalThemesOptIn"), ()),
         "claude-code": (("model", "modelSettings", "effortLevel"), ()),
@@ -104,15 +104,22 @@ def test_shipped_manifest_loads_and_matches_gitattributes_and_git_check_attr(tmp
         "pi": (("defaultProvider", "defaultModel", "defaultThinkingLevel"), ("deviceId", "trackingId")),
     }
     for name, (picks, unrestored) in expected.items():
-        spec = manifest.by_harness[name]
-        assert spec.pick_keys == picks
-        assert spec.unrestored_keys == unrestored
-    assert [s.harness for s in manifest.live_state] == ["agy", "claude-code", "codex", "pi"]
+        for spec in manifest.by_harness[name]:
+            assert spec.pick_keys == picks
+            assert spec.unrestored_keys == unrestored
+    assert [(s.harness, s.config) for s in manifest.live_state] == [
+        ("agy", "harnesses/agy/settings.json"),
+        ("claude-code", "harnesses/claude/settings.json"),
+        ("claude-code", "harnesses/claude/work/settings.json"),
+        ("codex", "harnesses/codex/config.toml"),
+        ("pi", "harnesses/pi/settings.json"),
+    ]
     hs.check_gitattributes(manifest)
 
     repo, env = init_repo(tmp_path)
     shutil.copy(REPO / ".gitattributes", repo / ".gitattributes")
-    positive = ["harnesses/claude/settings.json", "harnesses/claude/settings.work.json", "harnesses/codex/config.toml",
+    positive = ["harnesses/claude/settings.json", "harnesses/claude/settings.work.json",
+                "harnesses/claude/work/settings.json", "harnesses/codex/config.toml",
                 "harnesses/codex/config.work.toml", "harnesses/pi/settings.json", "harnesses/agy/settings.json"]
     negative = ["harnesses/claude/settings/nested.json", "harnesses.toml", "links.toml", "harnesses/codex/hooks.json"]
     for path in positive + negative:
@@ -239,9 +246,48 @@ def test_manifest_validation_refuses_each_schema_and_partition_violation(tmp_pat
 
 
 def test_valid_fixtures_load(tmp_path):
-    assert manifest_from(tmp_path, JSON_ENTRY).by_harness["a"].unrestored_keys == ("x",)
-    spec = manifest_from(tmp_path, TOML_ENTRY).by_harness["c"]
+    assert manifest_from(tmp_path, JSON_ENTRY).by_harness["a"][0].unrestored_keys == ("x",)
+    (spec,) = manifest_from(tmp_path, TOML_ENTRY).by_harness["c"]
     assert spec.trust_table.pattern == "p\\..+" and spec.pick_keys == ("m", "e")
+
+
+TWO_CONFIGS = '''schema = 1
+[[harnesses.a.live_state]]
+config = "a/s.json"
+filter_glob = "a/s*.json"
+format = "json"
+clean_keys = ["m"]
+picks_record = "local/p.json"
+pick_units = [["m"]]
+
+[[harnesses.a.live_state]]
+config = "a/work/s.json"
+filter_glob = "a/work/s*.json"
+format = "json"
+clean_keys = ["m"]
+picks_record = "local/p.json"
+pick_units = [["m"]]
+'''
+
+
+def test_array_live_state_declares_several_configs_for_one_harness(tmp_path):
+    manifest = manifest_from(tmp_path, TWO_CONFIGS)
+    assert [spec.config for spec in manifest.by_harness["a"]] == ["a/s.json", "a/work/s.json"]
+    assert [spec.harness for spec in manifest.live_state] == ["a", "a"]
+
+
+@pytest.mark.parametrize("text, problem", [
+    ("schema = 1\n[harnesses.a]\nlive_state = []\n", "harnesses.a.live_state must not be an empty array"),
+    (TWO_CONFIGS.replace('config = "a/work/s.json"\nfilter_glob = "a/work/s*.json"',
+                         'config = "a/sw.json"\nfilter_glob = "a/*w.json"'), "overlaps"),
+    (TWO_CONFIGS.replace('config = "a/work/s.json"\nfilter_glob = "a/work/s*.json"',
+                         'config = "a/s.json"\nfilter_glob = "a/s*.json"'), "is used by both a and a"),
+    ("schema = 1\n[harnesses.a]\nlive_state = [1]\n", "harnesses.a.live_state[0] must be a table"),
+])
+def test_array_live_state_refusals(tmp_path, text, problem):
+    with pytest.raises(hs.ManifestError) as caught:
+        manifest_from(tmp_path, text)
+    assert any(problem in item for item in caught.value.problems), caught.value.problems
 
 
 def test_clean_only_live_state_defaults_unrestored_keys_and_validates(tmp_path):
@@ -252,9 +298,9 @@ filter_glob = "a/s*.json"
 format = "json"
 clean_keys = ["m", "e"]
 '''
-    spec = manifest_from(tmp_path, clean_only).by_harness["a"]
+    (spec,) = manifest_from(tmp_path, clean_only).by_harness["a"]
     assert spec.unrestored_keys == ("m", "e") and spec.pick_units == () and spec.picks_record is None
-    explicit = manifest_from(tmp_path, clean_only + 'unrestored_keys = ["e", "m"]\n').by_harness["a"]
+    (explicit,) = manifest_from(tmp_path, clean_only + 'unrestored_keys = ["e", "m"]\n').by_harness["a"]
     assert set(explicit.unrestored_keys) == {"m", "e"}
     with pytest.raises(hs.ManifestError):
         manifest_from(tmp_path, clean_only + 'unrestored_keys = ["m"]\n')
@@ -412,7 +458,7 @@ def test_check_clean_tree_in_process_ignores_worktrees_and_git(tmp_path):
 def test_clean_json_and_three_arg_clean_toml(tmp_path):
     assert hs.clean_json('{"a": 1, "model": "x", "é": 2}', ["model"]) == '{\n  "a": 1,\n  "é": 2\n}\n'
     manifest = hs.load_manifest()
-    codex = manifest.by_harness["codex"]
+    (codex,) = manifest.by_harness["codex"]
     text = (
         'model = "gpt"\n'
         'model_reasoning_effort = "high"\n'
@@ -444,7 +490,7 @@ def test_clean_json_and_three_arg_clean_toml(tmp_path):
     )
     assert hs.clean_toml(text, codex.toml_clean_keys, codex.toml_clean_tables) == expected
     assert hs.clean_for_spec(codex, text) == expected
-    pi = manifest.by_harness["pi"]
+    (pi,) = manifest.by_harness["pi"]
     assert hs.clean_for_spec(pi, '{"deviceId": "d", "theme": "t"}') == '{\n  "theme": "t"\n}\n'
     unmatched = re.compile(r"nomatch")
     assert hs.clean_toml(text, (), (unmatched,)) == text
@@ -557,6 +603,9 @@ def test_branch_switch_across_pre_manifest_and_post_manifest_commits_with_requir
         settings, config = tracked[branch]
         (repo / "claude/settings.json").write_text(json.dumps(settings, indent=2) + "\n")
         (repo / "codex/config.toml").write_text(config)
+        if branch == "post-manifest":  # the current manifest also declares the work home
+            (repo / "claude/work").mkdir(exist_ok=True)
+            (repo / "claude/work/settings.json").write_text(json.dumps(settings, indent=2) + "\n")
 
     write_tracked("pre-manifest")
     git(repo, env, "config", "filter.harness-state.clean", hs.EXPECTED_CLEAN_FILTER)

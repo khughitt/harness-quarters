@@ -1685,7 +1685,7 @@ def test_frozen_records_copy_deepcopy_and_pickle(tmp_path):
 
 
 @pytest.mark.parametrize('path', ['harnesses/claude/settings.json', 'harnesses/codex/hooks.json',
-                                  'harnesses/codex/work/hooks.json', 'local/claude/settings.work.json'])
+                                  'harnesses/codex/work/hooks.json', 'harnesses/claude/work/settings.json'])
 @pytest.mark.parametrize('shell', [False, True])
 def test_relocated_wiring_is_protected(tmp_path, path, shell):
     d = Driver(tmp_path, 'claude-code')

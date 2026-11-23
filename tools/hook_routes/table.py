@@ -13,6 +13,7 @@ __all__ = [
 # The home links and legacy relay runtime consume these tracked outputs.
 _REQUIRED_HOMES = {
     ("claude-code", "harnesses/claude/settings.json"),
+    ("claude-code", "harnesses/claude/work/settings.json"),
     ("codex", "harnesses/codex/hooks.json"),
     ("codex", "harnesses/codex/work/hooks.json"),
     ("agy", "harnesses/agy/hooks.json"),

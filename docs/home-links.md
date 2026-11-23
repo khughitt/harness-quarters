@@ -98,7 +98,9 @@ and task/flow skills target their registered owners directly.
 
 ## Current home groups
 
-Claude Code and Codex have personal and private work homes. Agy's settings home
+Claude Code and Codex have personal and work homes. The work Claude Code settings
+are tracked (harnesses/claude/work/settings.json); the work Codex config.toml
+stays private under local/. Agy's settings home
 is .gemini/antigravity-cli and its hook/skill home is .gemini/config; both are one
 session-store integration, not personal/work session adapters. Its skills.json
 uses a relative path to .agents/skills because agy does not expand home syntax

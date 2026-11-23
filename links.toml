@@ -126,7 +126,7 @@ home = "~/.claude"
 home = "~/.claude-work"
 [harness.claude-work.links]
 "CLAUDE.md" = "lore:instructions/AGENTS.md"
-"settings.json" = "local/claude/settings.work.json"
+"settings.json" = "harnesses/claude/work/settings.json"
 "statusline-command.sh" = "harnesses/claude/statusline-command.sh"
 
 [harness.codex]

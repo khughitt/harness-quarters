@@ -470,14 +470,15 @@ def test_real_manifest_with_codex_needs_setup_first(tmp_path):
     assert states(after)["~/.codex-work/hooks.json"] == "create"
 
 
-def test_real_manifest_work_home_without_local_names_the_file(tmp_path):
+def test_real_manifest_links_work_claude_home_to_tracked_settings(tmp_path):
     home = tmp_path / "home"
     (home / ".claude-work").mkdir(parents=True)
     clone = fresh_clone(tmp_path, home)
     assert just_setup(clone).returncode == 0
     result = link(clone, home)
-    assert result.returncode == 2
-    assert "local/claude/settings.work.json" in result.stderr
+    assert result.returncode == 0, result.stderr
+    work_settings = "~/" + "/".join((".claude-work", "settings.json"))
+    assert states(result)[work_settings] == "create"
 
 
 def test_real_manifest_links_agy_and_agy_config_when_homes_exist(tmp_path):

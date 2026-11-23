@@ -27,8 +27,9 @@ are whole-file renders.
 
 Run `tools/hook-routes check` to validate the table and compare the checkout with its
 live render using the current home. It compares Claude Code's parsed hook values by event and checks
-the other files byte for byte. The table must cover all four shipped harness
-settings and the legacy relay subscriber template. Exit status 1 names the drift
+the other files byte for byte. The table must cover all five shipped hook files
+(Claude Code and Codex, each personal and work, and agy) and the legacy relay
+subscriber template. Exit status 1 names the drift
 or table error on stderr. The local pre-commit hook and `just check-hygiene` check the staged
 copies over the same export as the other staged checks. Portable CI hygiene
 omits the HOME-dependent comparison. The renderer tests use the checked-in
