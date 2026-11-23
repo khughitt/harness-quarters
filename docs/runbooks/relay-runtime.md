@@ -4,8 +4,8 @@ Type: guide; document types 1. Install, upgrade and recover the pinned standalon
 runtime and hook images. See [home links](../home-links.md) for launcher ownership
 and [capabilities](../harness-capabilities.md) for native/adapter/policy boundaries.
 
-`relay/package.json` selects v0.5.0; `relay/package-lock.json` fixes its commit to
-`1f1c28da62e7867caf3acaddf16ba13079a37e85`. The declared home launcher resolves to
+`relay/package.json` selects v0.6.0; `relay/package-lock.json` fixes its commit to
+`9078727105f06b4a17ccbf177821806d7eed93be`. The declared home launcher resolves to
 `relay/bin/relay`, which reads that pin and runs the versioned installation under
 `$HOME/.local/share/relay/` (falling back to the account's passwd home when
 `HOME` is overridden and `RELAY_INSTALL_ROOT` is unset). Node and npm come from `/usr/bin`.

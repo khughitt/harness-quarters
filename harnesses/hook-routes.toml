@@ -11,6 +11,11 @@ command = "/usr/bin/node"
 script = "~/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js"
 commit = "1f1c28da62e7867caf3acaddf16ba13079a37e85"
 
+[runtimes."v0.6.0"]
+command = "/usr/bin/node"
+script = "~/.local/share/relay/v0.6.0/node_modules/relay/bin/relay.js"
+commit = "9078727105f06b4a17ccbf177821806d7eed93be"
+
 [states.claude-sessionstart]
 state = "native"
 owner = "hq-a83688"
@@ -216,12 +221,47 @@ bindings = [
 [homes.agy]
 harness = "agy"
 path = "harnesses/agy/hooks.json"
-bindings = [
-  { event = "SessionStart", lines = [{ policies = ["agy-healing", "claude-profile", "capture-notice"], command = "~/d/hq/harnesses/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice" }] },
-  { event = "SessionStart", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "session-start", subscriber_file = "shared-v0.5.0", outer_ms = 60000, timeout = 60 }] },
-  { event = "PreToolUse", matcher = "run_command", lines = [{ policies = ["agy-healing"], command = "~/d/hq/harnesses/agy/hook PreToolUse" }] },
-  { event = "PreToolUse", matcher = "*", lines = [{ policies = ["relay-hooks", "ops-guard", "familiar"], runtime = "v0.5.0", relay_kind = "before-tool", subscriber_file = "shared-v0.5.0", outer_ms = 60000, timeout = 60 }] },
-  { event = "Stop", lines = [{ policies = ["agy-healing", "claim-guard"], command = "~/d/hq/harnesses/agy/hook Stop" }] },
-  { event = "Stop", lines = [{ policies = ["agy-harness-state-refresh"], command = "~/.local/bin/harness-state-refresh" }] },
-  { event = "Stop", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "turn-end", subscriber_file = "shared-v0.5.0", outer_ms = 60000, timeout = 60 }] },
-]
+
+[[homes.agy.bindings]]
+event = "SessionStart"
+
+[[homes.agy.bindings.lines]]
+policies = ["agy-healing", "claude-profile", "capture-notice"]
+command = "~/d/hq/harnesses/agy/hook"
+runtime = "v0.6.0"
+delegates = [["lore", "hook", "profile-notice"], ["mindful", "notice", "session-start"]]
+states.agy-healing = { state = "bridge", evidence = "tools/test_agy_bridge_session_start.py", activation = "hq-a83688:agy-owner-activation" }
+states.claude-profile = { state = "bridge", evidence = "tools/test_agy_bridge_session_start.py", activation = "hq-a83688:agy-owner-activation" }
+states.capture-notice = { state = "bridge", evidence = "tools/test_agy_bridge_session_start.py", activation = "hq-a83688:agy-owner-activation" }
+
+[[homes.agy.bindings]]
+event = "SessionStart"
+lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "session-start", subscriber_file = "shared-v0.5.0", outer_ms = 60000, timeout = 60 }]
+
+[[homes.agy.bindings]]
+event = "PreToolUse"
+matcher = "run_command"
+lines = [{ policies = ["agy-healing"], command = "~/d/hq/harnesses/agy/hook PreToolUse" }]
+
+[[homes.agy.bindings]]
+event = "PreToolUse"
+matcher = "*"
+lines = [{ policies = ["relay-hooks", "ops-guard", "familiar"], runtime = "v0.5.0", relay_kind = "before-tool", subscriber_file = "shared-v0.5.0", outer_ms = 60000, timeout = 60 }]
+
+[[homes.agy.bindings]]
+event = "Stop"
+
+[[homes.agy.bindings.lines]]
+policies = ["claim-guard"]
+command = "~/d/hq/harnesses/agy/hook"
+runtime = "v0.5.0"
+delegates = [["tasks", "hook", "claim-guard"]]
+states.claim-guard = { state = "bridge", evidence = "tools/test_agy_bridge_stop.py", activation = "hq-a83688:agy-owner-activation" }
+
+[[homes.agy.bindings]]
+event = "Stop"
+lines = [{ policies = ["agy-healing", "agy-harness-state-refresh"], command = "~/.local/bin/harness-state-refresh" }]
+
+[[homes.agy.bindings]]
+event = "Stop"
+lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "turn-end", subscriber_file = "shared-v0.5.0", outer_ms = 60000, timeout = 60 }]

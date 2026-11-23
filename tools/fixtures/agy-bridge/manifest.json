@@ -1,0 +1,12 @@
+{
+  "repository": "tasks",
+  "commit": "000a65d134b293a5a08e53beb1cb1abc8723df39",
+  "source": "tests/fixtures/hooks/cases.json",
+  "source_sha256": "13536adc7a958f68e80619119632e98e66a31b3d5d1a7374819b70aec31883d4",
+  "selection": {
+    "harness": "agy",
+    "event": "Stop"
+  },
+  "case_count": 70,
+  "cases_sha256": "2014c9ac384ee4adb7cc4dfcd96c79c819dad7f3ce611e86ed98523bb5842891"
+}

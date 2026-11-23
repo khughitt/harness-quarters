@@ -1,6 +1,7 @@
 """Read the declared hook routes and their rendering inputs."""
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+import shlex
 import tomllib
 from typing import Literal
 
@@ -140,6 +141,9 @@ class _Runtime:
     def argv(self, home: Path) -> tuple[str, str]:
         return expand_path(self.command, home), expand_path(self.script, home)
 
+    def package_dir(self, home: Path) -> Path:
+        return Path(expand_path(self.script, home)).parent.parent
+
 
 @dataclass(frozen=True)
 class Table:
@@ -273,6 +277,15 @@ def _validate_structure(table, *, required_outputs):
                             or not line.command or line.runtime not in table.runtimes
                             or not line.delegates or line.subscriber_file is not None):
                         raise ValueError(f"{where}: agy bridge needs a command, ordered delegates and a known runtime")
+                    launcher = shlex.split(line.command)
+                    if len(launcher) != 1 or not launcher[0]:
+                        raise ValueError(f"{where}: bridge command must contain only the launcher")
+                    if any(not argv[0] or "/" in argv[0] for argv in line.delegates):
+                        raise ValueError(f"{where}: bridge delegates must name commands on PATH")
+                    if len(set(line.delegates)) != len(line.delegates):
+                        raise ValueError(f"{where}: duplicate delegate command")
+                    if binding.event == "Stop" and len(line.delegates) != 1:
+                        raise ValueError(f"{where}: Stop bridge requires one guard command on PATH")
                 elif (line.runtime not in table.runtimes or line.subscriber_file not in files
                       or line.delegates or not (line.outer_ms and line.timeout)):
                     raise ValueError(f"{where}: relay line needs a known runtime and subscriber file, budget and timeout")

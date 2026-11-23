@@ -67,6 +67,21 @@ def relay_entries(file):
     return entries
 
 
+def expected_agy_bridge(event):
+    # The checked-in homes can differ from the account running hosted tests.
+    relay = next(hook for _, _, hook in hook_entries(FILES[1])
+                 if parse_relay_command(hook['command'], 'v0.5.0'))
+    runtime_root = Path(shlex.split(relay['command'])[1]).parents[4]
+    if event == 'SessionStart':
+        args = [event, '--runtime', str(runtime_root / 'v0.6.0/node_modules/relay'),
+                '--delegate', 'lore hook profile-notice', '--delegate', 'mindful notice session-start']
+    else:
+        assert event == 'Stop'
+        args = [event, '--runtime', str(runtime_root / 'v0.5.0/node_modules/relay'),
+                '--guard', 'tasks hook claim-guard']
+    return '~/d/hq/harnesses/agy/hook ' + shlex.join(args)
+
+
 def test_claude_relay_events():
     assert relay_entries(FILES[0]) == [
         ('SessionStart', 'startup|resume', 'claude-code', 600000, 'SessionStart', 600),
@@ -133,9 +148,9 @@ def test_native_entries_kept_in_order(file):
         }
     elif file == FILES[3]:
         assert native == {
-            'SessionStart': ['~/d/hq/harnesses/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice'],
+            'SessionStart': [expected_agy_bridge('SessionStart')],
             'PreToolUse': ['~/d/hq/harnesses/agy/hook PreToolUse'],
-            'Stop': ['~/d/hq/harnesses/agy/hook Stop', '~/.local/bin/harness-state-refresh'],
+            'Stop': [expected_agy_bridge('Stop'), '~/.local/bin/harness-state-refresh'],
         }
     else:
         session_start = ['~/d/lore/hooks/claude-profile']

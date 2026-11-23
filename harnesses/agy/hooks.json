@@ -4,7 +4,7 @@
     "SessionStart": [
       {
         "type": "command",
-        "command": "~/d/hq/harnesses/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice"
+        "command": "~/d/hq/harnesses/agy/hook SessionStart --runtime /home/keith/.local/share/relay/v0.6.0/node_modules/relay --delegate 'lore hook profile-notice' --delegate 'mindful notice session-start'"
       },
       {
         "type": "command",
@@ -36,7 +36,7 @@
     "Stop": [
       {
         "type": "command",
-        "command": "~/d/hq/harnesses/agy/hook Stop"
+        "command": "~/d/hq/harnesses/agy/hook Stop --runtime /home/keith/.local/share/relay/v0.5.0/node_modules/relay --guard 'tasks hook claim-guard'"
       },
       {
         "type": "command",

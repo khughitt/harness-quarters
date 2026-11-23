@@ -8,17 +8,18 @@ import tomllib
 
 import pytest
 
+from test_relay_wiring import expected_agy_bridge
+
 ROOT = Path(__file__).resolve().parents[1]
 HOOK = ROOT / "harnesses/agy" / "hook"
 HOOKS_JSON = ROOT / "harnesses/agy" / "hooks.json"
 CONV_ID = "1e9adf4a-ae3b-4261-896c-648dd48c3388"
-SUB_ID = "abb9b545-1003-45c7-9ddf-07a269c1ff5c"
 
 
-def clean_env(**overrides):
+def clean_env(*, HOME, **overrides):
     env = {
         "PATH": os.environ["PATH"],
-        "HOME": str(overrides.pop("HOME", "/nonexistent")),
+        "HOME": str(HOME),
         "PYTHONDONTWRITEBYTECODE": "1",
     }
     for key, value in overrides.items():
@@ -44,40 +45,6 @@ def run_hook(args, payload, cwd: Path, **env_overrides):
         text=True,
         timeout=10,
     )
-
-
-def write_facts_fixture(path: Path, wake_status="probed", wake_value=True, kinds_status="probed"):
-    wake_entry = (
-        f'status = "probed"\nvalue = {"true" if wake_value else "false"}\n'
-        'version = "1.4.12"\ndate = 2026-10-31\nevidence = "hq-e72097"\n'
-        'note = "Interactive terminal session probe: controller woke after child completion."\n'
-        if wake_status == "probed"
-        else 'status = "unknown"\n'
-    )
-    kinds_entry = (
-        'status = "probed"\nvalue = ["shell", "subagent"]\n'
-        'version = "1.4.12"\ndate = 2026-10-31\nevidence = "hq-e72097"\n'
-        'note = "Interactive terminal session probe: shell and subagent children woke controller."\n'
-        if kinds_status == "probed"
-        else 'status = "unknown"\n'
-    )
-    base = (ROOT / "facts" / "capabilities.toml").read_text()
-    doc = tomllib.loads(base)
-    slugs = list(tomllib.loads((ROOT / "harnesses.toml").read_text())["harnesses"])
-    lines = ["schema = 1\n"]
-    for fact_name, fact in doc["facts"].items():
-        lines.append(f"\n[facts.{fact_name}]\n")
-        lines.append(f'type = {json.dumps(fact["type"])}\n')
-        lines.append(f'description = {json.dumps(fact["description"])}\n')
-        if "probe" in fact:
-            lines.append(f'probe = {json.dumps(fact["probe"])}\n')
-        for harness in slugs:
-            if harness == "agy" and fact_name == "controller-wake":
-                lines.append(f"\n[facts.{fact_name}.harness.{harness}]\n{wake_entry}")
-            elif harness == "agy" and fact_name == "controller-wake-kinds":
-                lines.append(f"\n[facts.{fact_name}.harness.{harness}]\n{kinds_entry}")
-    path.write_text("".join(lines))
-    return path
 
 
 def test_hooks_json_declares_session_start_pre_tool_use_and_stop():
@@ -106,12 +73,7 @@ def test_hooks_json_declares_session_start_pre_tool_use_and_stop():
     session_start = hq["SessionStart"]
     assert len(session_start) == 2
     assert session_start[0]["type"] == "command"
-    ss_parts = session_start[0]["command"].split()
-    assert len(ss_parts) == 4
-    assert ss_parts[0].endswith("/hq/harnesses/agy/hook")
-    assert ss_parts[1] == "SessionStart"
-    assert ss_parts[2].endswith("/lore/hooks/claude-profile")
-    assert ss_parts[3].endswith("/ops/hooks/capture-notice")
+    assert session_start[0]["command"] == expected_agy_bridge("SessionStart")
     assert_relay_handler(session_start[1], "SessionStart")
 
     pre_tool = hq["PreToolUse"]
@@ -120,7 +82,7 @@ def test_hooks_json_declares_session_start_pre_tool_use_and_stop():
     pt_heal = pre_tool[0]["hooks"]
     assert len(pt_heal) == 1
     assert pt_heal[0]["type"] == "command"
-    assert pt_heal[0]["command"].split() == [ss_parts[0], "PreToolUse"]
+    assert pt_heal[0]["command"].split() == [shlex.split(session_start[0]["command"])[0], "PreToolUse"]
     assert pre_tool[1]["matcher"] == "*"
     pt_relay = pre_tool[1]["hooks"]
     assert len(pt_relay) == 1
@@ -129,7 +91,7 @@ def test_hooks_json_declares_session_start_pre_tool_use_and_stop():
     stop = hq["Stop"]
     assert len(stop) == 3
     assert stop[0]["type"] == "command"
-    assert stop[0]["command"].split() == [ss_parts[0], "Stop"]
+    assert stop[0]["command"] == expected_agy_bridge("Stop")
     assert stop[1] == {"type": "command", "command": "~/.local/bin/harness-state-refresh"}
     assert_relay_handler(stop[2], "Stop")
 
@@ -137,119 +99,24 @@ def test_hooks_json_declares_session_start_pre_tool_use_and_stop():
     assert manifest["harness"]["agy-config"]["links"]["hooks.json"] == "harnesses/agy/hooks.json"
 
 
-def test_session_start_combines_profile_and_capture_notice_into_inject_steps(tmp_path):
-    hook_cwd = tmp_path / "gemini-config"
-    hook_cwd.mkdir()
-    workspace = tmp_path / "workspace"
-    workspace.mkdir()
-    transcript = tmp_path / "brain" / "transcript_full.jsonl"
-    env_leak = tmp_path / "claude_env"
-
-    profile = write_script(
-        tmp_path / "profile-hook",
-        """import json, os, sys
-data = json.loads(sys.stdin.read())
-assert data == {"cwd": os.environ["EXP_CWD"], "transcript_path": os.environ["EXP_TRANSCRIPT"]}
-assert os.getcwd() == os.environ["EXP_CWD"]
-assert "CLAUDE_ENV_FILE" not in os.environ
-sys.stdout.write("profile: personal\\nfragment line\\n")
-""",
-    )
-    capture = write_script(
-        tmp_path / "capture-hook",
-        """import sys
-sys.stdout.write("captures: 2 awaiting triage\\n")
-""",
-    )
-
-    payload = {
-        "conversationId": CONV_ID,
-        "transcriptPath": str(transcript),
-        "workspacePaths": [str(workspace)],
-    }
-    res = run_hook(
-        ["SessionStart", str(profile), str(capture)],
-        payload,
-        cwd=hook_cwd,
-        HOME=tmp_path,
-        CLAUDE_ENV_FILE=env_leak,
-        EXP_CWD=workspace,
-        EXP_TRANSCRIPT=transcript,
-    )
-    assert res.returncode == 0
-    assert not env_leak.exists()
-    out = json.loads(res.stdout)
-    assert out == {
-        "injectSteps": [
-            {
-                "systemMessage": {
-                    "systemMessage": "profile: personal\nfragment line\n\ncaptures: 2 awaiting triage"
-                }
-            }
-        ]
-    }
-
-
-def test_session_start_returns_empty_object_when_delegates_emit_nothing(tmp_path):
-    workspace = tmp_path / "workspace"
-    workspace.mkdir()
-    silent = write_script(tmp_path / "silent", "import sys; sys.exit(0)")
-    res = run_hook(
-        ["SessionStart", str(silent)],
-        {"conversationId": CONV_ID, "workspacePaths": [str(workspace)]},
-        cwd=tmp_path,
-        HOME=tmp_path,
-    )
-    assert res.returncode == 0
-    assert json.loads(res.stdout) == {}
-
-
-def test_session_start_surfaces_missing_workspace_and_delegate_failure_without_blocking(tmp_path):
-    hook_cwd = tmp_path / "gemini-config"
-    hook_cwd.mkdir()
-    # Real claude-profile resolves fallback os.getcwd() when cwd is null; SessionStart must not call it when workspacePaths is missing.
-    profile_probe = write_script(
-        tmp_path / "claude-profile",
-        "import os, sys; sys.stdout.write(f'profile: external from {os.getcwd()}\\n')",
-    )
-    broken = write_script(tmp_path / "broken", "import sys; sys.stderr.write('boom\\n'); sys.exit(2)")
-    res = run_hook(
-        ["SessionStart", str(profile_probe), str(broken)],
-        {"conversationId": CONV_ID, "workspacePaths": []},
-        cwd=hook_cwd,
-        HOME=tmp_path,
-    )
-    assert res.returncode == 0
-    msg = json.loads(res.stdout)["injectSteps"][0]["systemMessage"]["systemMessage"]
-    assert "profile: unresolved" in msg
-    assert "workspacePaths" in msg
-    assert "profile: external" not in msg
-    assert "broken" in msg
-
-    empty_res = run_hook(
-        ["SessionStart", str(profile_probe)],
-        "   ",
-        cwd=hook_cwd,
-        HOME=tmp_path,
-    )
-    assert empty_res.returncode == 0
-    empty_msg = json.loads(empty_res.stdout)["injectSteps"][0]["systemMessage"]["systemMessage"]
-    assert "profile: unresolved" in empty_msg
-    assert "profile: external" not in empty_msg
-
-    workspace = tmp_path / "workspace"
-    workspace.mkdir()
-    missing_profile = tmp_path / "claude-profile-dir" / "claude-profile"
-    miss_res = run_hook(
-        ["SessionStart", str(missing_profile)],
-        {"conversationId": CONV_ID, "workspacePaths": [str(workspace)]},
-        cwd=hook_cwd,
-        HOME=tmp_path,
-    )
-    assert miss_res.returncode == 0
-    miss_msg = json.loads(miss_res.stdout)["injectSteps"][0]["systemMessage"]["systemMessage"]
-    assert miss_msg.startswith("profile: unresolved — ")
-    assert "run ops-profile session" in miss_msg
+@pytest.mark.parametrize("arguments", [
+    ["SessionStart", "retired-profile", "retired-capture"],
+    ["Stop"],
+    ["Stop", "--tasks", "retired-tasks", "--facts-file", "retired-facts"],
+])
+def test_retired_bridge_modes_return_usage_before_dispatch(tmp_path, arguments):
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    (binaries / "python3").symlink_to(sys.executable)
+    called = tmp_path / "called"
+    for name in ("retired-profile", "retired-capture", "retired-tasks", "tasks"):
+        write_script(binaries / name, f"from pathlib import Path\nPath({str(called)!r}).touch()")
+    result = run_hook(arguments, {"workspacePaths": [str(tmp_path)], "conversationId": CONV_ID},
+                      cwd=tmp_path, PATH=binaries, HOME=tmp_path)
+    assert result.returncode == 2
+    assert "usage:" in result.stderr
+    assert result.stdout == ""
+    assert not called.exists()
 
 
 def test_pre_tool_use_emits_empty_stdout_noop_and_rejects_extra_args(tmp_path):
@@ -425,7 +292,10 @@ sys.exit(res.returncode)
     assert missing_ws.returncode == 0
     assert json.loads(missing_ws.stdout)["decision"] == "deny"
 
-    st = invoke_relay("Stop", stop_payload(workspace=str(workspace)))
+    st = invoke_relay("Stop", {
+        "conversationId": CONV_ID, "executionNum": 0, "fullyIdle": True,
+        "terminationReason": "NO_TOOL_CALL", "error": "", "workspacePaths": [str(workspace)],
+    })
     assert st.returncode == 0, st.stderr
     assert st.stdout == ""
     snapshot = json.loads((relay_state / "agents.json").read_text())
@@ -446,263 +316,14 @@ sys.exit(res.returncode)
     ]
 
 
-def write_tasks_stub(path: Path, claims) -> Path:
-    return write_script(
-        path,
-        f"""import json, sys
-assert sys.argv[1:] == ["--json", "claims", "--all-projects"]
-sys.stdout.write(json.dumps({{"claims": {claims!r}}}))
-""",
-    )
+def notice_runtime():
+    root = Path(os.environ.get("HQ_TEST_RELAY_ROOT", Path.home() / ".local/share/relay"))
+    return root / "v0.6.0/node_modules/relay"
 
 
-def stop_payload(conv_id=CONV_ID, execution_num=0, fully_idle=True, reason="NO_TOOL_CALL", workspace="/tmp/ws"):
-    return {
-        "conversationId": conv_id,
-        "executionNum": execution_num,
-        "fullyIdle": fully_idle,
-        "terminationReason": reason,
-        "error": "",
-        "workspacePaths": [workspace],
-    }
-
-
-def test_stop_allows_when_no_live_claim_matches_conversation(tmp_path):
-    tasks_bin = write_tasks_stub(
-        tmp_path / "tasks",
-        [
-            {
-                "id": "hq-111111",
-                "prefix": "hq",
-                "session": "agy:other-conv",
-                "live": True,
-                "host": "box",
-                "worktree": "/tmp/wt1",
-            },
-            {
-                "id": "hq-222222",
-                "prefix": "hq",
-                "session": f"agy:{CONV_ID}",
-                "live": False,
-                "host": "box",
-                "worktree": "/tmp/wt2",
-            },
-        ],
-    )
-    facts = write_facts_fixture(tmp_path / "capabilities.toml")
-    res = run_hook(
-        ["Stop", "--tasks", str(tasks_bin), "--facts-file", str(facts)],
-        stop_payload(),
-        cwd=tmp_path,
-        HOME=tmp_path,
-    )
-    assert res.returncode == 0
-    assert json.loads(res.stdout) == {}
-
-
-@pytest.mark.parametrize("session_value", [f"agy:{CONV_ID}", CONV_ID])
-def test_stop_blocks_once_when_live_claim_held_and_fully_idle(tmp_path, session_value):
-    tasks_bin = write_tasks_stub(
-        tmp_path / "tasks",
-        [
-            {
-                "id": "hq-e72097",
-                "prefix": "hq",
-                "session": session_value,
-                "live": True,
-                "host": "box",
-                "worktree": "/tmp/worktree-hq",
-            }
-        ],
-    )
-    facts = write_facts_fixture(tmp_path / "capabilities.toml")
-    res = run_hook(
-        ["Stop", "--tasks", str(tasks_bin), "--facts-file", str(facts)],
-        stop_payload(execution_num=0, fully_idle=True),
-        cwd=tmp_path,
-        HOME=tmp_path,
-    )
-    assert res.returncode == 0
-    reply = json.loads(res.stdout)
-    assert reply["decision"] == "continue"
-    assert "`hq-e72097` in `/tmp/worktree-hq`" in reply["reason"]
-    assert "(1) Continue" in reply["reason"]
-    assert "tasks park" in reply["reason"]
-    assert "tasks done" in reply["reason"]
-    assert "never does" not in reply["reason"]
-    assert "ops-33cef9" in reply["reason"]
-
-
-def test_stop_allows_retry_when_execution_num_positive(tmp_path):
-    broken_tasks = write_script(tmp_path / "tasks", "import sys; sys.exit(1)")
-    res = run_hook(
-        ["Stop", "--tasks", str(broken_tasks)],
-        stop_payload(execution_num=1, fully_idle=True),
-        cwd=tmp_path,
-        HOME=tmp_path,
-    )
-    assert res.returncode == 0
-    assert json.loads(res.stdout) == {}
-
-
-@pytest.mark.parametrize("term_reason", ["ERROR", "USER_CANCELED", "MAX_INVOCATIONS", "MAX_TOKEN_BUDGET_EXCEEDED"])
-def test_stop_allows_non_normal_termination_reasons(tmp_path, term_reason):
-    tasks_bin = write_tasks_stub(
-        tmp_path / "tasks",
-        [
-            {
-                "id": "hq-e72097",
-                "prefix": "hq",
-                "session": f"agy:{CONV_ID}",
-                "live": True,
-                "host": "box",
-                "worktree": "/tmp/wt",
-            }
-        ],
-    )
-    facts = write_facts_fixture(tmp_path / "capabilities.toml")
-    res = run_hook(
-        ["Stop", "--tasks", str(tasks_bin), "--facts-file", str(facts)],
-        stop_payload(execution_num=0, fully_idle=True, reason=term_reason),
-        cwd=tmp_path,
-        HOME=tmp_path,
-    )
-    assert res.returncode == 0
-    assert json.loads(res.stdout) == {}
-
-
-def test_stop_allows_in_flight_waking_child_when_wake_facts_probed(tmp_path):
-    tasks_bin = write_tasks_stub(
-        tmp_path / "tasks",
-        [
-            {
-                "id": "hq-e72097",
-                "prefix": "hq",
-                "session": f"agy:{CONV_ID}",
-                "live": True,
-                "host": "box",
-                "worktree": "/tmp/wt",
-            }
-        ],
-    )
-    facts = write_facts_fixture(tmp_path / "capabilities.toml", wake_status="probed", wake_value=True)
-    res = run_hook(
-        ["Stop", "--tasks", str(tasks_bin), "--facts-file", str(facts)],
-        stop_payload(execution_num=0, fully_idle=False),
-        cwd=tmp_path,
-        HOME=tmp_path,
-    )
-    assert res.returncode == 0
-    assert json.loads(res.stdout) == {}
-
-
-@pytest.mark.parametrize("wake_status,wake_value", [("unknown", True), ("probed", False)])
-def test_stop_blocks_when_fully_idle_false_but_wake_unprobed_or_false(tmp_path, wake_status, wake_value):
-    tasks_bin = write_tasks_stub(
-        tmp_path / "tasks",
-        [
-            {
-                "id": "hq-e72097",
-                "prefix": "hq",
-                "session": f"agy:{CONV_ID}",
-                "live": True,
-                "host": "box",
-                "worktree": "/tmp/wt",
-            }
-        ],
-    )
-    facts = write_facts_fixture(tmp_path / "capabilities.toml", wake_status=wake_status, wake_value=wake_value)
-    res = run_hook(
-        ["Stop", "--tasks", str(tasks_bin), "--facts-file", str(facts)],
-        stop_payload(execution_num=0, fully_idle=False),
-        cwd=tmp_path,
-        HOME=tmp_path,
-    )
-    assert res.returncode == 0
-    assert json.loads(res.stdout)["decision"] == "continue"
-
-
-def test_stop_subagent_conversation_id_is_isolated_from_root_claim(tmp_path):
-    tasks_bin = write_tasks_stub(
-        tmp_path / "tasks",
-        [
-            {
-                "id": "hq-e72097",
-                "prefix": "hq",
-                "session": f"agy:{CONV_ID}",
-                "live": True,
-                "host": "box",
-                "worktree": "/tmp/wt",
-            }
-        ],
-    )
-    facts = write_facts_fixture(tmp_path / "capabilities.toml")
-    sub_res = run_hook(
-        ["Stop", "--tasks", str(tasks_bin), "--facts-file", str(facts)],
-        stop_payload(conv_id=SUB_ID, execution_num=0, fully_idle=True),
-        cwd=tmp_path,
-        HOME=tmp_path,
-    )
-    assert sub_res.returncode == 0
-    assert json.loads(sub_res.stdout) == {}
-
-
-@pytest.mark.parametrize(
-    "payload",
-    [
-        "{bad-json",
-        {"executionNum": 0, "fullyIdle": True, "terminationReason": "NO_TOOL_CALL"},
-    ],
-)
-def test_stop_fails_closed_once_on_malformed_input_or_tasks_error(tmp_path, payload):
-    broken_tasks = write_script(tmp_path / "tasks", "import sys; sys.stderr.write('db error\\n'); sys.exit(2)")
-    res = run_hook(["Stop", "--tasks", str(broken_tasks)], payload, cwd=tmp_path, HOME=tmp_path)
-    assert res.returncode == 0
-    assert json.loads(res.stdout)["decision"] == "continue"
-
-    tasks_err = run_hook(
-        ["Stop", "--tasks", str(broken_tasks)],
-        stop_payload(execution_num=0, fully_idle=True),
-        cwd=tmp_path,
-        HOME=tmp_path,
-    )
-    assert tasks_err.returncode == 0
-    reply = json.loads(tasks_err.stdout)
-    assert reply["decision"] == "continue"
-    assert "claims could not be read" in reply["reason"]
-
-
-def test_stop_reads_shipped_capabilities_toml_by_default(tmp_path):
-    tasks_bin = write_tasks_stub(
-        tmp_path / "tasks",
-        [
-            {
-                "id": "hq-e72097",
-                "prefix": "hq",
-                "session": f"agy:{CONV_ID}",
-                "live": True,
-                "host": "box",
-                "worktree": "/tmp/wt",
-            }
-        ],
-    )
-    in_flight = run_hook(
-        ["Stop", "--tasks", str(tasks_bin)],
-        stop_payload(execution_num=0, fully_idle=False),
-        cwd=tmp_path,
-        HOME=tmp_path,
-    )
-    assert in_flight.returncode == 0
-    assert json.loads(in_flight.stdout) == {}
-
-    idle = run_hook(
-        ["Stop", "--tasks", str(tasks_bin)],
-        stop_payload(execution_num=0, fully_idle=True),
-        cwd=tmp_path,
-        HOME=tmp_path,
-    )
-    assert idle.returncode == 0
-    assert json.loads(idle.stdout)["decision"] == "continue"
+def notice_argv(repo, delegate):
+    return [repo / "harnesses/agy/hook", "SessionStart", "--runtime", notice_runtime(),
+            "--delegate", delegate.name]
 
 
 def make_agy_checkout(tmp_path: Path):
@@ -711,6 +332,7 @@ def make_agy_checkout(tmp_path: Path):
     repo = tmp_path / "hq"
     home = tmp_path / "home"
     (repo / ".githooks").mkdir(parents=True)
+    (repo / "tools").symlink_to(ROOT / "tools", target_is_directory=True)
     for name in ("harness-state-clean", "harness_state.py", "codex-trust", "live-picks", "harness-state-refresh"):
         shutil.copy2(ROOT / ".githooks" / name, repo / ".githooks" / name)
     shutil.copy2(ROOT / "harnesses.toml", repo / "harnesses.toml")
@@ -736,6 +358,7 @@ def make_agy_checkout(tmp_path: Path):
 
     env = clean_env(
         HOME=home,
+        PATH=f"{tmp_path}:{os.defpath}",
         XDG_CONFIG_HOME=home / ".config",
         XDG_STATE_HOME=home / ".local" / "state",
         GIT_CONFIG_NOSYSTEM="1",
@@ -800,10 +423,10 @@ def test_session_start_and_pre_tool_use_heal_detached_settings_before_returning(
             f"""import sys
 from pathlib import Path
 assert Path({str(link)!r}).is_symlink()
-sys.stdout.write("profile: personal\\n")
+print('{{"context":"profile: personal"}}')
 """,
         )
-        argv = [str(repo / "harnesses/agy" / "hook"), "SessionStart", str(delegate)]
+        argv = notice_argv(repo, delegate)
         payload = {"conversationId": CONV_ID, "workspacePaths": [str(workspace)]}
     else:
         argv = [str(repo / "harnesses/agy" / "hook"), "PreToolUse"]
@@ -857,10 +480,10 @@ Path({str(called)!r}).write_text("called\\n")
 sys.exit(99)
 """,
     )
-    silent = write_script(tmp_path / "silent", "import sys; sys.exit(0)")
+    silent = write_script(tmp_path / "silent", "print('{}')")
 
     ss = subprocess.run(
-        [str(repo / "harnesses/agy" / "hook"), "SessionStart", str(silent)],
+        notice_argv(repo, silent),
         input=json.dumps({"conversationId": CONV_ID, "workspacePaths": [str(workspace)]}),
         cwd=str(tmp_path),
         env=env,
@@ -897,8 +520,8 @@ def test_session_start_and_pre_tool_use_do_not_fail_when_detached_refresh_errors
     link.write_text("{corrupt\n")
 
     if event == "SessionStart":
-        delegate = write_script(tmp_path / "profile-stub", 'import sys; sys.stdout.write("profile: personal\\n")')
-        argv = [str(repo / "harnesses/agy" / "hook"), "SessionStart", str(delegate)]
+        delegate = write_script(tmp_path / "profile-stub", """print('{"context":"profile: personal"}')""")
+        argv = notice_argv(repo, delegate)
         payload = {"conversationId": CONV_ID, "workspacePaths": [str(workspace)]}
     else:
         argv = [str(repo / "harnesses/agy" / "hook"), "PreToolUse"]

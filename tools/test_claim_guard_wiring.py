@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from test_relay_wiring import HOOK_VERSIONS, parse_relay_command
+from hook_routes.table import load
+from test_relay_wiring import HOOK_VERSIONS, expected_agy_bridge, parse_relay_command
 
 ROOT = Path(__file__).resolve().parents[1]
 COMMAND = '~/d/ops/hooks/claim-guard --harness codex'
@@ -71,7 +72,7 @@ def test_agy_home_guards_pretooluse_and_stop():
     stop = [(h['command'], h.get('timeout')) for h in hooks['Stop'] if h.get('type') == 'command']
     assert len(stop) == 3
     assert stop[:2] == [
-        ('~/d/hq/harnesses/agy/hook Stop', None),
+        (expected_agy_bridge('Stop'), None),
         ('~/.local/bin/harness-state-refresh', None),
     ]
     assert stop[2][1] == 60
@@ -79,3 +80,16 @@ def test_agy_home_guards_pretooluse_and_stop():
 
     manifest = tomllib.loads((ROOT / 'links.toml').read_text())
     assert manifest['harness']['agy-config']['links']['hooks.json'] == 'harnesses/agy/hooks.json'
+
+
+def test_agy_healing_and_claim_guard_follow_their_executing_commands():
+    table = load(ROOT / 'harnesses/hook-routes.toml')
+    lines = [(binding.event, line) for binding in table.homes['agy'].bindings for line in binding.lines]
+    healing = [(event, line.kind, line.command) for event, line in lines if 'agy-healing' in line.policies]
+    assert healing == [
+        ('SessionStart', 'bridge', '~/d/hq/harnesses/agy/hook'),
+        ('PreToolUse', 'native', '~/d/hq/harnesses/agy/hook PreToolUse'),
+        ('Stop', 'native', '~/.local/bin/harness-state-refresh'),
+    ]
+    [guard] = [line for event, line in lines if event == 'Stop' and 'claim-guard' in line.policies]
+    assert guard.kind == 'bridge' and guard.delegates == (('tasks', 'hook', 'claim-guard'),)

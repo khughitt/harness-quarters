@@ -87,7 +87,7 @@ from TT_JUNIT_DIR after the wrapper returns.
 The workflow uses ubuntu-24.04, sets PYTEST_XDIST_AUTO_NUM_WORKERS="2" (satisfying the
 suite driver's positive-integer check while both partitions run serially) and a finite 60-minute
 job limit. It pins uv 0.13.7, just 1.59.0, Node 26.13.0, Rust 1.99.1 and public
-tasks commit 85d88d497130050527a140c1c99e047225b161f4. System Python, zsh and
+tasks commit 000a65d134b293a5a08e53beb1cb1abc8723df39. System Python, zsh and
 libatomic1 come from the runner; actual versions are recorded. Setup explicitly
 fetches historical commit 6b434eb206c4464c062137e3600dcd303a543f68, which the
 rollback tests need but advertised branch history does not contain. It installs
@@ -98,9 +98,11 @@ storage route, together with curl for the verified download.
 The disposable runner installs
 tools at the exact /usr/bin paths its fixtures use. It runs setup,
 portable hygiene and the same complete suite, with TT_FORCE=1 at job scope.
-The job runs `just relay-install` with the repository lock in a temporary
-installation root. Qualification and preflight tests require that runtime via
-`HQ_TEST_RELAY_ROOT`. A missing installation there fails the tests.
+The job prepares two relay installations under a temporary `HQ_TEST_RELAY_ROOT`.
+The v0.5.0 hook and qualification tests use the frozen lock from hq commit
+`0bfce24bdc62a91e0376dd39123f074f354310e8`. The standalone launcher and
+SessionStart notice tests use v0.6.0 from the checkout's `just relay-install`.
+The preflight tests exercise both versions. A missing installation there fails the tests.
 All branch pushes and manual dispatch are covered, with no duplicate PR trigger.
 
 The always-run artifact upload retains HQ_TEST_ARTIFACT_DIR for seven days. Its
