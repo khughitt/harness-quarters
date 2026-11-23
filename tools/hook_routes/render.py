@@ -3,6 +3,7 @@ from dataclasses import replace
 from hashlib import sha256
 import json
 from pathlib import Path
+import shlex
 
 from .rules import validate
 from .table import Finding, SubscriberFile, Table, expand_path, load_candidate
@@ -73,6 +74,13 @@ def _quote(value):
 
 
 def _command(table, binding, line, harness, home):
+    if line.kind == "bridge" and binding.event == "Stop":
+        [launcher] = shlex.split(line.command)
+        [guard] = line.delegates
+        package = table.runtimes[line.runtime].package_dir(home)
+        # Keep ~/ relative to the eventual shell's home, as in the native bridge.
+        launcher = ("~/" + shlex.quote(launcher[2:]) if launcher.startswith("~/") else shlex.quote(launcher))
+        return launcher + " " + shlex.join(["Stop", "--runtime", str(package), "--guard", shlex.join(guard)])
     if line.kind in ("native", "bridge"):
         return line.command
     command, script = table.runtimes[line.runtime].argv(home)

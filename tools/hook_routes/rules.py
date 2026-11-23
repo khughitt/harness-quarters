@@ -135,13 +135,18 @@ def route_status(table: Table) -> list[PolicyRoute]:
     return status
 
 
-def _repository_tokens(table, line, home, render_home):
+def _repository_tokens(table, binding, line, home, render_home):
     args = []
     if line.command is not None:
         command = shlex.split(line.command)
         if line.kind == "bridge" and home.harness == "agy" and command:
             # The bridge shell expands a leading ~/ in the literal command it receives.
-            transport_home = Path.home() if line.command.lstrip().startswith("~/") else render_home
+            if binding.event == "Stop":
+                args.append(str(table.runtimes[line.runtime].package_dir(render_home)))
+                uses_shell_home = command[0].startswith("~/")
+            else:
+                uses_shell_home = line.command.lstrip().startswith("~/")
+            transport_home = Path.home() if uses_shell_home else render_home
             if _repository_paths(command[0], transport_home) == {_AGY_BRIDGE}:
                 command = command[1:]
         args.extend(command)
@@ -207,7 +212,7 @@ def _check_configuration(table, render_home, *, target, records):
                 findings.append(Finding("route-selection", where, "relay route needs a subscriber on this binding"))
             # A grandfathered path is permitted only if it has a named owner.
             if state is not None and state.kind not in ("native", "existing"):
-                args = _repository_tokens(table, line, home, render_home)
+                args = _repository_tokens(table, binding, line, home, render_home)
                 if args:
                     findings.append(Finding("repository-path", where, f"repository path in {state.kind} route: {args[0]}"))
             key = (name, binding.event, policy)

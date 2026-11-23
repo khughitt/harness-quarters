@@ -1,4 +1,6 @@
 """Exercise the opt-in Stop bridge with relay and isolated guard state."""
+import ctypes
+from dataclasses import replace
 from hashlib import sha256
 import json
 import os
@@ -82,7 +84,9 @@ def test_rendered_stop_bridge_invokes_declared_guard(runtime, sandbox):
     agy = table.homes["agy"]
     index = next(i for i, b in enumerate(agy.bindings) if b.event == "Stop" and
                  any("claim-guard" in line.policies for line in b.lines))
-    command = shlex.join([str(HOOK), "Stop", "--runtime", str(runtime), "--guard", "tasks hook claim-guard"])
+    # Render against the runtime declared for this home, which is test-owned.
+    table.runtimes["v0.5.0"] = replace(table.runtimes["v0.5.0"], script=str(runtime / "bin/relay.js"))
+    command = shlex.quote(str(HOOK))
     candidate = workspace / "candidate.toml"
     candidate.write_text(f'''[[moves]]
 home = "agy"
@@ -100,10 +104,21 @@ state = "bridge"
 evidence = "fixture"
 ''')
     rendered = render_candidate(table, candidate, Path(env["HOME"]))
-    [entry] = [line for line in json.loads(rendered[agy.path])["hq"]["Stop"] if "--guard" in line["command"]]
+    def guard_argv(image):
+        [entry] = [line for line in json.loads(image[agy.path])["hq"]["Stop"] if "--guard" in line["command"]]
+        return shlex.split(entry["command"])
+
+    argv = guard_argv(rendered)
+    assert argv == [str(HOOK), "Stop", "--runtime", str(runtime), "--guard", "tasks hook claim-guard"]
     stub(sandbox, """print('{"decision":"deny","reason":"held claim"}')""")
-    assert invoke(runtime, sandbox, {}, command=shlex.split(entry["command"])) == {
+    assert invoke(runtime, sandbox, {}, command=argv) == {
         "decision": "continue", "reason": "held claim"}
+    moved = workspace / "updated runtime"
+    table.runtimes["v0.5.0"] = replace(table.runtimes["v0.5.0"], script=str(moved / "bin/relay.js"))
+    candidate.write_text(candidate.read_text().replace('"tasks","hook"', '"fixture-tasks","hook"'))
+    changed = render_candidate(table, candidate, Path(env["HOME"]))
+    assert guard_argv(changed) == [str(HOOK), "Stop", "--runtime", str(moved),
+                                   "--guard", "fixture-tasks hook claim-guard"]
 
 
 def test_stop_escape_cancel_invalid_count_owner_missing(runtime, sandbox):
@@ -163,6 +178,47 @@ def test_stop_projection_failure_preserves_refire(sandbox):
     assert invoke(sandbox[0] / "missing-runtime", sandbox, {"executionNum": 1}) == {}
 
 
+@pytest.mark.parametrize(("fields", "inner", "exempt"), [
+    (b'"terminationReason":"USER_CANCELED","executionNum":"unknown"', b'{"text":"[}"}', True),
+    (b'"executionNum":1.0', b'false', True),
+    (b'"executionNum":9007199254740992', b'null', False),
+    (b'"executionNum":1', b'false,', False),
+    (b'"executionNum":1', b'NaN', False),
+])
+def test_deep_metadata_with_unavailable_projection(sandbox, fields, inner, exempt):
+    nested = b'[' * 1800 + inner + b']' * 1800
+    raw = b'{"metadata":' + nested + b',' + fields + b'}'
+    reply = invoke(sandbox[0] / "absent-runtime", sandbox, raw)
+    if exempt:
+        assert reply == {}
+    else:
+        assert reply["decision"] == "continue"
+
+
+def test_escape_when_json_decoder_reaches_its_nesting_limit(monkeypatch):
+    escape = runpy.run_path(str(HOOK))["_owner_failure_exempt"]
+    original = json.loads
+
+    def limited(text, **kwargs):
+        if "[" * 128 in text:
+            raise RecursionError("JSON decoder depth exceeded")
+        return original(text, **kwargs)
+
+    monkeypatch.setattr(json, "loads", limited)
+    raw = '{"executionNum":1,"metadata":' + "[" * 600 + "null" + "]" * 600 + "}"
+    assert escape(raw)
+    assert not escape(raw.replace("null", "null,"))
+
+
+@pytest.mark.parametrize("marks", [1, 2])
+def test_stop_bom_matches_relay(runtime, sandbox, marks):
+    stub(sandbox, """print('{"decision":"allow"}')""")
+    raw = b"\xef\xbb\xbf" * marks + b'{"executionNum":1}'
+    reply = invoke(runtime, sandbox, raw)
+    assert (sandbox[0] / "invoked").exists() == (marks == 1)
+    assert (reply == {}) == (marks == 1)
+
+
 def test_escape_reasons_match_tasks_corpus():
     manifest = json.loads((CORPUS / "manifest.json").read_bytes())
     assert sha256((CORPUS / "cases.json").read_bytes()).hexdigest() == manifest["cases_sha256"]
@@ -207,6 +263,47 @@ def owner(sandbox):
     workspace, env = sandbox
     (Path(env["PATH"]) / "tasks").symlink_to(Path(binary).resolve())
     return workspace, env
+
+
+def test_owner_timeout_reaps_facts_reader_and_child(runtime, owner):
+    workspace, env = owner
+    case = next(case for case in CASES if case["id"] == "agy-own")
+    write_owner_state(case, workspace, env)
+    reader = Path(env["HOME"]) / ".agents/bin/harness-facts"
+    marker = workspace / "facts-pids"
+    release = workspace / "release"
+    child_code = (f"from pathlib import Path\nimport time\nend = time.monotonic() + 15\n"
+                  f"while not Path({str(release)!r}).exists() and time.monotonic() < end: time.sleep(0.02)")
+    reader.write_text(f"""#!{sys.executable}
+import json, os, subprocess, sys
+from pathlib import Path
+env = {{key: os.environ[key] for key in ("HOME", "PATH")}}
+with subprocess.Popen([sys.executable, "-c", {child_code!r}], env=env) as child:
+    Path({str(marker)!r}).write_text(json.dumps([os.getpid(), os.getpgrp(), child.pid]))
+""")
+    # The test adopts only fixture descendants if a cleanup regression occurs.
+    libc = ctypes.CDLL(None, use_errno=True)
+    original = ctypes.c_int()
+    assert libc.prctl(37, ctypes.byref(original), 0, 0, 0) == 0  # PR_GET_CHILD_SUBREAPER
+    assert libc.prctl(36, 1, 0, 0, 0) == 0  # PR_SET_CHILD_SUBREAPER
+    try:
+        native = case["native"].replace("$CWD", json.dumps(str(workspace))[1:-1]).encode()
+        reply = invoke(runtime, owner, native)
+        assert reply["decision"] == "continue" and "timed out" in reply["reason"]
+        reader_pid, group, child_pid = json.loads(marker.read_text())
+        assert group == reader_pid
+        for pid in (reader_pid, child_pid):
+            assert not Path(f"/proc/{pid}").exists(), f"owned facts process {pid} remains after Stop"
+    finally:
+        release.touch()
+        if marker.exists():
+            reader_pid, _, child_pid = json.loads(marker.read_text())
+            for pid in (reader_pid, child_pid):
+                try:
+                    os.waitpid(pid, 0)
+                except ChildProcessError:
+                    pass
+        assert libc.prctl(36, original.value, 0, 0, 0) == 0
 
 
 def test_held_claim_check_repeats_when_agy_becomes_idle(runtime, owner):

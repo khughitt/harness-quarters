@@ -3,6 +3,7 @@ from dataclasses import replace
 from hashlib import sha256
 import json
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import sys
@@ -227,10 +228,12 @@ def test_agy_bridge_allows_hq_transport_and_checks_delegate_paths(table, delegat
 
     state = RouteState("bridge", evidence="bridge-fixtures")
     transport = Path("d", "hq", "harnesses", "agy", "hook")
-    line = Line(("guard",), command=f"{prefix}{transport} Stop",
+    line = Line(("guard",), command=f"{prefix}{transport}",
                 runtime="v0.5.0", delegates=((delegate, "Stop"),), states={"guard": state})
     agy = replace(load(TABLE).homes["agy"], bindings=(Binding("Stop", None, (line,)),))
-    table = replace(table, homes={"agy": agy})
+    package = tmp_path / "runtime"
+    runtime = replace(table.runtimes["v0.5.0"], script=str(package / "bin/relay.js"))
+    table = replace(table, homes={"agy": agy}, runtimes={"v0.5.0": runtime})
     assert _findings(table) == (["repository-path"] if delegate.startswith("~/") else [])
 
     monkeypatch.setenv("HOME", str(tmp_path))
@@ -240,9 +243,11 @@ def test_agy_bridge_allows_hq_transport_and_checks_delegate_paths(table, delegat
             render_next(table, render_home)
     else:
         rendered = render_next(table, render_home)
-        assert json.loads(rendered[agy.path])["hq"]["Stop"][0]["command"] == line.command
+        command = json.loads(rendered[agy.path])["hq"]["Stop"][0]["command"]
+        assert shlex.split(command) == [line.command, "Stop", "--runtime", str(package),
+                                         "--guard", f"{delegate} Stop"]
 
-    other_hook = replace(line, command=f"{prefix}{transport}-other Stop", delegates=(("tasks-stop", "Stop"),))
+    other_hook = replace(line, command=f"{prefix}{transport}-other", delegates=(("tasks-stop", "Stop"),))
     agy = replace(agy, bindings=(Binding("Stop", None, (other_hook,)),))
     with pytest.raises(ValueError, match=f"repository-path: .*{transport}-other"):
         render_next(replace(table, homes={"agy": agy}), render_home)

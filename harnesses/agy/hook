@@ -15,10 +15,13 @@ directory containing hooks.json) for hq-owned state and hooks not yet covered by
   or, with --runtime and --guard, projects the native event for the owner command.
 """
 import argparse
+import ctypes
 import json
 import os
 from pathlib import Path
+import re
 import shlex
+import signal
 import stat
 import subprocess
 import sys
@@ -378,11 +381,50 @@ def _invalid_json_constant(value):
     raise ValueError(f"invalid JSON constant {value}")
 
 
+def _decode_stop(raw):
+    return json.loads(raw, parse_int=float, parse_constant=_invalid_json_constant)
+
+
+def _decode_stop_fields(raw):
+    # Validate in slices of 64 levels. Replace each validated inner container
+    # with null in its parent: only the top-level scalar values are needed.
+    boundary = re.compile(r'["{}\[\]]')
+    pieces = []
+    starts = []
+    depth = start = pos = 0
+    while match := boundary.search(raw, pos):
+        char = match[0]
+        pos = match.end()
+        if char == '"':
+            _, pos = json.decoder.scanstring(raw, pos)
+        elif char in "[{":
+            if depth and depth % 64 == 0:
+                pieces.append(raw[start:match.start()])
+                starts.append(len(pieces))
+                start = match.start()
+            depth += 1
+        else:
+            depth -= 1
+            if depth < 0:
+                raise ValueError("unexpected JSON closing delimiter")
+            if depth and depth % 64 == 0:
+                segment = starts.pop()
+                pieces.append(raw[start:pos])
+                _decode_stop("".join(pieces[segment:]))
+                pieces[segment:] = ["null"]
+                start = pos
+    if depth:
+        raise ValueError("unclosed JSON container")
+    pieces.append(raw[start:])
+    return _decode_stop("".join(pieces))
+
+
 def _owner_failure_exempt(raw):
     # Relay reads JavaScript numbers, including integral decimal and exponent forms.
     try:
-        event = json.loads(raw, parse_int=float, parse_constant=_invalid_json_constant)
-    except (ValueError, RecursionError):
+        raw = raw.removeprefix("\ufeff")  # Relay's UTF-8 TextDecoder consumes one BOM.
+        event = _decode_stop_fields(raw)
+    except ValueError:
         return False
     if not isinstance(event, dict):
         return False
@@ -393,6 +435,29 @@ def _owner_failure_exempt(raw):
     )
 
 
+def _run_owned_guard(argv, envelope, env):
+    # This bridge process supervises one guard. Linux reparents the guard's
+    # separately grouped facts reader and its children here if the guard exits.
+    children = Path("/proc/thread-self/children")
+    with children.open("rb") as owned:
+        libc = ctypes.CDLL(None, use_errno=True)
+        if libc.prctl(36, 1, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER
+            raise OSError(ctypes.get_errno(), "cannot supervise guard descendants")
+        signal.signal(signal.SIGCHLD, signal.SIG_DFL)
+        try:
+            return subprocess.run(argv, input=json.dumps(envelope).encode(), env=env,
+                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=TIMEOUT_S)
+        finally:
+            # run() has reaped the direct guard. Each PID here is now our own
+            # unreaped child. Reaping one parent can reveal a further generation.
+            while children_left := owned.read().split():
+                for value in children_left:
+                    pid = int(value)
+                    os.kill(pid, signal.SIGKILL)
+                    os.waitpid(pid, 0)
+                owned.seek(0)
+
+
 def owner_stop(stdin, runtime, guard, env):
     raw = ""
     stage = "read Stop input"
@@ -400,7 +465,7 @@ def owner_stop(stdin, runtime, guard, env):
         data = stdin.buffer.read(MAX_NATIVE_BYTES + 1)
         if len(data) > MAX_NATIVE_BYTES:
             raise ValueError("native input exceeds 4 MiB")
-        raw = data.decode("utf-8-sig")
+        raw = data.decode("utf-8")
         stage = "project Stop input"
         # The original bridge modes also run in standalone settings-healing fixtures.
         sys.path.insert(0, str(ROOT / "tools"))
@@ -418,8 +483,7 @@ def owner_stop(stdin, runtime, guard, env):
         stage = f"invoke {argv[0]}"
         child_env = {key: env[key] for key in ("PATH", "HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME")
                      if key in env}
-        done = subprocess.run(argv, input=json.dumps(envelope).encode(), env=child_env,
-                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=TIMEOUT_S)
+        done = _run_owned_guard(argv, envelope, child_env)
         if done.returncode:
             raise ValueError(f"exited {done.returncode}")
         stage = "parse guard reply"
