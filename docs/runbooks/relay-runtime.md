@@ -22,9 +22,9 @@ version is installed there. Other hosts cannot see this host's worktrees, so run
 On each host, `just relay-subscribers` runs `tools/hook-routes deploy live`.
 It installs each subscriber file named by the live route table and its reconciliation
 file. The active base is `~/.config/relay/v0.5.0-<digest-prefix>`. Different bytes
-at an existing destination cause a refusal. The previous v0.5.0 file stays in
-`~/.config/relay/v0.5.0` for rollback, and the v0.3.0 schema-1 rollback file
-stays at `~/.config/relay/subscribers.json`. Run `just relay-reap` for reconciliation.
+at an existing destination cause a refusal. A cutover keeps the previous base for
+rollback until the user accepts it and confirms its removal; no rollback base is
+retained now. Run `just relay-reap` for reconciliation.
 It points `XDG_CONFIG_HOME` at the live table's `reconciliation_file` base.
 
 Prepare each hook cutover on every host that shares the settings before
@@ -46,8 +46,8 @@ See [hook routes](../hook-routes.md).
 
 Schema 2 resolves each subscriber's `argv[0]` on `PATH` and passes later arguments
 literally. The active template uses `env` followed by familiar's checkout path
-and the `observe` command. The previous configurations also contain the ops
-command guard for rollback.
+and the `observe` command. The ops command guard is retired and no retained
+configuration names it.
 
 For an isolated rehearsal, set `RELAY_INSTALL_ROOT` to a private scratch directory
 for both `just relay-install` and the worktree's explicit `relay/bin/relay` path.
