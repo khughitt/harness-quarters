@@ -231,7 +231,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/d/ops/hooks/claude-posttooluse"
+            "command": "tt-posttooluse"
           }
         ]
       },
@@ -252,7 +252,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/d/ops/hooks/claude-posttooluse"
+            "command": "tt-posttooluse"
           }
         ]
       },
