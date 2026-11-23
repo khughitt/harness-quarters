@@ -8,7 +8,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-__all__ = ["PATH", "Colour", "Match", "Palette", "PaletteError", "Role", "load"]
+__all__ = ["MATCHES", "PATH", "VERSION", "Colour", "Match", "Palette", "PaletteError", "Role", "load"]
 
 PATH = Path(__file__).resolve().parents[2] / "palette.toml"
 VERSION = 1
@@ -78,8 +78,13 @@ def load(path: Path = PATH) -> Palette:
     except (OSError, tomllib.TOMLDecodeError) as error:
         raise PaletteError(f"{path}: {error}") from None
     _keys(data, "palette", required={"version", "harness", "vendor", "model", "role", "case"})
-    if data["version"] != VERSION:
+    if type(data["version"]) is not int or data["version"] != VERSION:
         raise PaletteError(f"version {data['version']!r} is not {VERSION}")
+    for section in ("harness", "vendor", "model", "role"):
+        if not isinstance(data[section], dict):
+            raise PaletteError(f"{section} is not a table")
+    if not isinstance(data["case"], list):
+        raise PaletteError("case is not an array of tables")
     harnesses, aliases = {}, {}
     for name, entry in data["harness"].items():
         _keys(entry, f"harness.{name}", required={"aliases", "rgb", "xterm", "oklch"})
@@ -99,7 +104,7 @@ def load(path: Path = PATH) -> Palette:
     families, models = {}, {}
     for key, entry in data["model"].items():
         _keys(entry, f"model.{key}", required={"vendor", "family", "rgb", "xterm", "oklch"})
-        if entry["vendor"] not in names:
+        if _string(entry["vendor"], f"model.{key}.vendor") not in names:
             raise PaletteError(f"model.{key}: unknown vendor {entry['vendor']!r}")
         family = _token(entry["family"], f"model.{key}.family")
         if key != f"{names[entry['vendor']]}-{family}":
@@ -113,10 +118,11 @@ def load(path: Path = PATH) -> Palette:
         colour_keys = {"rgb", "xterm", "oklch"}
         has_colour = bool(colour_keys & entry.keys())
         _keys(entry, f"role.{name}", required={"sgr", "meaning"} | (colour_keys if has_colour else set()))
-        if not re.fullmatch(r"(\d+(;\d+)*)?", entry["sgr"]) or not (has_colour or entry["sgr"]):
+        sgr = _string(entry["sgr"], f"role.{name}.sgr")
+        if not re.fullmatch(r"(\d+(;\d+)*)?", sgr) or not (has_colour or sgr):
             raise PaletteError(f"role.{name}: sgr {entry['sgr']!r} is not SGR parameters")
-        roles[name] = Role(_colour(entry, f"role.{name}") if has_colour else None, entry["sgr"],
-                           _strings([entry["meaning"]], f"role.{name}.meaning")[0])
+        roles[name] = Role(_colour(entry, f"role.{name}") if has_colour else None, sgr,
+                           _string(entry["meaning"], f"role.{name}.meaning"))
     cases = []
     for index, entry in enumerate(data["case"]):
         _keys(entry, f"case[{index}]", required={"raw", "expect", "match"})
@@ -140,6 +146,12 @@ def _strings(values: object, where: str) -> list[str]:
     if not isinstance(values, list) or not all(isinstance(v, str) for v in values):
         raise PaletteError(f"{where} is not a list of strings")
     return values
+
+
+def _string(value: object, where: str) -> str:
+    if not isinstance(value, str):
+        raise PaletteError(f"{where}: {value!r} is not a string")
+    return value
 
 
 def _token(value: object, where: str) -> str:

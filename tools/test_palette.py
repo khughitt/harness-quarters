@@ -91,6 +91,11 @@ def test_xterm_stand_ins_are_distinct():
     (('family = "opus"', 'family = "sonnet"'), "is not claude-sonnet"),
     (('aliases = ["claude"]', 'aliases = ["claude"]\nshade = 1'), "unknown ['shade']"),
     (('match = "family"', 'match = "fuzzy"'), "is not one of"),
+    (("version = 1", "version = true"), "version True"),
+    (("version = 1", "version = 1.0"), "version 1.0"),
+    (('vendor = "anthropic"', 'vendor = ["anthropic"]'), "is not a string"),
+    (('sgr = "1"', "sgr = 1"), "is not a string"),
+    (("[harness.claude-code]", "[[harness]]"), "harness is not a table"),
 ])
 def test_load_refuses_a_file_that_breaks_the_contract(tmp_path, edit, message):
     text = palette.PATH.read_text()

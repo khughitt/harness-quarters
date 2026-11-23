@@ -51,15 +51,21 @@ hash or a guess, since that would claim an identity the palette does not hold.
 
 - Colour is decoration. Plain, JSON and other machine output carries identities, never
   colour codes.
-- Whether to colour at all follows the consumer's CLI contract: ops
-  `docs/cli-conventions.md` sets `--color auto|always|never` with `NO_COLOR` and a
-  `<NAME>_COLOR` default.
+- Whether to colour at all: `--color always` and `--color never` win. `auto` colours
+  only when the output stream is a terminal and `NO_COLOR` is unset or empty, as
+  `hq sessions` does. ops `docs/cli-conventions.md` sets the flag's spelling, its default
+  and the `<NAME>_COLOR` override of that default.
 - Use `rgb` when `COLORTERM` is `truecolor` or `24bit`, and `xterm` otherwise.
 - Pad and align plain text first and add escape codes last, so styling never changes
   visible width.
 - Roles mark values, not identities. `alert` adds bold to its red. `muted` is dim
   (SGR 2) with no colour. A value can take a role while its row keeps its identity
   colours.
+- Graphs take no colours of their own. A series that plots one harness or model family
+  uses that identity's colour. Any other series (a total, a rate across identities)
+  prints in the terminal's default colour, or `muted` for idle or absent points. A point
+  that is out of range takes `alert` or `caution`. A dedicated series colour would be a
+  new palette entry and goes to review like any other.
 
 ## Consuming the file
 
