@@ -43,6 +43,11 @@ def initialize(repo):
 
 
 def prepare():
+    home_kind = ".codex-work" if CASE["home"] == "codex-work" else ".codex"
+    transcript = HOME / (".claude/projects/fixture/session.jsonl" if CASE["harness"] == "claude-code"
+                         else f"{home_kind}/sessions/rollout.jsonl")
+    payload = dict(CASE["payload"], cwd=str(CWD), transcript_path=str(transcript))
+    write(ROOT / "payload.json", json.dumps(payload))
     write(ROOT / "environment.json", json.dumps(ENV))
     write(HOME / ".gitconfig", "[user]\n name = Fixture\n email = replay@example.invalid\n")
     projects = ["demo", "lore", "ops"]
@@ -110,7 +115,7 @@ class Queue(BaseHTTPRequestHandler):
 
 
 def invoke(argv, payload):
-    return subprocess.run(argv, input=json.dumps(payload), cwd=CWD, env=ENV, text=True, capture_output=True, timeout=65)
+    return subprocess.run(argv, input=payload, cwd=CWD, env=ENV, text=True, capture_output=True, timeout=65)
 
 
 def observation(policy, context, success, diagnostic):
@@ -140,10 +145,7 @@ def observation(policy, context, success, diagnostic):
 
 
 def exercise(side):
-    home_kind = ".codex-work" if CASE["home"] == "codex-work" else ".codex"
-    transcript = HOME / (".claude/projects/fixture/session.jsonl" if CASE["harness"] == "claude-code"
-                         else f"{home_kind}/sessions/rollout.jsonl")
-    payload = dict(CASE["payload"], cwd=str(CWD), transcript_path=str(transcript))
+    payload = (ROOT / "payload.json").read_text()
     if side == "native":
         answers = {}
         commands = {"profile": SYNC / "lore/hooks/claude-profile", "capture": SYNC / "ops/hooks/capture-notice",
@@ -171,7 +173,17 @@ def exercise(side):
                      "--outer-ms", str(CASE["budget"]), "--subscribers", str(ROOT / "candidate/subscribers.json"),
                      CASE["event"]], payload)
     problems = [s for s in result.stderr.splitlines() if not s.startswith(("SESSION_HANDLE_UNAVAILABLE:", "PROCESS_UNAVAILABLE:"))]
-    if result.returncode or problems:
+    failures = {}
+    global_errors = []
+    selected = CASE["selected"]
+    for diagnostic in problems:
+        prefix, _, detail = diagnostic.partition(": ")
+        name = detail.partition(" ")[0]
+        if prefix in {"NOTICE_FAILED", "NOTICE_DROPPED", "SUBSCRIBER_FAILED", "SUBSCRIBER_SKIPPED"} and name in selected:
+            failures[name] = diagnostic
+        else:
+            global_errors.append(diagnostic)
+    if result.returncode or global_errors:
         diagnostic = f"relay exit {result.returncode}: {result.stderr} native reply: {result.stdout}"
         return {p: {"ok": False, "value": None, "diagnostic": diagnostic} for p in CASE["policies"]}
     reply = json.loads(result.stdout) if result.stdout else {}
@@ -183,7 +195,8 @@ def exercise(side):
     notice_policies = {"profile", "capture", "index", "stale", "halt"}
     contributions = []
     for item in records:
-        if item["stdout"] and CASE["selected"][item["subscriber"]] in notice_policies and item["status"] == 0:
+        if (item["subscriber"] not in failures and item["stdout"] and item["status"] == 0
+                and selected[item["subscriber"]] in notice_policies):
             reply_context = json.loads(item["stdout"]).get("context")
             if reply_context:
                 contributions.append(reply_context)
@@ -191,7 +204,14 @@ def exercise(side):
     if delivered:
         delivered_ok = delivered_ok and reply["hookSpecificOutput"]["hookEventName"] == CASE["event"]
     answers = {}
+    other_failures = [msg for name, msg in failures.items() if selected[name] not in CASE["policies"]]
+    if other_failures:
+        answers["_composition"] = other_failures
     for policy in CASE["policies"]:
+        policy_failures = [msg for name, msg in failures.items() if selected[name] == policy]
+        if policy_failures:
+            answers[policy] = {"ok": False, "value": None, "diagnostic": "\n".join(policy_failures)}
+            continue
         hits = [r for r in records if CASE["selected"][r["subscriber"]] == policy]
         success = len(hits) == 1 and hits[0]["status"] == 0
         context = ""
@@ -202,17 +222,25 @@ def exercise(side):
     return answers
 
 
-if sys.argv[1] == "prepare":
-    print(json.dumps(prepare()))
-elif "capture" in CASE["selected"].values():
-    # Each bwrap invocation owns its loopback device and fixed native API port.
-    with HTTPServer(("127.0.0.1", 3331), Queue) as server:
-        thread = Thread(target=server.serve_forever)
-        thread.start()
-        try:
-            print(json.dumps(exercise(sys.argv[1])))
-        finally:
-            server.shutdown()
-            thread.join()
-else:
-    print(json.dumps(exercise(sys.argv[1])))
+def main(action):
+    if action == "prepare":
+        return prepare()
+    elif "capture" in CASE["selected"].values():
+        # Each bwrap invocation owns its loopback device and fixed native API port.
+        with HTTPServer(("127.0.0.1", 3331), Queue) as server:
+            thread = Thread(target=server.serve_forever)
+            thread.start()
+            try:
+                return exercise(action)
+            finally:
+                server.shutdown()
+                thread.join()
+    else:
+        return exercise(action)
+
+
+if __name__ == "__main__":
+    namespace = os.readlink("/proc/self/ns/pid")
+    if namespace == sys.argv[3] or os.readlink("/proc/1/ns/pid") != namespace:
+        raise ValueError("replay requires a private PID namespace and its own proc filesystem")
+    print(json.dumps(main(sys.argv[1])))

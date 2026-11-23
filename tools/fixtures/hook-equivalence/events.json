@@ -4,48 +4,74 @@
     "version": "2.1.325",
     "sessionMode": "interactive",
     "event": "SessionStart",
-    "source": "relay 1f1c28da62e7867caf3acaddf16ba13079a37e85:test/fixtures/hook-events/claude-code.SessionStart.input.json",
     "payload": {
       "hook_event_name": "SessionStart",
       "session_id": "fixture-session",
       "source": "startup"
-    }
+    },
+    "upstream": "relay 1f1c28da62e7867caf3acaddf16ba13079a37e85:test/fixtures/hook-events/claude-code.SessionStart.input.json",
+    "changes": [
+      "session_id replaced with fixture-session",
+      "cwd replaced with the fixture checkout",
+      "model omitted for synthetic provenance",
+      "transcript_path replaced with the fixture home path",
+      "scratchpad_dir omitted"
+    ]
   },
   {
     "harness": "claude-code",
     "version": "2.1.325",
     "sessionMode": "interactive",
     "event": "Stop",
-    "source": "relay 1f1c28da62e7867caf3acaddf16ba13079a37e85:test/fixtures/hook-events/claude-code.Stop.input.json",
     "payload": {
       "hook_event_name": "Stop",
       "session_id": "fixture-session",
       "stop_hook_active": false,
       "background_tasks": []
-    }
+    },
+    "upstream": "relay 1f1c28da62e7867caf3acaddf16ba13079a37e85:test/fixtures/hook-events/claude-code.Stop.input.json",
+    "changes": [
+      "session_id replaced with fixture-session",
+      "cwd replaced with the fixture checkout",
+      "background_tasks replaced with an empty list",
+      "session_crons omitted",
+      "fixture transcript_path added"
+    ]
   },
   {
     "harness": "codex",
     "version": "0.168.0",
     "sessionMode": "interactive",
     "event": "SessionStart",
-    "source": "relay 1f1c28da62e7867caf3acaddf16ba13079a37e85:test/fixtures/hook-events/codex.SessionStart.input.json",
     "payload": {
       "hook_event_name": "SessionStart",
       "session_id": "fixture-session",
       "source": "startup"
-    }
+    },
+    "upstream": "relay 1f1c28da62e7867caf3acaddf16ba13079a37e85:test/fixtures/hook-events/codex.SessionStart.input.json",
+    "changes": [
+      "session_id replaced with fixture-session",
+      "cwd replaced with the fixture checkout",
+      "model omitted for synthetic provenance",
+      "transcript_path replaced with the fixture home path"
+    ]
   },
   {
     "harness": "codex",
     "version": "0.168.0",
     "sessionMode": "interactive",
     "event": "Stop",
-    "source": "relay 1f1c28da62e7867caf3acaddf16ba13079a37e85:test/fixtures/hook-events/codex.Stop.input.json",
     "payload": {
       "hook_event_name": "Stop",
       "session_id": "fixture-session",
       "stop_hook_active": false
-    }
+    },
+    "upstream": "relay 1f1c28da62e7867caf3acaddf16ba13079a37e85:test/fixtures/hook-events/codex.Stop.input.json",
+    "changes": [
+      "session_id replaced with fixture-session",
+      "cwd replaced with the fixture checkout",
+      "stop_hook_active changed from true to false",
+      "fixture transcript_path added"
+    ]
   }
 ]

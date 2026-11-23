@@ -45,8 +45,8 @@ class EvidenceLine:
 
 def _corpus(path):
     identity = ("harness", "version", "sessionMode", "event")
-    events = {tuple(event[key] for key in identity): event
-              for event in json.loads((FIXTURES / "events.json").read_bytes())}
+    templates = (FIXTURES / "events.json").read_bytes()
+    events = {tuple(event[key] for key in identity): event for event in json.loads(templates)}
     rows = json.loads((path / "cases.json" if path.is_dir() else path).read_bytes())
     if not isinstance(rows, list) or not rows:
         raise ValueError("empty or invalid replay corpus")
@@ -65,7 +65,9 @@ def _corpus(path):
         if target not in events:
             raise ValueError(f"unrecorded fixture identity: {target}")
         row["payload"] = events[target]["payload"]
-        row["payloadSource"] = events[target]["source"]
+        row["upstream"] = events[target]["upstream"]
+        row["changes"] = events[target]["changes"]
+        row["templateSha256"] = sha256(templates).hexdigest()
     return rows
 
 
@@ -184,15 +186,16 @@ def _assets(table, root, path_env, selected, home):
     if policies & {"profile", "stale"}:
         found = shutil.which("lore", path=path_env)
         source = Path(found).resolve() if found else lore / "bin/lore"
-        if (source.parent.parent / "src/lore").is_dir():
-            lore = source.parent.parent
-            for name in ("src/lore", "profiles", "hooks/claude-profile"):
-                _copy(lore / name, dest / "lore" / name)
-        _copy(source, dest / "lore/bin/lore")
+        # Today's oracle belongs to the deployed checkout, independently of PATH.
+        for name in ("src/lore", "profiles", "bin/lore", "hooks/claude-profile"):
+            _copy(lore / name, dest / "lore" / name)
+        owner = root / "replacement-lore"
+        owner_root = source.parent.parent
+        if (owner_root / "src/lore").is_dir():
+            for name in ("src/lore", "profiles"):
+                _copy(owner_root / name, owner / name)
+        _copy(source, owner / "bin/lore")
         (root / "owners/lore").symlink_to("../home/d/lore/bin/lore")
-        native = shutil.which("claude-profile", path=path_env)
-        if native and not (dest / "lore/hooks/claude-profile").exists():
-            _copy(Path(native), dest / "lore/hooks/claude-profile")
     if policies & {"stale", "index"}:
         for name in ("hooks/claude-sessionstart", "bin/git-index-health", "bin/linked.py"):
             _copy(ops / name, dest / "ops" / name)
@@ -224,10 +227,9 @@ def _assets(table, root, path_env, selected, home):
 
 
 def _sandbox(tree, binds, action, payload=None):
-    # The native capture endpoint and existing absolute observer argv cannot be
-    # redirected by environment alone. Other owners need only the private tree.
-    mounted = any(target != Path("/packages/relay") for _, target in binds)
-    root = Path("/fixture") if mounted else tree.resolve()
+    # Admission reads config, while a real hook identifies its invoking harness
+    # from /proc. Every execution side uses the same private namespace layout.
+    root = tree.resolve() if action == "budget" else Path("/fixture")
     home = root / "home"
     env = {"HOME": str(home), "PATH": f"{root}/fixture-bin:/usr/bin", "LANG": "C.UTF-8",
            "XDG_CONFIG_HOME": str(home / ".config"), "XDG_DATA_HOME": str(home / ".local/share"),
@@ -236,8 +238,6 @@ def _sandbox(tree, binds, action, payload=None):
     package = next(source for source, target in binds if target == Path("/packages/relay"))
     if action == "budget":
         command = ["/usr/bin/node", Path(__file__).with_name("relay_call.mjs"), package, "budget"]
-    elif not mounted:
-        command = ["/usr/bin/python3", FIXTURES / "exercise.py", action, package]
     else:
         command = ["/usr/bin/bwrap", "--unshare-all", "--die-with-parent", "--new-session", "--ro-bind", "/usr", "/usr",
                    "--symlink", "usr/bin", "/bin", "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
@@ -246,7 +246,8 @@ def _sandbox(tree, binds, action, payload=None):
                    "--ro-bind", str(FIXTURES / "hosts"), "/etc/hosts"]
         for source, target in binds:
             command.extend(["--ro-bind", str(source), str(target)])
-        command.extend(["--chdir", "/fixture", "--", "/usr/bin/python3", "/exercise.py", action, "/packages/relay"])
+        command.extend(["--chdir", "/fixture", "--", "/usr/bin/python3", "/exercise.py", action, "/packages/relay",
+                        os.readlink("/proc/self/ns/pid")])
     result = subprocess.run(command, env=env, cwd=tree, input=json.dumps(payload), capture_output=True,
                             text=True, timeout=90)
     if result.returncode:
@@ -280,17 +281,32 @@ def run(table, next_dir: Path, cases: Path, *, scratch: Path, path_env: str) -> 
                 request = dict(row, home=key, selected=selected, policies=sorted(policies), budget=budget)
                 (tree / "request.json").write_text(json.dumps(request))
                 _sandbox(tree, binds, "prepare")
+                digest = sha256((tree / "payload.json").read_bytes()).hexdigest()
                 tree.rename(seed)
                 results = {}
                 for side in ("native", "relay"):
                     shutil.copytree(seed, tree, symlinks=True)
+                    if side == "relay" and (tree / "replacement-lore").is_dir():
+                        # Keep the logical path equal on both sides for profile recovery text.
+                        for name in ("src", "profiles", "bin/lore"):
+                            current = tree / "home/d/lore" / name
+                            replacement = tree / "replacement-lore" / name
+                            if current.is_dir():
+                                shutil.rmtree(current)
+                            else:
+                                current.unlink(missing_ok=True)
+                            if replacement.exists():
+                                current.parent.mkdir(parents=True, exist_ok=True)
+                                replacement.rename(current)
                     results[side] = _sandbox(tree, binds, side)
                     shutil.rmtree(tree)
             for policy in sorted(policies):
                 native, relay = (results[side][policy] for side in ("native", "relay"))
                 passed = native["ok"] and relay["ok"] and native["value"] == relay["value"]
                 status = "passed" if passed else "failed"
-                details = f"case={row['case']} source={row['source']} payload={row['payloadSource']} fixture replay"
+                details = (f"case={row['case']} source={row['source']} template=tools/fixtures/hook-equivalence/events.json "
+                           f"templateSha256={row['templateSha256']} payloadSha256={digest} upstream={row['upstream']} "
+                           f"changes={json.dumps(row['changes'])} fixture replay")
                 if not passed:
                     details += f" native={json.dumps(native)} relay={json.dumps(relay)}"
                 binding = f"{key}/{event}"
@@ -298,6 +314,11 @@ def run(table, next_dir: Path, cases: Path, *, scratch: Path, path_env: str) -> 
                         f"policy={policy} relayCommit={table.runtimes[version].commit} "
                         f"configDigest={sha256(data).hexdigest()} {details}")
                 lines.append(EvidenceLine(binding, policy, status, line))
+            if diagnostic := results["relay"].get("_composition"):
+                lines.append(EvidenceLine(binding, "composition", "failed",
+                                          f"composition failed {binding} {harness} {row['version']} {row['sessionMode']} "
+                                          f"{details} diagnostic={json.dumps(diagnostic)} "
+                                          f"relayCommit={table.runtimes[version].commit} configDigest={sha256(data).hexdigest()}"))
         if relevant - covered:
             raise ValueError(f"{key}/{event}: missing fixture coverage for {sorted(relevant - covered)}")
     if not lines:

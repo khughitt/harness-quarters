@@ -194,8 +194,13 @@ for each binding and dispatches the unchanged bytes through its public hook CLI.
 The output contains a `policyEquivalence` evidence string for each applicable
 policy and case, including the binding, harness, target version, session mode,
 source fixture, runtime commit and SHA-256 of the deployed subscriber bytes.
-A difference or failed dispatch exits 1 and includes the native and relay
-observations. The destination must be new.
+Each line identifies the local event template file and its SHA-256, the digest
+of the exact payload sent to both commands, its upstream fixture ancestry and
+the synthetic substitutions. A difference or failed dispatch exits 1 and includes
+the native and relay observations. A failed notice or observer retains its own
+diagnostic. Delivered siblings are compared independently. A failure belonging to
+a subscriber outside the policies compared by that case produces a separate
+failed composition line and a nonzero command exit. The destination must be new.
 
 The recorded corpus in `tools/fixtures/hook-equivalence/` covers profile
 delivery and failure, instruction drift, missing-index repair, empty and
@@ -210,14 +215,19 @@ Each side starts at the same pathname from a fresh copy of a fixture-owned
 checkout, home, XDG directories, Git config, tasks registry and detached
 records store. The runner copies refresh and its companion scripts into the
 fixture hq checkout, and uses the fixture PATH for the owner commands.
+Profile replay copies the deployed native lore hook, source and profile files
+independently of the replacement executable selected on PATH. Both trees run at
+the same logical pathname so that recovery commands remain comparable.
 It rejects unexpected subscriber environment keys or values. Claude
 subscribers receive the two provenance values the pinned relay supplies for
 the synthetic event. The fixture runs the donor and owner stale-notice
 policies against a recorded assembler result and excludes the retired ops
 Projects check. Capture compares the actual donor and owner clients against
 an isolated triage-queue service. The native donor fixes its address at
-`localhost:3331`. Compositions with capture or the existing absolute familiar
-observer therefore use Linux bubblewrap with private network, PID and mount
-namespaces. The input packages are mounted read-only, all fixture writes are
-disposable, and an unavailable namespace prevents that replay. Other cases
-need only their fixture trees and the binding's installed relay.
+`localhost:3331`. Every real hook replay runs in Linux bubblewrap with a private PID namespace
+and proc filesystem. Relay looks up harness ancestry while selecting its
+supervisor and publishing its registry. The fixture checks that its namespace
+differs from the caller's and that proc belongs to it before running any hooks.
+It also uses private mounts and loopback for existing absolute observer argv and
+the fixed capture endpoint. An unavailable namespace prevents a real replay.
+Admission-only checks use the pinned public budget API with a private environment.
