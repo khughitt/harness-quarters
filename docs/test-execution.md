@@ -114,6 +114,11 @@ The accepted hosted omissions are these exact local integration checks:
 
 - tools/test_agy_hooks.py::test_relay_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard
 - tools/test_harness_links.py::test_registered_owner_targets_match_portable_fixture_shapes
+- tools/test_hook_routes_equivalence.py::test_real_replay_leaves_host_untouched, when a required owner command is absent
+
+The equivalence test runs the installed index-repair owner and the copied hq refresh
+against independent disposable checkouts. The remaining equivalence tests use the
+pinned hosted relay and portable owner fixtures. They require no network namespace.
 
 Portable owner fixtures exercise link behavior without private checkouts. The local
 integration check also copies the real registered targets and compares their shapes.

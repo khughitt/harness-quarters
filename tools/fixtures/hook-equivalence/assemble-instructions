@@ -1,0 +1,7 @@
+"""Recorded assembler boundary used by lore's stale-notice policy replay."""
+import sys
+from pathlib import Path
+assert sys.argv[1:] == ["check", "--working-tree"]
+if Path("fragment.txt").read_bytes() != Path("delivered.txt").read_bytes():
+    print("assemble-instructions: fixture fragment differs from delivery", file=sys.stderr)
+    raise SystemExit(1)

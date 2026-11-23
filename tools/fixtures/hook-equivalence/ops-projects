@@ -1,0 +1,4 @@
+"""The retired ops Projects check contributes no notice to the donor replay."""
+def main(argv, env, root):
+    assert argv == ["check", "--brief"]
+    return 0

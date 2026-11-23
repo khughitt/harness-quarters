@@ -184,3 +184,40 @@ the owner commands and runtimes pass preflight on each host, and close all agy
 sessions. Running sessions cache command strings for the retired invocation
 forms. To roll back after activation, revert the merge with
 `git revert -m 1 <merge>` and restart agy sessions.
+
+## Donor policy equivalence
+
+`tools/hook-routes equivalence --next DIR --out FILE` reads the frozen
+`render candidate` directory. It verifies the manifest hashes, subscriber-file
+addresses and binding runtime identity. The pinned relay selects the subscribers
+for each binding and dispatches the unchanged bytes through its public hook CLI.
+The output contains a `policyEquivalence` evidence string for each applicable
+policy and case, including the binding, harness, target version, session mode,
+source fixture, runtime commit and SHA-256 of the deployed subscriber bytes.
+A difference or failed dispatch exits 1 and includes the native and relay
+observations. The destination must be new.
+
+The recorded corpus in `tools/fixtures/hook-equivalence/` covers profile
+delivery and failure, instruction drift, missing-index repair, empty and
+nonempty capture queues, and Stop refresh. A recorded event describes one
+target version and session mode. The shipped synthetic inputs cover the
+interactive Claude Code 2.1.325 and Codex 0.168.0 fixture targets documented
+by relay. Other targets require sourced fixtures of their own. These strings
+supply the policy check in a qualification row. Live delivery and latency
+have their own evidence requirements.
+
+Each side starts at the same pathname from a fresh copy of a fixture-owned
+checkout, home, XDG directories, Git config, tasks registry and detached
+records store. The runner copies refresh and its companion scripts into the
+fixture hq checkout, and uses the fixture PATH for the owner commands.
+It rejects unexpected subscriber environment keys or values. Claude
+subscribers receive the two provenance values the pinned relay supplies for
+the synthetic event. The fixture runs the donor and owner stale-notice
+policies against a recorded assembler result and excludes the retired ops
+Projects check. Capture compares the actual donor and owner clients against
+an isolated triage-queue service. The native donor fixes its address at
+`localhost:3331`. Compositions with capture or the existing absolute familiar
+observer therefore use Linux bubblewrap with private network, PID and mount
+namespaces. The input packages are mounted read-only, all fixture writes are
+disposable, and an unavailable namespace prevents that replay. Other cases
+need only their fixture trees and the binding's installed relay.
