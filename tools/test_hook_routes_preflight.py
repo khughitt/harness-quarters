@@ -39,8 +39,14 @@ def test_deploy_refuses_different_bytes(tmp_path):
 
 
 def today(tmp_path, native=False):
+    """A one-binding Claude home holding an unqualified SessionStart relay line on the shared file."""
     table = load(TABLE)
-    binding = next(b for _, h, _, b in table.bindings() if h.harness == "claude-code" and b.lines[0].kind == "relay")
+    # The personal home's SessionStart line runs the qualified donor-2 file, whose
+    # records bind the account HOME. Select the Claude Code SessionStart line that
+    # stays on the reconciliation file, which carries only existing-state policies.
+    binding = next(b for _, h, _, b in table.bindings()
+                   if h.harness == "claude-code" and b.event == "SessionStart" and b.lines[0].kind == "relay"
+                   and b.lines[0].subscriber_file == table.reconciliation_file)
     if native:
         binding = Binding("Stop", None, (Line(("claim-guard",), command="absent-command"),))
     return replace(table, homes={"claude": replace(table.homes["claude"], bindings=(binding,))})

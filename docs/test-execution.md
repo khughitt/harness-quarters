@@ -110,8 +110,17 @@ setup-report.txt records setup; the initially empty suite/ child is
 HQ_TEST_EVIDENCE_DIR and holds the inventory, coverage and two reports. A failed
 setup or partial run retains available evidence and remains unverified.
 
-The accepted hosted omission is
-`tools/test_harness_links.py::test_registered_owner_targets_match_portable_fixture_shapes`.
+The accepted hosted omissions are these exact local integration checks:
+
+- tools/test_harness_links.py::test_registered_owner_targets_match_portable_fixture_shapes
+- tools/test_hook_routes_equivalence.py::test_real_replay_leaves_host_untouched, when a required owner command is absent
+
+The equivalence test runs the installed index-repair owner and the copied hq refresh
+against independent disposable checkouts. It also checks one real mixed-notice
+dispatch, the private PID namespace and absence of host process handles in the
+fixture registry and supervisor. The remaining equivalence tests call the pinned
+hosted relay for budget admission, then use fixture transport observations for
+command output and evidence checks. They require no namespace privileges.
 
 Portable owner fixtures exercise link behavior without private checkouts. The local
 integration check uses the local project registry to copy real owner targets and

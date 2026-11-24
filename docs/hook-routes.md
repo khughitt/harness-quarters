@@ -188,3 +188,77 @@ the owner commands and runtimes pass preflight on each host, and close all agy
 sessions. Running sessions cache command strings for the retired invocation
 forms. To roll back after activation, revert the merge with
 `git revert -m 1 <merge>` and restart agy sessions.
+
+## Claude Code donor cutover
+
+The personal Claude Code home's SessionStart and Stop relay lines use the live
+`donor-2-shared` subscriber file. Its tracked template is
+`relay/subscribers.donor-2.template.json`. Its expanded bytes match the frozen donor-2
+candidate's `v0.5.0-19b427ac306a/relay/subscribers.json`. The native ops and lore
+SessionStart lines and the native Stop claim guard and state refresh lines are
+gone from that home. Their policies are `relay` states on the two lines and cite
+the Claude Code 2.1.331 records for both session modes. A native SessionStart
+line runs `tasks notices --pretty` before the relay line. The ops hook gained that
+notice after donor-2 was frozen, and donor-2 has no subscriber for it. The line
+has a 5 second timeout. Relay's latency support covers only the measured native
+entries, so with this extra line SessionStart latency is unknown by relay's rule.
+The user accepted this limitation on hq-8185d3. Stop is unaffected. Every other Claude
+Code relay line keeps the shared file, which still serves reconciliation. The
+Codex homes and the work Claude Code home are unchanged.
+
+The activation reference `hq-a83688:claude-donor-activation` reserves a note on
+hq-a83688 for the user's grant. Before merging, deploy and preflight on each host,
+then pause Claude Code sessions. To roll back, revert the merge with
+`git revert -m 1 <merge>` and restart Claude Code sessions. The digest-addressed file
+can stay deployed.
+
+## Donor policy equivalence
+
+`tools/hook-routes equivalence --next DIR --out FILE` reads the frozen
+`render candidate` directory. It verifies the manifest hashes, subscriber-file
+addresses and binding runtime identity. The pinned relay selects the subscribers
+for each binding and dispatches the unchanged bytes through its public hook CLI.
+The output contains a `policyEquivalence` evidence string for each applicable
+policy and case, including the binding, harness, target version, session mode,
+source fixture, runtime commit and SHA-256 of the deployed subscriber bytes.
+Each line identifies the local event template file and its SHA-256, the digest
+of the exact payload sent to both commands, its upstream fixture ancestry and
+the synthetic substitutions. A difference or failed dispatch exits 1 and includes
+the native and relay observations. A failed notice or observer retains its own
+diagnostic, including stderr forwarded by the failed observer. Registry publication
+follows notice collection, so a publication failure marks the composition failed
+while an independently confirmed notice can still pass. A failure belonging to
+a subscriber outside the policies compared by that case produces a separate
+failed composition line and a nonzero command exit. The destination must be new.
+
+The recorded corpus in `tools/fixtures/hook-equivalence/` covers profile
+delivery and failure, instruction drift, missing-index repair, empty and
+nonempty capture queues, and Stop refresh. A recorded event describes one
+target version and session mode. The shipped synthetic inputs cover the
+interactive Claude Code 2.1.325 and Codex 0.168.0 fixture targets documented
+by relay, and Claude Code 2.1.331 in both interactive and non-interactive
+(`claude -p`) mode, derived from relay's live payload captures at that version.
+Other targets require sourced fixtures of their own. These strings
+supply the policy check in a qualification row. Live delivery and latency
+have their own evidence requirements.
+
+Each side starts at the same pathname from a fresh copy of a fixture-owned
+checkout, home, XDG directories, Git config, tasks registry and detached
+records store. The runner copies refresh and its companion scripts into the
+fixture hq checkout, and uses the fixture PATH for the owner commands.
+Profile replay copies the deployed native lore hook, source and profile files
+independently of the replacement executable selected on PATH. Both trees run at
+the same logical pathname so that recovery commands remain comparable.
+It rejects unexpected subscriber environment keys or values. Claude
+subscribers receive the two provenance values the pinned relay supplies for
+the synthetic event. The fixture runs the donor and owner stale-notice
+policies against a recorded assembler result and excludes the retired ops
+Projects check. Capture compares the actual donor and owner clients against
+an isolated triage-queue service. The native donor fixes its address at
+`localhost:3331`. Every real hook replay runs in Linux bubblewrap with a private PID namespace
+and proc filesystem. Relay looks up harness ancestry while selecting its
+supervisor and publishing its registry. The fixture checks that its namespace
+differs from the caller's and that proc belongs to it before running any hooks.
+It also uses private mounts and loopback for existing absolute observer argv and
+the fixed capture endpoint. An unavailable namespace prevents a real replay.
+Admission-only checks use the pinned public budget API with a private environment.

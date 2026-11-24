@@ -1,0 +1,164 @@
+[
+  {
+    "harness": "claude-code",
+    "version": "2.1.325",
+    "sessionMode": "interactive",
+    "event": "SessionStart",
+    "payload": {
+      "hook_event_name": "SessionStart",
+      "session_id": "fixture-session",
+      "source": "startup"
+    },
+    "upstream": "relay 1f1c28da62e7867caf3acaddf16ba13079a37e85:test/fixtures/hook-events/claude-code.SessionStart.input.json",
+    "changes": [
+      "session_id replaced with fixture-session",
+      "cwd replaced with the fixture checkout",
+      "model omitted for synthetic provenance",
+      "transcript_path replaced with the fixture home path",
+      "scratchpad_dir omitted"
+    ]
+  },
+  {
+    "harness": "claude-code",
+    "version": "2.1.325",
+    "sessionMode": "interactive",
+    "event": "Stop",
+    "payload": {
+      "hook_event_name": "Stop",
+      "session_id": "fixture-session",
+      "stop_hook_active": false,
+      "background_tasks": []
+    },
+    "upstream": "relay 1f1c28da62e7867caf3acaddf16ba13079a37e85:test/fixtures/hook-events/claude-code.Stop.input.json",
+    "changes": [
+      "session_id replaced with fixture-session",
+      "cwd replaced with the fixture checkout",
+      "background_tasks replaced with an empty list",
+      "session_crons omitted",
+      "fixture transcript_path added"
+    ]
+  },
+  {
+    "harness": "codex",
+    "version": "0.168.0",
+    "sessionMode": "interactive",
+    "event": "SessionStart",
+    "payload": {
+      "hook_event_name": "SessionStart",
+      "session_id": "fixture-session",
+      "source": "startup"
+    },
+    "upstream": "relay 1f1c28da62e7867caf3acaddf16ba13079a37e85:test/fixtures/hook-events/codex.SessionStart.input.json",
+    "changes": [
+      "session_id replaced with fixture-session",
+      "cwd replaced with the fixture checkout",
+      "model omitted for synthetic provenance",
+      "transcript_path replaced with the fixture home path"
+    ]
+  },
+  {
+    "harness": "codex",
+    "version": "0.168.0",
+    "sessionMode": "interactive",
+    "event": "Stop",
+    "payload": {
+      "hook_event_name": "Stop",
+      "session_id": "fixture-session",
+      "stop_hook_active": false
+    },
+    "upstream": "relay 1f1c28da62e7867caf3acaddf16ba13079a37e85:test/fixtures/hook-events/codex.Stop.input.json",
+    "changes": [
+      "session_id replaced with fixture-session",
+      "cwd replaced with the fixture checkout",
+      "stop_hook_active changed from true to false",
+      "fixture transcript_path added"
+    ]
+  },
+  {
+    "harness": "claude-code",
+    "version": "2.1.331",
+    "sessionMode": "interactive",
+    "event": "SessionStart",
+    "payload": {
+      "session_id": "fixture-session",
+      "hook_event_name": "SessionStart",
+      "source": "startup"
+    },
+    "upstream": "relay-d487c1 $WORK_ROOT/relay/relay-d487c1/v0.5.0.WLoZlr/live-2.1.331/runs/selection-baseline-interactive-sleep8-cut-at-exit/payloads/SessionStart-0-1795519034785968676.json sha256=68f20cb8bf75225396a21dcb95efe891d1052ec4e5c9fd25ddde5158fcf434c7",
+    "changes": [
+      "session_id replaced with fixture-session",
+      "cwd replaced with the fixture checkout",
+      "model omitted for synthetic provenance",
+      "transcript_path replaced with the fixture home path"
+    ]
+  },
+  {
+    "harness": "claude-code",
+    "version": "2.1.331",
+    "sessionMode": "interactive",
+    "event": "Stop",
+    "payload": {
+      "session_id": "fixture-session",
+      "prompt_id": "fixture-prompt",
+      "permission_mode": "default",
+      "effort": {
+        "level": "medium"
+      },
+      "hook_event_name": "Stop",
+      "stop_hook_active": false,
+      "last_assistant_message": "selection first turn done",
+      "background_tasks": [],
+      "session_crons": []
+    },
+    "upstream": "relay-d487c1 $WORK_ROOT/relay/relay-d487c1/v0.5.0.WLoZlr/live-2.1.331/runs/selection-baseline-interactive-sleep8-cut-at-exit/payloads/Stop-0-1795519050950885995.json sha256=d3e0ae4313e8df423cb5bb4a30a7e0c976a065570a04a96d86995101f4b07465",
+    "changes": [
+      "session_id replaced with fixture-session",
+      "cwd replaced with the fixture checkout",
+      "prompt_id replaced with fixture-prompt",
+      "transcript_path replaced with the fixture home path"
+    ]
+  },
+  {
+    "harness": "claude-code",
+    "version": "2.1.331",
+    "sessionMode": "non-interactive",
+    "event": "SessionStart",
+    "payload": {
+      "session_id": "fixture-session",
+      "hook_event_name": "SessionStart",
+      "source": "startup"
+    },
+    "upstream": "relay-d487c1 $WORK_ROOT/relay/relay-d487c1/v0.5.0.WLoZlr/live-2.1.331/runs/selection-baseline-print-sleep8/payloads/SessionStart-0-1795518695383204749.json sha256=ee516d385ab62ec29126694fe53dbb4cb568dc556e834a0999a1904490cf9f83",
+    "changes": [
+      "session_id replaced with fixture-session",
+      "cwd replaced with the fixture checkout",
+      "transcript_path replaced with the fixture home path"
+    ]
+  },
+  {
+    "harness": "claude-code",
+    "version": "2.1.331",
+    "sessionMode": "non-interactive",
+    "event": "Stop",
+    "payload": {
+      "session_id": "fixture-session",
+      "prompt_id": "fixture-prompt",
+      "permission_mode": "default",
+      "effort": {
+        "level": "medium"
+      },
+      "hook_event_name": "Stop",
+      "stop_hook_active": false,
+      "last_assistant_message": "selection first turn done",
+      "background_tasks": [],
+      "session_crons": []
+    },
+    "upstream": "relay-d487c1 $WORK_ROOT/relay/relay-d487c1/v0.5.0.WLoZlr/live-2.1.331/runs/selection-baseline-print-sleep8/payloads/Stop-0-1795518711537532820.json sha256=a573149c231dd09e267671eafa64cffb3adb60d0fb3c1dcf22961572666c363e",
+    "changes": [
+      "session_id replaced with fixture-session",
+      "cwd replaced with the fixture checkout",
+      "prompt_id replaced with fixture-prompt",
+      "transcript_path replaced with the fixture home path"
+    ]
+  }
+]

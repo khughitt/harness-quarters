@@ -1,0 +1,179 @@
+{
+  "schema": 2,
+  "subscribers": [
+    {
+      "name": "familiar",
+      "role": "observer",
+      "registry": "snapshot",
+      "harnesses": [
+        "claude-code",
+        "codex"
+      ],
+      "kinds": [
+        "session-start",
+        "turn-end"
+      ],
+      "privateFields": [
+        {
+          "nativeEvent": "Stop",
+          "fields": [
+            "backgroundTasks"
+          ]
+        }
+      ],
+      "argv": [
+        "env",
+        "@HOME@/d/familiar/bin/familiar",
+        "observe"
+      ],
+      "timeoutMs": 2000
+    },
+    {
+      "name": "familiar-codex-workers",
+      "role": "observer",
+      "registry": "snapshot",
+      "harnesses": [
+        "codex"
+      ],
+      "kinds": [
+        "child-stop"
+      ],
+      "argv": [
+        "env",
+        "@HOME@/d/familiar/bin/familiar",
+        "observe"
+      ],
+      "timeoutMs": 2000
+    },
+    {
+      "name": "tasks-halt-notice",
+      "role": "notice",
+      "harnesses": [
+        "claude-code"
+      ],
+      "kinds": [
+        "session-start"
+      ],
+      "argv": [
+        "tasks",
+        "hook",
+        "halt-notice"
+      ],
+      "timeoutMs": 1000
+    },
+    {
+      "name": "lore-stale-notice",
+      "role": "notice",
+      "harnesses": [
+        "claude-code"
+      ],
+      "kinds": [
+        "session-start"
+      ],
+      "argv": [
+        "lore",
+        "hook",
+        "stale-notice"
+      ],
+      "timeoutMs": 12000
+    },
+    {
+      "name": "git-index-repair",
+      "role": "notice",
+      "harnesses": [
+        "claude-code"
+      ],
+      "kinds": [
+        "session-start"
+      ],
+      "argv": [
+        "git-index-health",
+        "--session-start"
+      ],
+      "timeoutMs": 6000
+    },
+    {
+      "name": "lore-profile-notice",
+      "role": "notice",
+      "harnesses": [
+        "claude-code",
+        "codex"
+      ],
+      "kinds": [
+        "session-start"
+      ],
+      "argv": [
+        "lore",
+        "hook",
+        "profile-notice"
+      ],
+      "timeoutMs": 3000
+    },
+    {
+      "name": "mindful-capture-notice",
+      "role": "notice",
+      "harnesses": [
+        "claude-code",
+        "codex"
+      ],
+      "kinds": [
+        "session-start"
+      ],
+      "argv": [
+        "mindful",
+        "notice",
+        "session-start"
+      ],
+      "timeoutMs": 2000
+    },
+    {
+      "name": "tasks-claim-guard",
+      "role": "guard",
+      "harnesses": [
+        "claude-code"
+      ],
+      "kinds": [
+        "turn-end"
+      ],
+      "argv": [
+        "tasks",
+        "hook",
+        "claim-guard"
+      ],
+      "timeoutMs": 12000
+    },
+    {
+      "name": "tasks-claim-guard-codex",
+      "role": "guard",
+      "harnesses": [
+        "codex"
+      ],
+      "kinds": [
+        "turn-end",
+        "child-stop"
+      ],
+      "argv": [
+        "tasks",
+        "hook",
+        "claim-guard"
+      ],
+      "timeoutMs": 12000
+    },
+    {
+      "name": "harness-state-refresh",
+      "role": "observer",
+      "registry": "occurrence",
+      "harnesses": [
+        "claude-code",
+        "codex"
+      ],
+      "kinds": [
+        "turn-end"
+      ],
+      "argv": [
+        "harness-state-refresh"
+      ],
+      "timeoutMs": 6000
+    }
+  ]
+}

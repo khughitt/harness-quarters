@@ -6,7 +6,9 @@ import json
 import os
 from pathlib import Path
 import sys
+import tempfile
 
+from . import equivalence
 from .deploy import deploy, live_files, reconcile_base, review_files
 from .preflight import installed_versions, run as preflight
 from .qualification import qualification_findings
@@ -101,6 +103,9 @@ def main(argv):
     deploy_modes.add_parser("next").add_argument("directory", type=Path)
     commands.add_parser("reconcile-base", help="show the live relay reconciliation config base")
     commands.add_parser("preflight", help="check the installed host").add_argument("--next", type=Path)
+    replay = commands.add_parser("equivalence", help="compare frozen relay candidates with native fixture callers")
+    replay.add_argument("--next", required=True, type=Path)
+    replay.add_argument("--out", required=True, type=Path)
     status = commands.add_parser("status", help="show route states, donor references or changed Codex trust keys")
     modes = status.add_mutually_exclusive_group()
     modes.add_argument("--donor", metavar="PATH")
@@ -129,6 +134,16 @@ def main(argv):
             for path in deploy(files, home):
                 print(path)
             return 0
+        if args.command == "equivalence":
+            if args.out.exists():
+                raise ValueError(f"evidence destination already exists: {args.out}")
+            with tempfile.TemporaryDirectory(prefix="hook-equivalence-") as scratch:
+                rows = equivalence.run(table, args.next, equivalence.DEFAULT_CASES,
+                                       scratch=Path(scratch), path_env=os.environ.get("PATH", os.defpath))
+            with args.out.open("x") as evidence:
+                for row in rows:
+                    print(row.line, file=evidence)
+            return int(any(row.status == "failed" for row in rows))
         if args.command == "preflight":
             home = Path.home()
             if args.next is None:
