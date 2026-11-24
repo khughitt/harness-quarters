@@ -334,17 +334,17 @@ def on_output(state, event, payload, day):
         if call['usage_id'] is not None:
             _retire(state, state['pending_tools'].pop(call_id))
     # A result's status belongs to its own call, distinct from associated command exits.
-    shown = result = None
-    if call is not None and isinstance(output, (str, list)):
-        shown = runs.output_text(output)
-        result = outcomes.result_text(call['tool'], shown)
+    shown = runs.shown_text(output) if call is not None else None
+    result = outcomes.result_text(call['tool'], shown) if shown is not None else None
     cut, tokens, size = outcomes.truncation(payload.get('output', ''))
     event['results'].append({'call_id': call_id, 'bytes': _size(payload.get('output', '')),
         'error': own['error'] if call is not None else None,
         'interrupted': own['interrupted'] if call is not None else None,
         'native_duration_ms': None, 'background_id': None, 'agent': None,
         'child_session': None, 'answers': None, 'exit_code': None,
-        'empty': empty_output(result), 'diagnostic': result,
+        # A script's own result says nothing of its commands' output.
+        'empty': empty_output(result) if call is not None and call['tool'] != 'exec' else None,
+        'diagnostic': result,
         'harness_text': shown.startswith(outcomes.ARGUMENTS_FAILED) if shown is not None else None,
         'truncation': {'kind': cut, 'original_tokens': tokens, 'original_bytes': size}})
     _add(event['execution'], facts)

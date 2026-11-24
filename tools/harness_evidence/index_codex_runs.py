@@ -233,6 +233,17 @@ def output_text(output):
     return ""
 
 
+def shown_text(output):
+    """An output's own text blocks; None when it shows no text (an image, or no output)."""
+    if isinstance(output, str):
+        return output
+    if not isinstance(output, list):
+        return None
+    texts = [block["text"] for block in output
+             if isinstance(block, dict) and isinstance(block.get("text"), str)]
+    return "\n".join(texts) if texts or not output else None
+
+
 def results(text):
     """Result objects the script printed, in order, read with the JSON decoder.
 
@@ -685,7 +696,10 @@ def _close_by_poll(state, run, end_lo_ms, end_ms, exit_code, source, output):
             outcomes.command(run["session_id"], run["run_id"], run["call_id"],
                                        run["start_ms"], end_ms, "bounds", exit_code, source,
                                        "session", operation_seq=run["operation_seq"],
-                                       **outcomes.output_evidence(exit_code, output))]
+                                       # Earlier chunks were not kept, so an empty last one
+                                       # does not make the command's output empty.
+                                       **{**outcomes.output_evidence(exit_code, output),
+                                          "empty": False if output and output.strip() else None})]
 
 
 def on_output(state, call_id, output, at_ms, outcome=None):

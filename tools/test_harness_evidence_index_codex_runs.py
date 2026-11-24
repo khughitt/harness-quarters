@@ -2047,6 +2047,23 @@ class FailureEvidenceTests(unittest.TestCase):
         results, _ = self.results([exec_script("x1", "boom()", T0), fn_output("x1", text, T1)])
         self.assertEqual(results["x1"]["diagnostic"], text)
 
+    def test_image_outputs_have_no_text_and_mixed_outputs_keep_only_theirs(self):
+        image = {"type": "input_image", "image_url": "data:x"}
+        for output, text, empty in (([image], None, None), ([{"type": "input_text", "text": "a"}, image], "a", False),
+                                    ([], "", True), (None, None, None)):
+            results, _ = self.results([fn_call("v1", "view_image", {"path": "/a"}, T0), fn_output("v1", output, T1)])
+            self.assertEqual((results["v1"]["diagnostic"], results["v1"]["empty"]), (text, empty), output)
+
+    def test_script_results_never_claim_emptiness(self):
+        for text in ("Script failed\nOutput:\n", "failed to parse function arguments: x"):
+            results, _ = self.results([exec_script("x1", "boom()", T0), fn_output("x1", text, T1)])
+            self.assertIsNone(results["x1"]["empty"])
+
+    def test_a_last_empty_chunk_does_not_make_a_session_command_empty(self):
+        commands, _ = self.commands([exec_command_call("e1", "rg x", T0), fn_output("e1", running(5) + "a match", T1),
+            fn_call("p1", "write_stdin", {"session_id": 5, "chars": ""}, T2), fn_output("p1", exited(1), T3)])
+        self.assertIsNone(commands["e1#s5"]["empty"])
+
     def test_successful_command_carries_no_diagnostic(self):
         commands, _ = self.commands([exec_script("x1", 'text(await tools.exec_command({cmd:"ls"}));', T0),
             exec_output("x1", T1, "Script completed\nOutput:\n", chunk(1, exit_code=0, output=""))])
