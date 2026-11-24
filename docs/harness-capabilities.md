@@ -45,14 +45,13 @@ foreign closure authority. After a definition change, inspect and trust the exac
 definition through native /hooks in each home. Trust restoration follows the
 [runtime upgrade procedure](runbooks/relay-runtime.md).
 
-Agy's local hook runs profile/capture-notice at SessionStart and heals detached
-settings before startup and run_command. PreToolUse healing emits empty stdout,
-keeping native permission prompts intact. Relay translates run_command to Bash
-for ops's guard and dispatches its familiar subscriber. Its agy handler timeout
-is 60 seconds with --outer-ms 60000. Stop also refreshes picks and performs the
-local one-shot claim check, allowing a stop while fullyIdle is false under the
-probed controller-wake behavior. This fallback remains until the shared guard
-supports that route; an installed observer is not a substitute refusal channel.
+Agy's local hook calls the profile and capture notice owners at SessionStart
+and heals detached settings before startup and run_command. PreToolUse healing
+emits empty stdout, keeping native permission prompts intact. Relay translates
+run_command to Bash and dispatches the familiar observer from the digest-addressed
+subscriber file. Its agy handler timeout is 60 seconds with `--outer-ms 60000`.
+The Stop bridge calls the tasks claim guard and passes its decision back to agy.
+A separate native Stop handler refreshes picks.
 
 ## Decoder capability evidence
 

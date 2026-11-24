@@ -79,6 +79,7 @@ def prepare():
         for key, value in (("clean", ".githooks/harness-state-clean %f"), ("required", "true"), ("smudge", "cat")):
             git(HQ, "config", "filter.harness-state." + key, value)
         write(HQ / "harnesses/claude/settings.json", '{}\n')
+        write(HQ / "harnesses/claude/work/settings.json", '{}\n')
         write(HQ / "harnesses/codex/config.toml", "[features]\nhooks = true\n")
         write(HQ / "harnesses/pi/settings.json", '{}\n')
         write(HQ / "harnesses/agy/settings.json", '{}\n')

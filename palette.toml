@@ -1,0 +1,263 @@
+# Guild identity and status colours: harnesses, model families and status roles.
+# Owned by hq; contract and classifier: docs/palette.md. Consumers keep a byte-identical
+# copy and test their reader against the [[case]] rows. Approved in hq-d2d32c.
+#
+# rgb: the 24-bit colour. xterm: its xterm-256 stand-in. Both keep 3:1 contrast on a
+# dark (#1e1e1e) and a light (#ffffff) background. oklch: the source of rgb (lightness,
+# chroma, hue); a change edits oklch and recomputes rgb, and tools/test_palette.py checks
+# that they agree.
+
+version = 1
+
+# Harnesses, keyed by their harnesses.toml names. A declared harness absent here (opencode,
+# pi-durable) and any unknown name stay uncoloured.
+
+[harness.claude-code]
+aliases = ["claude"]
+rgb = "#d97e38"
+xterm = 166
+oklch = [0.68, 0.14, 55]
+
+[harness.codex]
+aliases = []
+rgb = "#4b99d7"
+xterm = 32
+oklch = [0.66, 0.12, 245]
+
+[harness.agy]
+aliases = []
+rgb = "#439458"
+xterm = 65
+oklch = [0.60, 0.12, 150]
+
+[harness.pi]
+aliases = []
+rgb = "#765fca"
+xterm = 99
+oklch = [0.56, 0.16, 290]
+
+# Vendors: `prefix` is a model id's first token. The colour is the fallback for a model
+# of that vendor whose family is not listed below.
+
+[vendor.anthropic]
+prefix = "claude"
+rgb = "#9e7f6a"
+xterm = 137
+oklch = [0.62, 0.05, 55]
+
+[vendor.openai]
+prefix = "gpt"
+rgb = "#718a9c"
+xterm = 67
+oklch = [0.62, 0.04, 240]
+
+[vendor.google]
+prefix = "gemini"
+rgb = "#768d7a"
+xterm = 101
+oklch = [0.62, 0.04, 150]
+
+# Model families, keyed <vendor prefix>-<family>. Versions and effort suffixes share
+# their family's colour. Hues are banded by vendor: Anthropic orange, OpenAI blue,
+# Google green.
+
+[model.claude-opus]
+vendor = "anthropic"
+family = "opus"
+rgb = "#e87045"
+xterm = 202
+oklch = [0.68, 0.16, 40]
+
+[model.claude-sonnet]
+vendor = "anthropic"
+family = "sonnet"
+rgb = "#bb7400"
+xterm = 136
+oklch = [0.62, 0.14, 70]
+
+[model.claude-haiku]
+vendor = "anthropic"
+family = "haiku"
+rgb = "#89691b"
+xterm = 130
+oklch = [0.54, 0.10, 85]
+
+[model.claude-fable]
+vendor = "anthropic"
+family = "fable"
+rgb = "#a9513c"
+xterm = 131
+oklch = [0.54, 0.12, 35]
+
+[model.gpt-sol]
+vendor = "openai"
+family = "sol"
+rgb = "#3e9dca"
+xterm = 68
+oklch = [0.66, 0.11, 232]
+
+[model.gpt-astra]
+vendor = "openai"
+family = "astra"
+rgb = "#5c71d2"
+xterm = 62
+oklch = [0.58, 0.15, 272]
+
+[model.gpt-terra]
+vendor = "openai"
+family = "terra"
+rgb = "#2c9f97"
+xterm = 66
+oklch = [0.64, 0.10, 188]
+
+[model.gpt-luna]
+vendor = "openai"
+family = "luna"
+rgb = "#7595bd"
+xterm = 103
+oklch = [0.66, 0.07, 255]
+
+[model.gemini-carbon]
+vendor = "google"
+family = "carbon"
+rgb = "#3f9b65"
+xterm = 29
+oklch = [0.62, 0.12, 155]
+
+[model.gemini-neon]
+vendor = "google"
+family = "neon"
+rgb = "#719c27"
+xterm = 100
+oklch = [0.64, 0.15, 128]
+
+[model.gemini-hydrogen]
+vendor = "google"
+family = "hydrogen"
+rgb = "#38886d"
+xterm = 30
+oklch = [0.57, 0.09, 168]
+
+# Status roles, never identities. `sgr` is added to the colour (or used alone).
+# Unknown identities use none of these: they print in the terminal's default colour.
+
+[role.alert]
+rgb = "#db4241"
+xterm = 160
+oklch = [0.60, 0.19, 25]
+sgr = "1"
+meaning = "a value well outside its normal range; missing evidence"
+
+[role.caution]
+rgb = "#b68b16"
+xterm = 138
+oklch = [0.66, 0.13, 85]
+sgr = ""
+meaning = "a value outside its normal range"
+
+[role.muted]
+sgr = "2"
+meaning = "chrome, idle or absent values"
+
+# Classifier corpus: a raw model id as a store records it, the key it resolves to
+# ("" for none) and how (family, vendor or none).
+
+[[case]]
+raw = "gpt-6.1-sol"
+expect = "gpt-sol"
+match = "family"
+
+[[case]]
+raw = "claude-opus-5-5"
+expect = "claude-opus"
+match = "family"
+
+[[case]]
+raw = "gpt-6-astra"
+expect = "gpt-astra"
+match = "family"
+
+[[case]]
+raw = "claude-fable-5-2"
+expect = "claude-fable"
+match = "family"
+
+[[case]]
+raw = "claude-sonnet-5-5"
+expect = "claude-sonnet"
+match = "family"
+
+[[case]]
+raw = "claude-haiku-5-5"
+expect = "claude-haiku"
+match = "family"
+
+[[case]]
+raw = "gpt-5.6-terra"
+expect = "gpt-terra"
+match = "family"
+
+[[case]]
+raw = "gpt-6-luna"
+expect = "gpt-luna"
+match = "family"
+
+[[case]]
+raw = "gemini-4-carbon-high"
+expect = "gemini-carbon"
+match = "family"
+
+[[case]]
+raw = "gemini-4-neon-high"
+expect = "gemini-neon"
+match = "family"
+
+[[case]]
+raw = "gemini-4-hydrogen-tiered-xhigh"
+expect = "gemini-hydrogen"
+match = "family"
+
+[[case]]
+raw = "claude-opus-5-5-high"
+expect = "claude-opus"
+match = "family"
+
+[[case]]
+raw = "gpt-5.4"
+expect = "openai"
+match = "vendor"
+
+[[case]]
+raw = "gemini-3.8-flash-tiered"
+expect = "google"
+match = "vendor"
+
+[[case]]
+raw = "codex-auto-review"
+expect = ""
+match = "none"
+
+[[case]]
+raw = "<synthetic>"
+expect = ""
+match = "none"
+
+[[case]]
+raw = "opus-5-5"
+expect = "claude-opus"
+match = "family"
+
+[[case]]
+raw = "claude-haiku-4-5-20251001"
+expect = "claude-haiku"
+match = "family"
+
+[[case]]
+raw = "gpt-5.3-codex-spark"
+expect = "openai"
+match = "vendor"
+
+[[case]]
+raw = ""
+expect = ""
+match = "none"

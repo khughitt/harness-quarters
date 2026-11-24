@@ -1,4 +1,5 @@
 """Committed hook images retain their approved runtime independently of the CLI pin."""
+from hashlib import sha256
 import json
 import shlex
 from pathlib import Path
@@ -6,7 +7,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-FILES = ['harnesses/claude/settings.json', 'harnesses/codex/hooks.json', 'harnesses/codex/work/hooks.json', 'harnesses/agy/hooks.json']
+FILES = ['harnesses/claude/settings.json', 'harnesses/codex/hooks.json', 'harnesses/codex/work/hooks.json', 'harnesses/agy/hooks.json',
+         'harnesses/claude/work/settings.json']
 # Hook upgrades have a separate approval gate from the CLI pin, per harness. The v0.5.0
 # cutover (hq-663049) moved every relayed harness together: schema-2 subscriber files are
 # refused by v0.3.0 and schema-1 files by v0.5.0, so one host runs one subscriber schema.
@@ -15,6 +17,7 @@ HOOK_VERSIONS = {
     FILES[1]: 'v0.5.0',
     FILES[2]: 'v0.5.0',
     FILES[3]: 'v0.5.0',
+    FILES[4]: 'v0.5.0',
 }
 
 
@@ -30,8 +33,11 @@ def parse_relay_command(command, version):
     assert argv[5] == '--outer-ms'
     assert argv[7] == '--subscribers'
     assert Path(argv[8]).is_absolute()
-    # Each relay version reads its own subscriber file, so the prior pair stays runnable.
-    assert argv[8].endswith(f'/.config/relay/{version}/relay/subscribers.json')
+    # The runtime and expanded subscriber bytes determine the deployed address.
+    root = next(parent.parent for parent in Path(argv[1]).parents if parent.name == '.local')
+    template = (ROOT / 'relay/subscribers.template.json').read_bytes()
+    digest = sha256(template.replace(b'@HOME@', str(root).encode())).hexdigest()[:12]
+    assert Path(argv[8]) == root / '.config/relay' / f'{version}-{digest}' / 'relay/subscribers.json'
     return argv[4], int(argv[6]), argv[9]
 
 
@@ -96,6 +102,19 @@ def test_claude_relay_events():
     ]
 
 
+def test_claude_work_relay_events():
+    assert relay_entries(FILES[4]) == [
+        ('SessionStart', 'startup|resume', 'claude-code', 600000, 'SessionStart', 600),
+        ('UserPromptSubmit', None, 'claude-code', 600000, 'UserPromptSubmit', 600),
+        ('PreToolUse', '*', 'claude-code', 600000, 'PreToolUse', 600),
+        ('Notification', 'idle_prompt', 'claude-code', 600000, 'Notification:idle_prompt', 600),
+        ('Notification', 'permission_prompt', 'claude-code', 600000, 'Notification:permission_prompt', 600),
+        ('Stop', None, 'claude-code', 600000, 'Stop', 600),
+        ('StopFailure', None, 'claude-code', 600000, 'StopFailure', 600),
+        ('SessionEnd', None, 'claude-code', 60000, 'SessionEnd', 60),
+    ]
+
+
 @pytest.mark.parametrize('file', FILES[1:3])
 def test_codex_relay_events(file):
     assert sorted(relay_entries(file)) == sorted([
@@ -142,8 +161,15 @@ def test_native_entries_kept_in_order(file):
                              '~/d/lore/hooks/claude-profile', '~/d/ops/hooks/capture-notice'],
             'Stop': ['~/d/ops/hooks/claim-guard --harness claude-code',
                      '~/.local/bin/harness-state-refresh'],
-            'PostToolUse': ['~/d/ops/hooks/claude-posttooluse'],
-            'PostToolUseFailure': ['~/d/ops/hooks/claude-posttooluse'],
+            # tt's native command counts test front-door use; ops owns it on PATH.
+            'PostToolUse': ['tt-posttooluse'],
+            'PostToolUseFailure': ['tt-posttooluse'],
+        }
+    elif file == FILES[4]:
+        # The work home runs the profile notice and state refresh natively, nothing else.
+        assert native == {
+            'SessionStart': ['~/d/lore/hooks/claude-profile'],
+            'Stop': ['~/.local/bin/harness-state-refresh'],
         }
     elif file == FILES[3]:
         assert native == {

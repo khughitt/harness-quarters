@@ -17,8 +17,8 @@ Run `just setup` once per checkout, and once on each host after pulling a change
 recipe; it is idempotent. The repository git config it writes (`filter.harness-state.*`
 included) lives in the synced checkout and is shared between hosts.
 It installs the git hooks and the harness-state filter (docs/live-state.md explains its three keys)
-and creates `local/codex/rules/`. Work settings under `local/` come from another
-configured host; setup creates directories, not private settings.
+and creates `local/codex/rules/`. The work Codex config under `local/` comes from
+another configured host; setup creates directories, not private settings.
 
 ## Gates
 
@@ -30,7 +30,7 @@ The focused route preserves arguments and runner status through the host budget.
 Both partitions run serially. Local `just test` runs through `host-budget`, and the suite
 validates a positive integer `PYTEST_XDIST_AUTO_NUM_WORKERS`. `just ci-test` shares the suite
 and never sets `TT_FORCE`. The workflow sets both at job scope (`PYTEST_XDIST_AUTO_NUM_WORKERS="2"`)
-and retains setup and suite artifacts. Accepted hosted coverage has exactly the three local
+and retains setup and suite artifacts. Accepted hosted coverage has exactly the two local
 integration omissions listed in docs/test-execution.md; none excludes a module.
 Both pre-push routes run mandatory `just check-hygiene` followed by `just test`; no outer
 composite is timed. The hook declares origin branches covered for the workflow and warns
@@ -87,8 +87,8 @@ The generated global Projects block is checked by lore.
 - `facts/capabilities.toml` and `tools/harness-facts`: what each harness has been shown
   to do, with the record behind each value. The tool is the only reader; it takes the
   declared harness names from `[harnesses]` in `harnesses.toml`.
-- `agents/skills/session-logs/`: session-store guidance. `agents/bin/` keeps
-  session-episodes, wake-judge and their tests.
+- `palette.toml` and `tools/palette`: guild harness, model-family and status colours (docs/palette.md).
+- `agents/skills/session-logs/`: session-store guidance. `agents/bin/` keeps session-episodes, wake-judge and their tests.
 - `harnesses/pi/`: the pinned pi install (`just pi-install`), its launcher, the `settings.json`
   its home links to, the pick-preserving `harnesses/pi/extensions/harness-state.ts`, and the probes
   behind the `pi` and `pi-durable` facts. A version change reruns the probes (docs/harness-capabilities.md).
@@ -104,7 +104,7 @@ The generated global Projects block is checked by lore.
 - Change home routing in `links.toml`. Apply with `just link --apply` from main only;
   linking to a worktree would leave live harnesses dependent on temporary storage.
   Targets must exist in their registered owner checkouts before an apply.
-- Keep `local/` untracked. It contains work settings, rules and saved Codex trust;
+- Keep `local/` untracked. It contains the work Codex config, rules, saved picks and Codex trust;
   publishing it would expose host and work state.
 - Treat model picks, effort and Codex trust as live state. The clean filter and trust
   hooks preserve their contract; avoid stashing or overwriting main's harness configs

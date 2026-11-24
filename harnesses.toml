@@ -1,6 +1,6 @@
 # Declarative harness manifest: canonical harness slugs and tracked live-state configs.
 # Capability facts (tools/harness-facts) read [harnesses]; Git live-state hooks
-# (.githooks/harness_state.py) read [harnesses.<name>.live_state].
+# (.githooks/harness_state.py) read [harnesses.<name>.live_state], a table or an array of tables.
 schema = 1
 
 [harnesses.agy.live_state]
@@ -11,9 +11,18 @@ clean_keys = ["model", "effort", "effortByBase", "trustedWorkspaces", "seasonalT
 picks_record = "local/live-picks-agy.json"
 pick_units = [["model"], ["effort", "effortByBase"], ["trustedWorkspaces"], ["seasonalThemesOptIn"]]
 
-[harnesses.claude-code.live_state]
+[[harnesses.claude-code.live_state]]
 config = "harnesses/claude/settings.json"
 filter_glob = "harnesses/claude/settings*.json"
+format = "json"
+clean_keys = ["model", "modelSettings", "effortLevel"]
+picks_record = "local/live-picks.json"
+pick_units = [["model", "modelSettings"], ["effortLevel"]]
+
+# The work home (~/.claude-work) keeps its own settings, hooks included.
+[[harnesses.claude-code.live_state]]
+config = "harnesses/claude/work/settings.json"
+filter_glob = "harnesses/claude/work/settings*.json"
 format = "json"
 clean_keys = ["model", "modelSettings", "effortLevel"]
 picks_record = "local/live-picks.json"

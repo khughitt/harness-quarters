@@ -54,7 +54,8 @@ def _transition(table):
     from hook_routes.table import Subscriber, TargetSubscriberFile
 
     live = table.homes["codex"].bindings[0]
-    template = load(TABLE).subscriber_files["shared-v0.5.0"].subscribers[0]
+    current = load(TABLE)
+    template = current.subscriber_files[current.reconciliation_file].subscribers[0]
     target = TargetSubscriberFile("v0.5.0", (
         replace(template, name="guard", nativeEvents=["Stop"], kinds=["turn-end"], tools=None),
     ))
@@ -263,7 +264,8 @@ def test_reconciliation_move_keeps_reconcile_observers(table, complete):
 
     today = load(TABLE)
     old = today.subscriber_files[today.reconciliation_file]
-    workers, familiar = old.subscribers[2], old.subscribers[1]
+    entries = {entry.name: entry for entry in old.subscribers}
+    workers, familiar = entries["familiar-codex-workers"], entries["familiar"]
     target = TargetSubscriberFile("v0.5.0", (workers, familiar) if complete else (workers,))
     table = replace(
         table, states={**table.states, **today.states}, subscribers=today.subscribers, subscriber_files={"shared": old},
@@ -379,7 +381,8 @@ def test_target_cannot_drop_the_shipped_relay_subscriber(omission):
 
     table = load(TABLE)
     source = table.subscriber_files[table.reconciliation_file]
-    event, subscriber = ("PreToolUse", "ops-guard") if omission == "tools" else ("Stop", "familiar")
+    event = "PreToolUse" if omission == "tools" else "Stop"
+    subscriber = "familiar"
     target = []
     for entry in source.subscribers:
         if entry.name == subscriber:

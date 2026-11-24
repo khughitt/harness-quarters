@@ -15,6 +15,7 @@ from hook_routes.table import load
 ROOT = Path(__file__).resolve().parents[1]
 TABLE = ROOT / 'harnesses/hook-routes.toml'
 CLAUDE = 'harnesses/claude/settings.json'
+CLAUDE_WORK = 'harnesses/claude/work/settings.json'
 CODEX = 'harnesses/codex/hooks.json'
 CODEX_WORK = 'harnesses/codex/work/hooks.json'
 AGY = 'harnesses/agy/hooks.json'
@@ -36,9 +37,10 @@ def test_render_reproduces_codex_and_agy_files():
         assert rendered[path] == (ROOT / path).read_bytes()
 
 
-def test_render_reproduces_claude_hooks():
-    before = (ROOT / CLAUDE).read_bytes()
-    after = render_live(load(TABLE), _tracked_home())[CLAUDE]
+@pytest.mark.parametrize('path', [CLAUDE, CLAUDE_WORK])
+def test_render_reproduces_claude_hooks(path):
+    before = (ROOT / path).read_bytes()
+    after = render_live(load(TABLE), _tracked_home())[path]
     assert json.loads(after)['hooks'] == json.loads(before)['hooks']
     # The checked-in hooks already use the renderer's indentation.
     assert after == before
@@ -61,13 +63,13 @@ def checkout(tmp_path):
     home = tmp_path / 'home'
     home.mkdir()
     repo = tmp_path / 'checkout'
-    tracked_home = os.fsencode(_tracked_home())
-    for path in (CLAUDE, CODEX, CODEX_WORK, AGY, SUBSCRIBERS):
+    for path in (CLAUDE, CLAUDE_WORK, CODEX, CODEX_WORK, AGY, SUBSCRIBERS):
         dest = repo / path
         dest.parent.mkdir(parents=True, exist_ok=True)
-        data = (ROOT / path).read_bytes()
-        dest.write_bytes(data.replace(tracked_home, os.fsencode(home)))
+        shutil.copyfile(ROOT / path, dest)
     shutil.copy(TABLE, repo / 'harnesses')
+    for path, data in render_live(load(repo / 'harnesses/hook-routes.toml'), home).items():
+        (repo / path).write_bytes(data)
     shutil.copytree(ROOT / 'tools/hook_routes', repo / 'tools/hook_routes',
                     ignore=shutil.ignore_patterns('__pycache__'))
     shutil.copy(ROOT / 'tools/hook-routes', repo / 'tools')
@@ -94,6 +96,17 @@ def test_claude_check_ignores_live_keys(checkout):
     result = _check(checkout)
     assert result.returncode == 1
     assert CLAUDE in result.stderr and 'SessionStart' in result.stderr
+
+
+def test_promoted_preflight_refuses_settings_rendered_for_another_home(checkout):
+    repo, home = checkout
+    other_home = home.with_name('other-home')
+    other_home.mkdir()
+    result = subprocess.run([sys.executable, str(repo / 'tools/hook-routes'), 'preflight'],
+                            env={'PATH': os.defpath, 'HOME': str(other_home)},
+                            cwd=repo, capture_output=True, text=True)
+    assert result.returncode == 1
+    assert CODEX in result.stderr and 'hook-drift' in result.stderr
 
 
 def test_check_reports_codex_drift(checkout):
@@ -154,14 +167,14 @@ def test_check_requires_the_legacy_subscriber_destination(checkout):
 def test_check_rejects_a_subscriber_role_override(checkout):
     root, _ = checkout
     path = root / 'harnesses/hook-routes.toml'
-    path.write_text(path.read_text().replace('{ name = "ops-guard",',
-                                             '{ name = "ops-guard", role = "observer",'))
+    path.write_text(path.read_text().replace('{ name = "familiar",',
+                                             '{ name = "familiar", role = "guard",'))
     template_path = root / SUBSCRIBERS
     template = json.loads(template_path.read_bytes())
-    template['subscribers'][0]['role'] = 'observer'
+    template['subscribers'][0]['role'] = 'guard'
     template_path.write_text(json.dumps(template, indent=2) + '\n')
 
     result = _check(checkout)
 
     assert result.returncode == 1
-    assert 'ops-guard' in result.stderr and 'role' in result.stderr
+    assert 'familiar' in result.stderr and 'role' in result.stderr

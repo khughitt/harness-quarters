@@ -22,8 +22,9 @@ private work settings or apply another person's home layout without configuratio
 | Pinned runtimes | harnesses/pi/, relay/ | home launchers and installed hook images |
 
 The shared checkout holds configuration; homes contain authentication, session
-stores and other private state. The untracked local/ directory holds private work
-configuration, saved picks and Codex trust. Setup creates directories, not secrets.
+stores and other private state. The untracked local/ directory holds the private work
+Codex configuration, saved picks and Codex trust. The work Claude Code settings
+are tracked at harnesses/claude/work/settings.json. Setup creates directories, not secrets.
 
 ## Owner boundaries
 

@@ -62,9 +62,11 @@ def test_preflight_refuses_missing_deployed_file(tmp_path):
 
 
 def test_preflight_refuses_digest_mismatch(tmp_path):
+    from hook_routes.deploy import live_files
     from hook_routes.preflight import run
     table = today(tmp_path)
-    dest = tmp_path / ".config/relay/v0.5.0/relay/subscribers.json"
+    address, = live_files(table, tmp_path)
+    dest = tmp_path / ".config/relay" / address
     dest.parent.mkdir(parents=True)
     dest.write_text("{}")
     assert "deployed-digest" in {f.code for f in run(table, home=tmp_path, path_env=str(tmp_path), next_dir=None)}
@@ -98,7 +100,7 @@ def test_reconcile_base_follows_table(tmp_path, monkeypatch, capsys):
     from hook_routes import cli
     table = today(tmp_path)
     alternate = replace(table.subscriber_files[table.reconciliation_file],
-                        path="~/.config/relay/v0.6.0/relay/subscribers.json")
+                        path="~/.config/relay/v0.6.0/relay/subscribers.json", runtime=None)
     table = replace(table, subscriber_files={"future": alternate}, reconciliation_file="future")
     monkeypatch.setattr(cli, "load", lambda path: table)
     monkeypatch.setenv("HOME", str(tmp_path))
@@ -268,7 +270,7 @@ def test_excluded_qualified_policy_keeps_static_check_portable(tmp_path, monkeyp
 @pytest.fixture
 def deployed_host(tmp_path, runtime):
     from hook_routes.deploy import deploy, live_files
-    from hook_routes.render import subscriber_bytes
+    from hook_routes.table import RouteState, Subscriber
 
     table = today(tmp_path)
     # The standalone launcher uses the checkout pin independently of the hook's runtime.
@@ -279,11 +281,17 @@ def deployed_host(tmp_path, runtime):
         assert source.is_dir(), f"missing relay installation for preflight: {source}"
         (installs / version).symlink_to(source, target_is_directory=True)
     source = table.subscriber_files[table.reconciliation_file]
-    digest = sha256(subscriber_bytes(table, source, tmp_path)).hexdigest()[:12]
-    reconcile = replace(source, path=f"~/.config/relay/v0.5.0-{digest}/relay/subscribers.json")
+    entry = replace(source.subscribers[0], name="fixture-guard", kinds=["before-tool"], tools=["Bash"])
+    guard_path = Path("d", "fixture", "hooks", "guard")
+    guard = Subscriber("fixture-guard", "guard", ("env", "/usr/bin/python3", f"~/{guard_path}"), 500)
+    state = RouteState("existing", owner="owner-123abc", grant="fixture")
+    reconcile = replace(source, path="~/.config/relay/v0.5.0/relay/subscribers.json", runtime=None,
+                        subscribers=(entry, *source.subscribers))
     files = dict(table.subscriber_files, reconcile=reconcile)
-    table = replace(table, reconciliation_file="reconcile", subscriber_files=files)
-    for command in ("d/ops/hooks/relay-guard", "d/familiar/bin/familiar"):
+    table = replace(table, reconciliation_file="reconcile", subscriber_files=files,
+                    subscribers={**table.subscribers, entry.name: guard},
+                    states={**table.states, entry.name: state})
+    for command in (guard_path, Path("d", "familiar", "bin", "familiar")):
         stub = tmp_path / command
         stub.parent.mkdir(parents=True)
         stub.write_text("raise AssertionError('preflight executed the hook')")
@@ -292,13 +300,16 @@ def deployed_host(tmp_path, runtime):
     return table
 
 
-@pytest.mark.parametrize(("source", "bad_directory"), [("shared-v0.5.0", False), ("reconcile", True)])
-def test_preflight_loads_deployed_file_with_relay(tmp_path, deployed_host, source, bad_directory):
+@pytest.mark.parametrize("bad_directory", [False, True])
+def test_preflight_loads_deployed_file_with_relay(tmp_path, deployed_host, bad_directory):
     from hook_routes.preflight import run
-    from hook_routes.table import expand_path
+    from hook_routes.render import subscriber_address, subscriber_bytes
     table = deployed_host
     assert not run(table, home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)
-    path = Path(expand_path(table.subscriber_files[source].path, tmp_path))
+    source = table.reconciliation_file if bad_directory else table.homes["claude"].bindings[0].lines[0].subscriber_file
+    file = table.subscriber_files[source]
+    address = subscriber_address(file, subscriber_bytes(table, file, tmp_path), tmp_path)
+    path = tmp_path / ".config/relay" / address
     if bad_directory:
         path.parent.chmod(0o755)
     else:
@@ -309,7 +320,7 @@ def test_preflight_loads_deployed_file_with_relay(tmp_path, deployed_host, sourc
 
 def test_preflight_checks_wrapped_guard_and_observer(tmp_path, deployed_host):
     from hook_routes.preflight import run
-    guard = tmp_path / "d/ops/hooks/relay-guard"
+    guard = tmp_path / "d/fixture/hooks/guard"
     familiar = tmp_path / "d/familiar/bin/familiar"
     guard.chmod(0o600)  # The interpreter only needs to read the guard.
     assert not run(deployed_host, home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)

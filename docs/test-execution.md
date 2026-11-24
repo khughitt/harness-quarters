@@ -112,7 +112,6 @@ setup or partial run retains available evidence and remains unverified.
 
 The accepted hosted omissions are these exact local integration checks:
 
-- tools/test_agy_hooks.py::test_relay_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard
 - tools/test_harness_links.py::test_registered_owner_targets_match_portable_fixture_shapes
 - tools/test_hook_routes_equivalence.py::test_real_replay_leaves_host_untouched, when a required owner command is absent
 
@@ -124,9 +123,9 @@ hosted relay for budget admission, then use fixture transport observations for
 command output and evidence checks. They require no namespace privileges.
 
 Portable owner fixtures exercise link behavior without private checkouts. The local
-integration check also copies the real registered targets and compares their shapes.
-Both listed checks need the local project registry. The hosted suite includes the
-pinned budget check in `tools/test_hook_routes_relay.py` and the qualification and
+integration check uses the local project registry to copy real owner targets and
+compare their shapes. The hosted suite includes agy relay dispatch, the pinned
+budget check in `tools/test_hook_routes_relay.py`, and the qualification and
 preflight cases. No module is excluded. The local preparation pilot exercises
 two miniature partitions and failure retention.
 The separate mods and live capability probes are outside just test.

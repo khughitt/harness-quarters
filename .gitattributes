@@ -1,4 +1,5 @@
 harnesses/claude/settings*.json filter=harness-state
+harnesses/claude/work/settings*.json filter=harness-state
 harnesses/codex/config*.toml filter=harness-state
 harnesses/pi/settings*.json filter=harness-state
 harnesses/agy/settings*.json filter=harness-state

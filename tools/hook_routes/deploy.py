@@ -7,7 +7,6 @@ import re
 import tempfile
 
 from .render import claude_hooks, render_next, subscriber_address, subscriber_bytes
-from .table import expand_path
 
 __all__ = ["deploy", "live_files", "review_files", "reconcile_base"]
 
@@ -16,11 +15,10 @@ _ADDRESS = re.compile(r"(v\d+\.\d+\.\d+)(?:-([0-9a-f]{12}))?/relay/subscribers\.
 
 def reconcile_base(table, home):
     source = table.subscriber_files[table.reconciliation_file]
-    file = Path(expand_path(source.path, home))
-    address = file.relative_to(home / ".config/relay").as_posix()
+    address = subscriber_address(source, subscriber_bytes(table, source, home), home)
     if not _ADDRESS.fullmatch(address):
-        raise ValueError(f"invalid reconciliation path: {file}")
-    return file.parents[1]
+        raise ValueError(f"invalid reconciliation path: {address}")
+    return (home / ".config/relay" / address).parents[1]
 
 
 def live_files(table, home):

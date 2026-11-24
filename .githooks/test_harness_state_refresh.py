@@ -42,7 +42,7 @@ def repo(tmp_path):
     assert Path(git(repo, "rev-parse", "--show-toplevel").stdout.strip()) == repo.resolve()
     assert Path(git(repo, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
     (repo / ".githooks").mkdir(parents=True)
-    (repo / "harnesses/claude").mkdir(parents=True)
+    (repo / "harnesses/claude/work").mkdir(parents=True)
     (repo / "harnesses/codex").mkdir(parents=True)
     (repo / "harnesses/pi").mkdir(parents=True)
     (repo / "harnesses/agy").mkdir(parents=True)
@@ -52,11 +52,13 @@ def repo(tmp_path):
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     shutil.copy2(HOOKS.parent / "harnesses.toml", repo / "harnesses.toml")
     (repo / ".gitattributes").write_text("harnesses/claude/settings*.json filter=harness-state\n"
+                                         "harnesses/claude/work/settings*.json filter=harness-state\n"
                                          "harnesses/codex/config*.toml filter=harness-state\n"
                                          "harnesses/pi/settings*.json filter=harness-state\n"
                                          "harnesses/agy/settings*.json filter=harness-state\n")
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     (repo / "harnesses/codex" / "config.toml").write_text("[features]\nhooks = true\n")
+    (repo / "harnesses/claude/work" / "settings.json").write_text(json.dumps({"theme": "x"}, indent=2) + "\n")
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
     git(repo, "config", "filter.harness-state.required", "true")
     git(repo, "config", "filter.harness-state.smudge", "cat")

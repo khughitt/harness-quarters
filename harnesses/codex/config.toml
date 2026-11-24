@@ -97,31 +97,31 @@ approval_mode = "approve"
 [hooks.state]
 
 [hooks.state."/home/keith/.codex/hooks.json:pre_tool_use:0:0"]
-trusted_hash = "sha256:7e2fc2c93e7f031f914a2c94e333ede16a48fbd3a979f1a1c3f742d6e4b07dc7"
+trusted_hash = "sha256:c886da83755e97cbbf0202e740569d37d405437bef4644136b95ecfe94d68c67"
 
 [hooks.state."/home/keith/.codex/hooks.json:permission_request:0:0"]
-trusted_hash = "sha256:09592200e4af931b5fbec50a4f8155abd71b74b950bd9c4a720acd82043aac55"
+trusted_hash = "sha256:241e4588e67c8ffde9ca4c08a54da3db905676f7fef088796f5133c68ba86f7b"
 
 [hooks.state."/home/keith/.codex/hooks.json:session_start:0:0"]
 trusted_hash = "sha256:589e521c4e97756cff31ed61c7a46da0f3254b18ae491e997213bc865204b63a"
 
 [hooks.state."/home/keith/.codex/hooks.json:user_prompt_submit:0:0"]
-trusted_hash = "sha256:15b4efc0ea8698d7d37fd95dedca3dc43e18a2104ae11c489772509ebf75a98b"
+trusted_hash = "sha256:c5ee5c5891a95b8f81b81a9c1a39834fe8a55249032166ef706e07f9c3f4a15b"
 
 [hooks.state."/home/keith/.codex/hooks.json:stop:0:0"]
 trusted_hash = "sha256:19c30d87a87c005ad66dce25343b7f71289c03ed6a659ba8cdb03adbfb4a51fe"
 
 [hooks.state."ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0"]
 trusted_hash = "sha256:defea43402fc8edba23234c694a1117cf80efc2da38968a40a1004cd9d63f725"
-trusted_content_hash = "sha256:a91612be9c16de7256d2b52754d63f7307d984543277ee87315dd28a58e19296"
+trusted_content_hash = "sha256:af07ad9bf207874b8f008e5ecdf99aeb163b2d725df4c194bbc90619986dc3be"
 
 [hooks.state."ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0"]
 trusted_hash = "sha256:5aa5ec474e0bb546f207794993b37fdf7507e54a64e09216be164c5b7b42a197"
-trusted_content_hash = "sha256:a91612be9c16de7256d2b52754d63f7307d984543277ee87315dd28a58e19296"
+trusted_content_hash = "sha256:af07ad9bf207874b8f008e5ecdf99aeb163b2d725df4c194bbc90619986dc3be"
 
 [hooks.state."ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0"]
 trusted_hash = "sha256:5b2c1dfa8c7ecc5e8881c8e69479f65d46ed727e0bc5b8e7b4553cee9e5c3daf"
-trusted_content_hash = "sha256:a91612be9c16de7256d2b52754d63f7307d984543277ee87315dd28a58e19296"
+trusted_content_hash = "sha256:af07ad9bf207874b8f008e5ecdf99aeb163b2d725df4c194bbc90619986dc3be"
 
 [hooks.state."/mnt/ssd/Dropbox/mindful/v6/.codex/hooks.json:post_tool_use:0:0"]
 trusted_hash = "sha256:f217fbcf8ebe41da3413e01f17f17afcb1cae89c2b995feccd9ebbc4b2297fb6"
@@ -136,22 +136,22 @@ trusted_hash = "sha256:93d58788b52b6aa7c5fa7bdaa8e38f893595b1e6dbd4b754f605220e9
 trusted_hash = "sha256:1af4d7b0db7828de49e3ee977c46c56581f393ab882e179db44eb24716951c3a"
 
 [hooks.state."/home/keith/.codex/hooks.json:stop:2:0"]
-trusted_hash = "sha256:f2c44875eeede5c39be20f006df35bd994b05aad7f94d0a9d29d0f388d6af2f9"
+trusted_hash = "sha256:0ced581846ac3b760b74a575b6fea27dbcb4cd35bb50eaae1deb7518a486e513"
 
 [hooks.state."/home/keith/.codex/hooks.json:subagent_stop:0:0"]
 trusted_hash = "sha256:79d4fb5fd6806169a482ae5ea2e69d902506ea9dfe03db2501ca7b2610b5e250"
 
 [hooks.state."/home/keith/.codex/hooks.json:session_start:2:0"]
-trusted_hash = "sha256:d399b5029ef69142c29481a8a74bcbb4574a4dcad3caa12c8a5f2cb807aec4de"
+trusted_hash = "sha256:586f5e07bb5a419c297bc302316dca590f05838b6738192590584395fd543123"
 
 [hooks.state."/home/keith/.codex/hooks.json:session_end:0:0"]
-trusted_hash = "sha256:9dca51f4bc2264dfdf172996fb56108dca673cb253acd640b37b8b3fdbe4fd91"
+trusted_hash = "sha256:bba03f5a9eb7080fb5eaeb5af213146a4c3a870f67c5f42bcf0ee57c27b03bb1"
 
 [hooks.state."/home/keith/.codex/hooks.json:subagent_start:0:0"]
-trusted_hash = "sha256:f5b1d41c7fbf8faf5f3aae4cc90b62250d711219c12b7ac009083fe1cfff561a"
+trusted_hash = "sha256:6490851d2ebbd1c4446c68786d1508ebcda93ee5f9ba8bd3dd65d375094bb68b"
 
 [hooks.state."/home/keith/.codex/hooks.json:subagent_stop:1:0"]
-trusted_hash = "sha256:79ea66a24b7e6ddda122dc94f21fb6c927e7bf151a77199ac4215e9025cae88e"
+trusted_hash = "sha256:9f8de337b4c912e9a67463f8910cc205c5d1fd4ebaab03f14c668f4fea7eeb70"
 
 [hooks.state."/home/keith/.codex/hooks.json:pre_tool_use:1:0"]
 trusted_hash = "sha256:ad9808dfde50bb1af94c00d8953a1f64d4ced63e6ddae95b9abf9eb376fd852d"

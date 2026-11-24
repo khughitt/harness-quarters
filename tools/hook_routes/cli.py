@@ -145,7 +145,12 @@ def main(argv):
                     print(row.line, file=evidence)
             return int(any(row.status == "failed" for row in rows))
         if args.command == "preflight":
-            return _report(preflight(table, home=Path.home(), path_env=os.environ.get("PATH", os.defpath),
+            home = Path.home()
+            if args.next is None:
+                drift = check_live(table, home)
+                if drift:
+                    return _report(drift)
+            return _report(preflight(table, home=home, path_env=os.environ.get("PATH", os.defpath),
                                      next_dir=args.next))
         if args.command == "status":
             return _status(args, table)

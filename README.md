@@ -31,9 +31,9 @@ just setup
 ```
 
 Setup installs repository hooks and the required harness-state Git filter, and
-creates local configuration directories. It does not generate private work
-settings, authenticate a harness or install model runtimes. Private work files
-come from an already configured host and remain untracked under `local/`.
+creates local configuration directories. It does not generate the private work
+Codex config, authenticate a harness or install model runtimes. That file comes
+from an already configured host and remains untracked under `local/`.
 
 Home links require registered owner checkouts and existing targets. From main:
 
@@ -94,8 +94,9 @@ boundaries; setup alone does not enable user timers.
 | `harnesses.toml` | Harness slugs, live config paths, stripped keys and pick units |
 | `.gitattributes` | Exact required clean-filter routes |
 | `harnesses/` | Tracked settings, hooks and runtime definitions |
-| `local/` | Untracked private work settings, saved picks and trust |
+| `local/` | Untracked private work Codex config, saved picks and trust |
 | `facts/capabilities.toml` | Validated observations with explicit unknown states |
+| `palette.toml` | Guild harness, model-family and status colours ([palette](docs/palette.md)) |
 | `tools/hq.toml` | Session selection and launch flags per home |
 
 Model picks, effort and Codex trust are live state. The required clean filter keeps
@@ -133,6 +134,7 @@ desktop use and paid capability probes retain their own authorization boundaries
 | Synthetic acceptance cases | [Session-log cases](docs/session-log-cases.md) |
 | Transcript custody and recovery | [Session archive](docs/session-archive.md) |
 | Turn limits and diagnostics | [Turn pause](docs/turn-pause.md) |
+| Shared output colours | [Palette](docs/palette.md) |
 | Observations and re-probing | [Harness capabilities](docs/harness-capabilities.md) |
 | Finite cutover and rollback interfaces | [Rename cutover](docs/rename-cutover.md) |
 | Focused, hosted and portable checks | [Test execution](docs/test-execution.md) |

@@ -65,9 +65,10 @@ def load_codex_spec():
     """The codex live-state entry from harnesses.toml; exits when it cannot trust-restore."""
     global CODEX_SPEC
     manifest = harness_state.load_manifest_or_exit("codex-trust")
-    spec = manifest.by_harness.get("codex")
-    if spec is None or spec.format != "toml" or spec.trust_table is None:
-        fail("harnesses.toml: codex needs a TOML live_state with trust_table")
+    specs = manifest.by_harness.get("codex", ())
+    if len(specs) != 1 or specs[0].format != "toml" or specs[0].trust_table is None:
+        fail("harnesses.toml: codex needs exactly one TOML live_state, with trust_table")
+    (spec,) = specs
     if spec.config != LIVE_NAME:
         fail(f"harnesses.toml: codex live_state config is {spec.config!r}, not {LIVE_NAME!r}")
     CODEX_SPEC = spec

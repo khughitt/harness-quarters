@@ -70,7 +70,7 @@ CHECKOUT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 # The hook wiring in this checkout, and the harness home files that link to it
 # (links.toml), protected with the state directory, the limits file and the facts
 # snapshot (which decides, among other things, whether compactions are counted).
-WIRING = ('harnesses/claude/settings.json', 'harnesses/codex/hooks.json', 'harnesses/codex/work/hooks.json', 'local/claude/settings.work.json')
+WIRING = ('harnesses/claude/settings.json', 'harnesses/codex/hooks.json', 'harnesses/codex/work/hooks.json', 'harnesses/claude/work/settings.json')
 HOME_LINKS = ('.claude/settings.json', '.claude-work/settings.json', '.codex/hooks.json', '.codex-work/hooks.json')
 GRACE = 25
 # The largest PreToolUse the hook judges; a larger one is refused (fail closed). Bytes

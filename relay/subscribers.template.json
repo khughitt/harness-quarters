@@ -2,27 +2,6 @@
   "schema": 2,
   "subscribers": [
     {
-      "name": "ops-guard",
-      "role": "guard",
-      "harnesses": [
-        "claude-code",
-        "codex",
-        "agy"
-      ],
-      "kinds": [
-        "before-tool"
-      ],
-      "tools": [
-        "Bash"
-      ],
-      "argv": [
-        "env",
-        "/usr/bin/python3",
-        "@HOME@/d/ops/hooks/relay-guard"
-      ],
-      "timeoutMs": 30000
-    },
-    {
       "name": "familiar",
       "role": "observer",
       "registry": "snapshot",
