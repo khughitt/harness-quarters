@@ -20,7 +20,7 @@ reason = "Keeps the halt, stale-instructions and index notices until their owner
 [states.tasks-notices]
 state = "native"
 owner = "tasks"
-reason = "tasks supplies the synced-records notices on PATH; donor-2 has no subscriber for them (user decision on hq-8185d3)."
+reason = "tasks supplies the synced-records notices on PATH; donor-2 has no subscriber for them (user decision on hq-8185d3). Holds while donor-2 serves Claude SessionStart; hq-e7bb1d decides where the notice goes when a later candidate replaces it."
 
 [states.claude-profile]
 state = "native"
