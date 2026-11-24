@@ -199,7 +199,10 @@ SessionStart lines and the native Stop claim guard and state refresh lines are
 gone from that home. Their policies are `relay` states on the two lines and cite
 the Claude Code 2.1.331 records for both session modes. A native SessionStart
 line runs `tasks notices --pretty` before the relay line. The ops hook gained that
-notice after donor-2 was frozen, and donor-2 has no subscriber for it. Every other Claude
+notice after donor-2 was frozen, and donor-2 has no subscriber for it. The line
+has a 5 second timeout. Relay's latency support covers only the measured native
+entries, so with this extra line SessionStart latency is unknown by relay's rule.
+The user accepted this limitation on hq-8185d3. Stop is unaffected. Every other Claude
 Code relay line keeps the shared file, which still serves reconciliation. The
 Codex homes and the work Claude Code home are unchanged.
 
