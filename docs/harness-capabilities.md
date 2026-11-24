@@ -49,6 +49,8 @@ The personal Claude Code home runs SessionStart and Stop through relay v0.5.0 wi
 the donor-2 subscriber file. SessionStart runs the tasks halt notice, lore's stale and
 profile notices, the git index repair and the mindful capture notice. Stop runs the
 tasks claim guard and the harness state refresh. The owner commands resolve on PATH.
+A native SessionStart line runs `tasks notices --pretty` for unregistered synced projects
+and unadopted renames.
 The work Claude Code home still runs its profile notice and state refresh natively.
 
 Agy's local hook calls the profile and capture notice owners at SessionStart

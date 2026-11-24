@@ -17,7 +17,9 @@ def session_start(path):
 def test_claude_runs_capture_notice_through_relay_once():
     # hq-8185d3 moved the notice into the donor-2 relay composition.
     commands = session_start(ROOT / 'harnesses/claude' / 'settings.json')
-    assert [parse_relay_command(c, HOOK_VERSIONS['harnesses/claude/settings.json']) for c in commands] == [
+    assert COMMAND not in commands
+    assert [parsed for c in commands
+            if (parsed := parse_relay_command(c, HOOK_VERSIONS['harnesses/claude/settings.json']))] == [
         ('claude-code', 600000, 'SessionStart', 'donor-2')]
     subscribers = json.loads((ROOT / 'relay/subscribers.donor-2.template.json').read_text())['subscribers']
     assert [s['argv'] for s in subscribers].count(['mindful', 'notice', 'session-start']) == 1

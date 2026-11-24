@@ -17,6 +17,11 @@ state = "native"
 owner = "hq-a83688"
 reason = "Keeps the halt, stale-instructions and index notices until their owner commands can run."
 
+[states.tasks-notices]
+state = "native"
+owner = "tasks"
+reason = "tasks supplies the synced-records notices on PATH; donor-2 has no subscriber for them (user decision on hq-8185d3)."
+
 [states.claude-profile]
 state = "native"
 owner = "hq-a83688"
@@ -193,6 +198,7 @@ subscribers = [
 harness = "claude-code"
 path = "harnesses/claude/settings.json"
 bindings = [
+  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["tasks-notices"], command = "tasks notices --pretty" }] },
   { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["relay-provenance", "familiar", "claude-sessionstart", "claude-profile", "capture-notice"], runtime = "v0.5.0", relay_kind = "session-start", subscriber_file = "donor-2-shared", outer_ms = 600000, timeout = 600, states = { "claude-sessionstart" = { state = "relay", records = ["claude-code-2.1.331-interactive-v0.5.0-19b427ac306a.json", "claude-code-2.1.331-non-interactive-v0.5.0-19b427ac306a.json"], activation = "hq-a83688:claude-donor-activation" }, "claude-profile" = { state = "relay", records = ["claude-code-2.1.331-interactive-v0.5.0-19b427ac306a.json", "claude-code-2.1.331-non-interactive-v0.5.0-19b427ac306a.json"], activation = "hq-a83688:claude-donor-activation" }, "capture-notice" = { state = "relay", records = ["claude-code-2.1.331-interactive-v0.5.0-19b427ac306a.json", "claude-code-2.1.331-non-interactive-v0.5.0-19b427ac306a.json"], activation = "hq-a83688:claude-donor-activation" } } }] },
   { event = "PostModelSwitch", lines = [{ policies = ["relay-provenance"], runtime = "v0.5.0", relay_kind = "model-change", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 60000, timeout = 60 }] },
   { event = "UserPromptSubmit", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "prompt", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600 }] },

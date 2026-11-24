@@ -50,6 +50,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "tasks notices --pretty"
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
             "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.5.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/v0.5.0-19b427ac306a/relay/subscribers.json' SessionStart",
             "timeout": 600
           }

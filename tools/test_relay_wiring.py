@@ -168,8 +168,10 @@ def test_native_entries_kept_in_order(file):
     if file == FILES[0]:
         # relay's built-in provenance replaced ops claude-provenance on SessionStart
         # and PostModelSwitch; the SessionStart notices, claim guard and state refresh
-        # moved into the donor-2 relay composition (hq-8185d3).
+        # moved into the donor-2 relay composition (hq-8185d3). tasks owns the synced-records
+        # notices, which donor-2 lacks, as a native line (user decision on hq-8185d3).
         assert native == {
+            'SessionStart': ['tasks notices --pretty'],
             # tt's native command counts test front-door use; ops owns it on PATH.
             'PostToolUse': ['tt-posttooluse'],
             'PostToolUseFailure': ['tt-posttooluse'],

@@ -197,7 +197,9 @@ The personal Claude Code home's SessionStart and Stop relay lines use the live
 candidate's `v0.5.0-19b427ac306a/relay/subscribers.json`. The native ops and lore
 SessionStart lines and the native Stop claim guard and state refresh lines are
 gone from that home. Their policies are `relay` states on the two lines and cite
-the Claude Code 2.1.331 records for both session modes. Every other Claude
+the Claude Code 2.1.331 records for both session modes. A native SessionStart
+line runs `tasks notices --pretty` before the relay line. The ops hook gained that
+notice after donor-2 was frozen, and donor-2 has no subscriber for it. Every other Claude
 Code relay line keeps the shared file, which still serves reconciliation. The
 Codex homes and the work Claude Code home are unchanged.
 
