@@ -189,6 +189,24 @@ sessions. Running sessions cache command strings for the retired invocation
 forms. To roll back after activation, revert the merge with
 `git revert -m 1 <merge>` and restart agy sessions.
 
+## Claude Code donor cutover
+
+The personal Claude Code home's SessionStart and Stop relay lines use the live
+`donor-2-shared` subscriber file. Its tracked template is
+`relay/subscribers.donor-2.template.json`. Its expanded bytes match the frozen donor-2
+candidate's `v0.5.0-19b427ac306a/relay/subscribers.json`. The native ops and lore
+SessionStart lines and the native Stop claim guard and state refresh lines are
+gone from that home. Their policies are `relay` states on the two lines and cite
+the Claude Code 2.1.331 records for both session modes. Every other Claude
+Code relay line keeps the shared file, which still serves reconciliation. The
+Codex homes and the work Claude Code home are unchanged.
+
+The activation reference `hq-a83688:claude-donor-activation` reserves a note on
+hq-a83688 for the user's grant. Before merging, deploy and preflight on each host,
+then pause Claude Code sessions. To roll back, revert the merge with
+`git revert -m 1 <merge>` and restart Claude Code sessions. The digest-addressed file
+can stay deployed.
+
 ## Donor policy equivalence
 
 `tools/hook-routes equivalence --next DIR --out FILE` reads the frozen

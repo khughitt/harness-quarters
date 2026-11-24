@@ -1,4 +1,5 @@
 """The route table reproduces the tracked hook wiring and detects drift."""
+from hashlib import sha256
 import json
 import os
 import shlex
@@ -9,8 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from hook_routes.render import render_live, splice_claude_hooks
+from hook_routes.render import render_live, splice_claude_hooks, subscriber_bytes
 from hook_routes.table import load
+from test_hook_routes_relay import runtime  # noqa: F401  (pytest fixture)
 
 ROOT = Path(__file__).resolve().parents[1]
 TABLE = ROOT / 'harnesses/hook-routes.toml'
@@ -83,17 +85,49 @@ def _check(checkout):
                           cwd=repo, capture_output=True, text=True)
 
 
-def test_claude_check_ignores_live_keys(checkout):
-    path = checkout[0] / CLAUDE
+@pytest.fixture
+def qualified_checkout(checkout, runtime):
+    """The checkout with the pinned relay and fixture qualification records for its HOME.
+
+    The tracked records bind each subscriber file's sha256 as expanded for the
+    account HOME, so they cannot match the temporary HOME. These copies are
+    fixture records: identical except for configDigest, rewritten to the digest
+    of the file each qualified line runs under the temporary HOME.
+    """
+    repo, home = checkout
+    installs = home / '.local/share/relay'
+    installs.mkdir(parents=True)
+    (installs / 'v0.5.0').symlink_to(runtime.parents[1], target_is_directory=True)
+    records = repo / 'harnesses/qualification'
+    shutil.copytree(ROOT / 'harnesses/qualification', records)
+    table = load(repo / 'harnesses/hook-routes.toml')
+    digests = {}
+    for _, _, _, binding in table.bindings():
+        for line in (line for line in binding.lines if line.kind == 'relay'):
+            data = subscriber_bytes(table, table.subscriber_files[line.subscriber_file], home)
+            for policy in line.policies:
+                state = table.policy_state(policy, line)
+                for name in state.records if state and state.kind == 'relay' else ():
+                    digests.setdefault(name, set()).add(sha256(data).hexdigest())
+    assert digests, 'the live table names no qualified relay line'
+    for name, (digest, *conflict) in digests.items():
+        assert not conflict, f'{name} would need two config digests'
+        path = records / name
+        path.write_text(json.dumps(dict(json.loads(path.read_bytes()), configDigest=digest)))
+    return repo, home
+
+
+def test_claude_check_ignores_live_keys(qualified_checkout):
+    path = qualified_checkout[0] / CLAUDE
     settings = json.loads(path.read_bytes())
     settings['model'] = 'test-model'
     path.write_text(json.dumps(settings))
-    result = _check(checkout)
+    result = _check(qualified_checkout)
     assert result.returncode == 0, result.stderr
 
     settings['hooks']['SessionStart'][0]['hooks'][0]['command'] = 'different-command'
     path.write_text(json.dumps(settings))
-    result = _check(checkout)
+    result = _check(qualified_checkout)
     assert result.returncode == 1
     assert CLAUDE in result.stderr and 'SessionStart' in result.stderr
 

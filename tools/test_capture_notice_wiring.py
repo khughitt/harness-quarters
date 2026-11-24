@@ -14,8 +14,13 @@ def session_start(path):
             if h['type'] == 'command']
 
 
-def test_claude_registers_capture_notice_once():
-    assert session_start(ROOT / 'harnesses/claude' / 'settings.json').count(COMMAND) == 1
+def test_claude_runs_capture_notice_through_relay_once():
+    # hq-8185d3 moved the notice into the donor-2 relay composition.
+    commands = session_start(ROOT / 'harnesses/claude' / 'settings.json')
+    assert [parse_relay_command(c, HOOK_VERSIONS['harnesses/claude/settings.json']) for c in commands] == [
+        ('claude-code', 600000, 'SessionStart', 'donor-2')]
+    subscribers = json.loads((ROOT / 'relay/subscribers.donor-2.template.json').read_text())['subscribers']
+    assert [s['argv'] for s in subscribers].count(['mindful', 'notice', 'session-start']) == 1
 
 
 def test_codex_appends_capture_notice_after_trusted_entries():
@@ -23,7 +28,7 @@ def test_codex_appends_capture_notice_after_trusted_entries():
     commands = session_start(ROOT / 'harnesses/codex' / 'hooks.json')
     assert len(commands) == 3
     assert commands[:2] == ['~/d/lore/hooks/claude-profile', COMMAND]
-    assert parse_relay_command(commands[2], HOOK_VERSIONS['harnesses/codex/hooks.json']) == ('codex', 600000, 'SessionStart')
+    assert parse_relay_command(commands[2], HOOK_VERSIONS['harnesses/codex/hooks.json']) == ('codex', 600000, 'SessionStart', 'shared')
 
 
 def test_codex_work_home_has_no_capture_notice():
@@ -38,4 +43,4 @@ def test_agy_registers_profile_and_capture_notice_once():
     commands = [h['command'] for h in hooks['SessionStart'] if h.get('type') == 'command']
     assert len(commands) == 2
     assert commands[0] == expected_agy_bridge('SessionStart')
-    assert parse_relay_command(commands[1], HOOK_VERSIONS['harnesses/agy/hooks.json']) == ('agy', 60000, 'SessionStart')
+    assert parse_relay_command(commands[1], HOOK_VERSIONS['harnesses/agy/hooks.json']) == ('agy', 60000, 'SessionStart', 'shared')

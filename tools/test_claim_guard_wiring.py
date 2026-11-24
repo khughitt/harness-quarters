@@ -35,7 +35,7 @@ def test_both_codex_homes_guard_root_and_worker(file, home):
               and '/turn-pause ' not in h['command']]  # pinned by test_turn_pause_wiring.py
     assert len(others) == 2
     assert others[0] == '~/.local/bin/harness-state-refresh'
-    assert parse_relay_command(others[1], HOOK_VERSIONS[f'harnesses/codex/{file}']) == ('codex', 600000, 'Stop')
+    assert parse_relay_command(others[1], HOOK_VERSIONS[f'harnesses/codex/{file}']) == ('codex', 600000, 'Stop', 'shared')
     manifest = tomllib.loads((ROOT / 'links.toml').read_text())
     assert manifest['harness'][home]['links']['hooks.json'] == f'harnesses/codex/{file}'
 
@@ -67,7 +67,7 @@ def test_agy_home_guards_pretooluse_and_stop():
     assert pre_tool[0] == ('run_command', '~/d/hq/harnesses/agy/hook PreToolUse', None)
     assert pre_tool[1][0] == '*'
     assert pre_tool[1][2] == 60
-    assert parse_relay_command(pre_tool[1][1], HOOK_VERSIONS['harnesses/agy/hooks.json']) == ('agy', 60000, 'PreToolUse')
+    assert parse_relay_command(pre_tool[1][1], HOOK_VERSIONS['harnesses/agy/hooks.json']) == ('agy', 60000, 'PreToolUse', 'shared')
 
     stop = [(h['command'], h.get('timeout')) for h in hooks['Stop'] if h.get('type') == 'command']
     assert len(stop) == 3
@@ -76,7 +76,7 @@ def test_agy_home_guards_pretooluse_and_stop():
         ('~/.local/bin/harness-state-refresh', None),
     ]
     assert stop[2][1] == 60
-    assert parse_relay_command(stop[2][0], HOOK_VERSIONS['harnesses/agy/hooks.json']) == ('agy', 60000, 'Stop')
+    assert parse_relay_command(stop[2][0], HOOK_VERSIONS['harnesses/agy/hooks.json']) == ('agy', 60000, 'Stop', 'shared')
 
     manifest = tomllib.loads((ROOT / 'links.toml').read_text())
     assert manifest['harness']['agy-config']['links']['hooks.json'] == 'harnesses/agy/hooks.json'

@@ -1,0 +1,311 @@
+{
+  "schema": 1,
+  "harness": "claude-code",
+  "version": "2.1.331",
+  "sessionMode": "non-interactive",
+  "platform": "linux",
+  "relayCommit": "1f1c28da62e7867caf3acaddf16ba13079a37e85",
+  "configDigest": "19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b",
+  "rows": [
+    {
+      "event": "SessionStart",
+      "role": "observer",
+      "outerMs": 600000,
+      "contextLimit": 10000,
+      "decode": {
+        "status": "passed",
+        "evidence": [
+          "test/fixtures/hook-events/claude-code.SessionStart.input.json at 1f1c28da62e7867caf3acaddf16ba13079a37e85",
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: the live native payload decoded and reached its notice subscriber"
+        ]
+      },
+      "nativeReply": {
+        "status": "passed",
+        "evidence": [
+          "reply encoding fixtures (test/hook-event.test.js, test/notice.test.js) on Node 22.23.2 and 26.5.0 at 1f1c28da62e7867caf3acaddf16ba13079a37e85 (89 tests, 2026-11-24)",
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: additionalContext encoding delivered live"
+        ]
+      },
+      "liveDelivery": {
+        "status": "passed",
+        "evidence": [
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: a 10,000-character notice context reached the model request intact; claude -p exited 0",
+          "host-a live composition 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, the hq donor-2 subscriber file 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b byte-for-byte with the real policy commands in a scratch home; report attached to relay-d487c1 as donor-2-live-composition-report.md: familiar's observer exited 0 with session ownership proven, and the five notices' composed 1,674-character context reached the model request, with no relay diagnostic or subscriber failure"
+        ]
+      },
+      "failure": {
+        "status": "passed",
+        "evidence": [
+          "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) on Node 22.23.2 and 26.5.0 at 1f1c28da62e7867caf3acaddf16ba13079a37e85 (89 tests, 2026-11-24)"
+        ]
+      },
+      "cleanup": {
+        "status": "passed",
+        "evidence": [
+          "test/child-containment.test.js on Node 22.23.2 and 26.5.0 at 1f1c28da62e7867caf3acaddf16ba13079a37e85 (89 tests, 2026-11-24)",
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: no subscriber survived and relay reap found nothing"
+        ]
+      },
+      "latency": {
+        "status": "passed",
+        "evidence": [
+          "host=host-a outerMs=30000 runtime=v22.23.2 claude-code SessionStart commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 24.2 p99 delta 22.5 max delta 22.0 ms",
+          "host=host-a outerMs=30000 runtime=v26.5.0 claude-code SessionStart commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 19.4 p99 delta 18.4 max delta 14.9 ms",
+          "host=host-b outerMs=30000 runtime=v22.23.2 claude-code SessionStart commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 14.7 p99 delta 14.3 max delta 6.1 ms",
+          "host=host-b outerMs=30000 runtime=v26.13.1 claude-code SessionStart commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 11.5 p99 delta 24.2 max delta 27.0 ms",
+          "judge.mjs at 1f1c28da62e7867caf3acaddf16ba13079a37e85: passed on host-a and host-b, each on Node 22 and a development runtime, against its own deployed composition (synthetic fixtures; transport evidence); judge and timing report attached to relay-d487c1 as sessionstart-two-host-judge.json and sessionstart-two-host-timing-report.md",
+          "measured at outerMs 30000 under plan amendment 2 (records 1ac7bf7ccd7da3aebe47d192d69d54459e17aa0b, user-accepted), no larger than this row's 600000; the native claude-sessionstart entry ran as three parallel baseline branches under the recorded mapping (ruling on relay-d487c1)",
+          "supported under design spec revision 7 and plan amendment 3 revision 4 (records fbdc0a8db7, both user-accepted 2026-11-24); evidence attached to relay-d487c1: the plan amendment 3 host-a evidence report (selection, timing variant, input), amendment-3-wiring-check.py (sha256 6f4fec37056b8a79) with the final per-host outputs attached as amendment-3-wiring-check-*.out (host-a 5dfe445e312db245, host-b 670187162a1ab9ac), the decoder replay decode-timed-inputs.out (73fa5f404c32469e) in the task scratch, and task notes for the user's hooks-only digest and the method rulings",
+          "candidate config 435d28ddaa949920c0c83266706bad8686417ae14498df39700078ba25182510, normalized from the donor-2 subscriber file",
+          "expected decoded event of the timed input (rebuilt with each run's own cwd, padded scratchpad_dir 738 bytes, decoded at 1f1c28da on both hosts' manifests): kind session-start, identity valid, model valid, transcriptPath valid, scratchpadDir invalid",
+          "support for host-a (recorded claude-code 2.1.331, mode interactive) at row claude-code 2.1.331 -p: relay commit 1f1c28da62e7 measured; wiring by host-a's check: hq HEAD 0cf989b1 and blob 3a40b806 as recorded, filtered live file = index = HEAD, blob hooks = frozen snapshot 76bd222d hooks, package 7aa175c2, config 8b6b51ee, outerMs 600000; selection at 2.1.331 -p from the byte-identical frozen snapshot and donor-2 settings 355613ee fired exactly the expected entries for startup and resume, every branch accounted for through the recorded mapping; baseline timing variant: every entry (600 s or default) ran the full 8 s, candidate-side timeouts being the same configured fields; scheduling parallel at 2.1.331 -p by run-print-schedule.sh (f4be5820) and concurrent starts in the print sleep8 selection run; input: live -p payloads carry no decoded field or entry shape the timed input lacks",
+          "support for host-b (recorded claude-code 2.1.304, mode interactive) at row claude-code 2.1.331 -p: relay commit 1f1c28da62e7 measured; wiring by host-b's check (read-only over ssh, user go-ahead): the same identities, plus the user's hooks-only digest fa401e42 of the live settings, equal to the frozen snapshot's; selection at 2.1.331 -p from the byte-identical frozen snapshot and donor-2 settings 355613ee fired exactly the expected entries for startup and resume, every branch accounted for through the recorded mapping; baseline timing variant: every entry (600 s or default) ran the full 8 s, candidate-side timeouts being the same configured fields; scheduling parallel at 2.1.331 -p by run-print-schedule.sh (f4be5820) and concurrent starts in the print sleep8 selection run; input: live -p payloads carry no decoded field or entry shape the timed input lacks",
+          "payload size and list lengths are benchmark parameters: this pass qualifies the binding's transport cost as timed on the benchmark; install enforces no payload limit"
+        ]
+      },
+      "retryFlag": {
+        "status": "not-applicable",
+        "evidence": []
+      },
+      "outerFailure": {
+        "status": "passed",
+        "evidence": [
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: claude -p with hanging SessionStart, Stop and SessionEnd subscribers: harness timeout lowered to 3 s: Claude Code logged the hooks as timed out and proceeded; relay killed by SIGTERM while waiting: Claude Code logged status code 1 and proceeded; in both, claude -p exited 0 after one model request, no subscriber outlived relay and relay reap found nothing"
+        ]
+      },
+      "policyEquivalence": {
+        "status": "passed",
+        "evidence": [
+          "notices lore-stale-notice, git-index-repair, lore-profile-notice and mindful-capture-notice: hq-a83688 ruling 2026-11-24: policyEquivalence passed for hq-owned roles (lore-profile-notice, lore-stale-notice, git-index-repair, mindful-capture-notice, harness-state-refresh) in claude-code 2.1.331 non-interactive (-p), relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b; hq-a83688 attachment donor-2-c1c68ea7-equivalence.txt (sha256 f0c88261840f8621bd59b9d48a5f6d5143d20aa0a62517bf75c750380dc7977e), replayed at hq c1c68ea7 from relay-d487c1's live-2.1.331 selection-baseline payload captures",
+          "observer familiar: relay's ruling on relay-d487c1 (2026-11-24) that no policy equivalence is owed, because familiar is relay's already-deployed observer line with no native counterpart and no displaced policy, as hq-a83688 recorded on 2026-11-24 when declining to replay it; its ownership and clean run in donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b at relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, claude-code 2.1.331 print, are in relay-d487c1's attachment donor-2-live-composition-report.md",
+          "notice tasks-halt-notice: tasks-d41ccb owner replay 2026-11-24 (records 7917159cca25f3bee2d0fad37a3bf1ddcb680146:tasks/tasks/files/tasks-d41ccb/claude-owner-replay-report.md, sha256 1216649717bc15806f9bfff5acb021f2dee1f598f5f9270849395d59a26ccb79; raw journals corpus.jsonl and cwd-confirmation.jsonl attached there): isolated replay through relay 1f1c28da62e7867caf3acaddf16ba13079a37e85's release bin/relay.js hook dispatch with donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b's two tasks entries (tasks hook claim-guard 12000 ms, tasks hook halt-notice 1000 ms), tasks 0.4.0 from e300fb3664042d1a53bc222f730aba58d6593383, against the displaced native policy (ops f1c08d8008a0f1117d01d9913f8d20951d9be7df claim-guard and SessionStart halt_notice), with templates from relay-d487c1's live 2.1.331 captures: SessionStart startup/resume print passed 34 paired comparisons and 2 declared corrupt-scan errors; 4 remain unresolved: when the event cwd is missing (startup, resume) relay's executable discovery refuses with NOTICE_FAILED REPOSITORY_UNREADABLE, and when it is a file (startup, resume) the subscriber spawn fails with NOTICE_FAILED SPAWN-FAILED, so the uncertainty context that both the displaced native halt_notice function and the tasks subscriber return for these inputs never reaches Claude; the displaced native SessionStart main reads its cwd from its own process and skips halt_notice when getcwd fails, and no live Claude dispatch with an invalid event cwd has been observed (fixture inputs only); superseded by the next line",
+          "notice tasks-halt-notice: tasks-d41ccb ruling 2026-11-24 accepts policyEquivalence for claude-code 2.1.331 SessionStart print at relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b, tasks e300fb3664042d1a53bc222f730aba58d6593383 (binary sha256 541934008fa398be0444e4523f9d52a2523296cf26f366431c0b4e385ea26286) at 1000 ms: 34 paired comparisons pass and 2 declared corrupt-scan errors are verified; a fresh confirmation (records ba80e48db36d3322783e33588af50fbcba2ec537:tasks/tasks/files/tasks-d41ccb/sessionstart-contract-confirmation.jsonl, sha256 839a6c3c8ec1ee571e0e84769e5eaea953795328d5c85df1e8e907dd400ee9e8) shows the 2 missing-cwd and 2 file-cwd variants (startup, resume) refused by relay with a blank native reply, typed failure codes and no delivered context, as the unusable-cwd contract in docs/api.md (Subscriber commands, relay cf5b3db43eb6c2f0ab0976b9f375fae69dab451e) requires; those are transport-contract passes, not policy invocations, and in them no halt context reaches the harness"
+        ]
+      }
+    },
+    {
+      "event": "SessionStart",
+      "role": "notice",
+      "outerMs": 600000,
+      "contextLimit": 10000,
+      "decode": {
+        "status": "passed",
+        "evidence": [
+          "test/fixtures/hook-events/claude-code.SessionStart.input.json at 1f1c28da62e7867caf3acaddf16ba13079a37e85",
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: the live native payload decoded and reached its notice subscriber"
+        ]
+      },
+      "nativeReply": {
+        "status": "passed",
+        "evidence": [
+          "reply encoding fixtures (test/hook-event.test.js, test/notice.test.js) on Node 22.23.2 and 26.5.0 at 1f1c28da62e7867caf3acaddf16ba13079a37e85 (89 tests, 2026-11-24)",
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: additionalContext encoding delivered live"
+        ]
+      },
+      "liveDelivery": {
+        "status": "passed",
+        "evidence": [
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: a 10,000-character notice context reached the model request intact; claude -p exited 0",
+          "host-a live composition 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, the hq donor-2 subscriber file 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b byte-for-byte with the real policy commands in a scratch home; report attached to relay-d487c1 as donor-2-live-composition-report.md: familiar's observer exited 0 with session ownership proven, and the five notices' composed 1,674-character context reached the model request, with no relay diagnostic or subscriber failure"
+        ]
+      },
+      "failure": {
+        "status": "passed",
+        "evidence": [
+          "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) on Node 22.23.2 and 26.5.0 at 1f1c28da62e7867caf3acaddf16ba13079a37e85 (89 tests, 2026-11-24)"
+        ]
+      },
+      "cleanup": {
+        "status": "passed",
+        "evidence": [
+          "test/child-containment.test.js on Node 22.23.2 and 26.5.0 at 1f1c28da62e7867caf3acaddf16ba13079a37e85 (89 tests, 2026-11-24)",
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: no subscriber survived and relay reap found nothing"
+        ]
+      },
+      "latency": {
+        "status": "passed",
+        "evidence": [
+          "host=host-a outerMs=30000 runtime=v22.23.2 claude-code SessionStart commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 24.2 p99 delta 22.5 max delta 22.0 ms",
+          "host=host-a outerMs=30000 runtime=v26.5.0 claude-code SessionStart commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 19.4 p99 delta 18.4 max delta 14.9 ms",
+          "host=host-b outerMs=30000 runtime=v22.23.2 claude-code SessionStart commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 14.7 p99 delta 14.3 max delta 6.1 ms",
+          "host=host-b outerMs=30000 runtime=v26.13.1 claude-code SessionStart commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 11.5 p99 delta 24.2 max delta 27.0 ms",
+          "judge.mjs at 1f1c28da62e7867caf3acaddf16ba13079a37e85: passed on host-a and host-b, each on Node 22 and a development runtime, against its own deployed composition (synthetic fixtures; transport evidence); judge and timing report attached to relay-d487c1 as sessionstart-two-host-judge.json and sessionstart-two-host-timing-report.md",
+          "measured at outerMs 30000 under plan amendment 2 (records 1ac7bf7ccd7da3aebe47d192d69d54459e17aa0b, user-accepted), no larger than this row's 600000; the native claude-sessionstart entry ran as three parallel baseline branches under the recorded mapping (ruling on relay-d487c1)",
+          "supported under design spec revision 7 and plan amendment 3 revision 4 (records fbdc0a8db7, both user-accepted 2026-11-24); evidence attached to relay-d487c1: the plan amendment 3 host-a evidence report (selection, timing variant, input), amendment-3-wiring-check.py (sha256 6f4fec37056b8a79) with the final per-host outputs attached as amendment-3-wiring-check-*.out (host-a 5dfe445e312db245, host-b 670187162a1ab9ac), the decoder replay decode-timed-inputs.out (73fa5f404c32469e) in the task scratch, and task notes for the user's hooks-only digest and the method rulings",
+          "candidate config 435d28ddaa949920c0c83266706bad8686417ae14498df39700078ba25182510, normalized from the donor-2 subscriber file",
+          "expected decoded event of the timed input (rebuilt with each run's own cwd, padded scratchpad_dir 738 bytes, decoded at 1f1c28da on both hosts' manifests): kind session-start, identity valid, model valid, transcriptPath valid, scratchpadDir invalid",
+          "support for host-a (recorded claude-code 2.1.331, mode interactive) at row claude-code 2.1.331 -p: relay commit 1f1c28da62e7 measured; wiring by host-a's check: hq HEAD 0cf989b1 and blob 3a40b806 as recorded, filtered live file = index = HEAD, blob hooks = frozen snapshot 76bd222d hooks, package 7aa175c2, config 8b6b51ee, outerMs 600000; selection at 2.1.331 -p from the byte-identical frozen snapshot and donor-2 settings 355613ee fired exactly the expected entries for startup and resume, every branch accounted for through the recorded mapping; baseline timing variant: every entry (600 s or default) ran the full 8 s, candidate-side timeouts being the same configured fields; scheduling parallel at 2.1.331 -p by run-print-schedule.sh (f4be5820) and concurrent starts in the print sleep8 selection run; input: live -p payloads carry no decoded field or entry shape the timed input lacks",
+          "support for host-b (recorded claude-code 2.1.304, mode interactive) at row claude-code 2.1.331 -p: relay commit 1f1c28da62e7 measured; wiring by host-b's check (read-only over ssh, user go-ahead): the same identities, plus the user's hooks-only digest fa401e42 of the live settings, equal to the frozen snapshot's; selection at 2.1.331 -p from the byte-identical frozen snapshot and donor-2 settings 355613ee fired exactly the expected entries for startup and resume, every branch accounted for through the recorded mapping; baseline timing variant: every entry (600 s or default) ran the full 8 s, candidate-side timeouts being the same configured fields; scheduling parallel at 2.1.331 -p by run-print-schedule.sh (f4be5820) and concurrent starts in the print sleep8 selection run; input: live -p payloads carry no decoded field or entry shape the timed input lacks",
+          "payload size and list lengths are benchmark parameters: this pass qualifies the binding's transport cost as timed on the benchmark; install enforces no payload limit"
+        ]
+      },
+      "retryFlag": {
+        "status": "not-applicable",
+        "evidence": []
+      },
+      "outerFailure": {
+        "status": "passed",
+        "evidence": [
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: claude -p with hanging SessionStart, Stop and SessionEnd subscribers: harness timeout lowered to 3 s: Claude Code logged the hooks as timed out and proceeded; relay killed by SIGTERM while waiting: Claude Code logged status code 1 and proceeded; in both, claude -p exited 0 after one model request, no subscriber outlived relay and relay reap found nothing"
+        ]
+      },
+      "policyEquivalence": {
+        "status": "passed",
+        "evidence": [
+          "notices lore-stale-notice, git-index-repair, lore-profile-notice and mindful-capture-notice: hq-a83688 ruling 2026-11-24: policyEquivalence passed for hq-owned roles (lore-profile-notice, lore-stale-notice, git-index-repair, mindful-capture-notice, harness-state-refresh) in claude-code 2.1.331 non-interactive (-p), relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b; hq-a83688 attachment donor-2-c1c68ea7-equivalence.txt (sha256 f0c88261840f8621bd59b9d48a5f6d5143d20aa0a62517bf75c750380dc7977e), replayed at hq c1c68ea7 from relay-d487c1's live-2.1.331 selection-baseline payload captures",
+          "observer familiar: relay's ruling on relay-d487c1 (2026-11-24) that no policy equivalence is owed, because familiar is relay's already-deployed observer line with no native counterpart and no displaced policy, as hq-a83688 recorded on 2026-11-24 when declining to replay it; its ownership and clean run in donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b at relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, claude-code 2.1.331 print, are in relay-d487c1's attachment donor-2-live-composition-report.md",
+          "notice tasks-halt-notice: tasks-d41ccb owner replay 2026-11-24 (records 7917159cca25f3bee2d0fad37a3bf1ddcb680146:tasks/tasks/files/tasks-d41ccb/claude-owner-replay-report.md, sha256 1216649717bc15806f9bfff5acb021f2dee1f598f5f9270849395d59a26ccb79; raw journals corpus.jsonl and cwd-confirmation.jsonl attached there): isolated replay through relay 1f1c28da62e7867caf3acaddf16ba13079a37e85's release bin/relay.js hook dispatch with donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b's two tasks entries (tasks hook claim-guard 12000 ms, tasks hook halt-notice 1000 ms), tasks 0.4.0 from e300fb3664042d1a53bc222f730aba58d6593383, against the displaced native policy (ops f1c08d8008a0f1117d01d9913f8d20951d9be7df claim-guard and SessionStart halt_notice), with templates from relay-d487c1's live 2.1.331 captures: SessionStart startup/resume print passed 34 paired comparisons and 2 declared corrupt-scan errors; 4 remain unresolved: when the event cwd is missing (startup, resume) relay's executable discovery refuses with NOTICE_FAILED REPOSITORY_UNREADABLE, and when it is a file (startup, resume) the subscriber spawn fails with NOTICE_FAILED SPAWN-FAILED, so the uncertainty context that both the displaced native halt_notice function and the tasks subscriber return for these inputs never reaches Claude; the displaced native SessionStart main reads its cwd from its own process and skips halt_notice when getcwd fails, and no live Claude dispatch with an invalid event cwd has been observed (fixture inputs only); superseded by the next line",
+          "notice tasks-halt-notice: tasks-d41ccb ruling 2026-11-24 accepts policyEquivalence for claude-code 2.1.331 SessionStart print at relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b, tasks e300fb3664042d1a53bc222f730aba58d6593383 (binary sha256 541934008fa398be0444e4523f9d52a2523296cf26f366431c0b4e385ea26286) at 1000 ms: 34 paired comparisons pass and 2 declared corrupt-scan errors are verified; a fresh confirmation (records ba80e48db36d3322783e33588af50fbcba2ec537:tasks/tasks/files/tasks-d41ccb/sessionstart-contract-confirmation.jsonl, sha256 839a6c3c8ec1ee571e0e84769e5eaea953795328d5c85df1e8e907dd400ee9e8) shows the 2 missing-cwd and 2 file-cwd variants (startup, resume) refused by relay with a blank native reply, typed failure codes and no delivered context, as the unusable-cwd contract in docs/api.md (Subscriber commands, relay cf5b3db43eb6c2f0ab0976b9f375fae69dab451e) requires; those are transport-contract passes, not policy invocations, and in them no halt context reaches the harness"
+        ]
+      }
+    },
+    {
+      "event": "Stop",
+      "role": "guard",
+      "outerMs": 600000,
+      "decode": {
+        "status": "passed",
+        "evidence": [
+          "test/fixtures/hook-events/claude-code.Stop.input.json at 1f1c28da62e7867caf3acaddf16ba13079a37e85",
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: the live native payload decoded and relay answered it"
+        ]
+      },
+      "nativeReply": {
+        "status": "passed",
+        "evidence": [
+          "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js) on Node 22.23.2 and 26.5.0 at 1f1c28da62e7867caf3acaddf16ba13079a37e85 (89 tests, 2026-11-24)",
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: decision block encoding honoured live (stop-retry probe)"
+        ]
+      },
+      "liveDelivery": {
+        "status": "passed",
+        "evidence": [
+          "host-a live composition 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, the hq donor-2 subscriber file 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b byte-for-byte with the real policy commands in a scratch home; report attached to relay-d487c1 as donor-2-live-composition-report.md: familiar's observer, tasks-claim-guard and harness-state-refresh ran on Stop with no relay diagnostic or subscriber failure; familiar's session row proves ownership"
+        ]
+      },
+      "failure": {
+        "status": "passed",
+        "evidence": [
+          "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) on Node 22.23.2 and 26.5.0 at 1f1c28da62e7867caf3acaddf16ba13079a37e85 (89 tests, 2026-11-24)"
+        ]
+      },
+      "cleanup": {
+        "status": "passed",
+        "evidence": [
+          "test/child-containment.test.js on Node 22.23.2 and 26.5.0 at 1f1c28da62e7867caf3acaddf16ba13079a37e85 (89 tests, 2026-11-24)",
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: no subscriber survived and relay reap found nothing"
+        ]
+      },
+      "latency": {
+        "status": "passed",
+        "evidence": [
+          "host=host-a outerMs=20000 runtime=v22.23.2 claude-code Stop commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 10.4 p99 delta 11.2 max delta -66.8 ms",
+          "host=host-a outerMs=20000 runtime=v26.5.0 claude-code Stop commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 8.9 p99 delta 7.6 max delta 15.5 ms",
+          "host=host-b outerMs=20000 runtime=v22.23.2 claude-code Stop commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 11.3 p99 delta 7.5 max delta 5.4 ms",
+          "host=host-b outerMs=20000 runtime=v26.13.1 claude-code Stop commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 9.4 p99 delta 12.3 max delta 9.7 ms",
+          "judge.mjs at 1f1c28da62e7867caf3acaddf16ba13079a37e85: passed on host-a and host-b, each on Node 22 and a development runtime, against its own deployed composition (synthetic fixtures; transport evidence); judge and timing report attached to relay-d487c1 as stop-two-host-judge.json and stop-two-host-timing-report.md",
+          "supported under design spec revision 7 and plan amendment 3 revision 4 (records fbdc0a8db7, both user-accepted 2026-11-24); evidence attached to relay-d487c1: the plan amendment 3 host-a evidence report (selection, timing variant, input), amendment-3-wiring-check.py (sha256 6f4fec37056b8a79) with the final per-host outputs attached as amendment-3-wiring-check-*.out (host-a 5dfe445e312db245, host-b 670187162a1ab9ac), the decoder replay decode-timed-inputs.out (73fa5f404c32469e) in the task scratch, and task notes for the user's hooks-only digest and the method rulings",
+          "candidate config bf96a94e7940fe497310388a472238b3fdc7fbecb95f0f4c626f08355e6c8340, normalized from the donor-2 subscriber file",
+          "expected decoded event of the timed input (rebuilt with each run's own cwd, padded session_crons[0].prompt 686 bytes host-a and 683 host-b, decoded at 1f1c28da): kind turn-end, identity valid, stopHookActive valid false, backgroundTasks valid with two entries, sessionCrons valid with one entry",
+          "support for host-a (recorded claude-code 2.1.331, mode interactive) at row claude-code 2.1.331 -p: relay commit 1f1c28da62e7 measured; wiring by host-a's check: hq HEAD 0cf989b1 and blob 3a40b806 as recorded, filtered live file = index = HEAD, blob hooks = frozen snapshot 76bd222d hooks, package 7aa175c2, config 8b6b51ee, outerMs 600000; selection at 2.1.331 -p from the byte-identical frozen snapshot and donor-2 settings 355613ee fired exactly the expected entries for both turns, every branch accounted for through the recorded mapping; baseline timing variant: turn-pause (5 s) cut at 5000 ms, the other entries past 8 s, candidate-side timeouts being the same configured fields; scheduling parallel at 2.1.331 -p by run-print-schedule.sh (f4be5820) and concurrent starts in the print sleep8 selection run; input: live -p payloads carry no decoded field or entry shape the timed input lacks",
+          "support for host-b (recorded claude-code 2.1.304, mode interactive) at row claude-code 2.1.331 -p: relay commit 1f1c28da62e7 measured; wiring by host-b's check (read-only over ssh, user go-ahead): the same identities, plus the user's hooks-only digest fa401e42 of the live settings, equal to the frozen snapshot's; selection at 2.1.331 -p from the byte-identical frozen snapshot and donor-2 settings 355613ee fired exactly the expected entries for both turns, every branch accounted for through the recorded mapping; baseline timing variant: turn-pause (5 s) cut at 5000 ms, the other entries past 8 s, candidate-side timeouts being the same configured fields; scheduling parallel at 2.1.331 -p by run-print-schedule.sh (f4be5820) and concurrent starts in the print sleep8 selection run; input: live -p payloads carry no decoded field or entry shape the timed input lacks",
+          "payload size and list lengths are benchmark parameters: this pass qualifies the binding's transport cost as timed on the benchmark; install enforces no payload limit"
+        ]
+      },
+      "retryFlag": {
+        "status": "passed",
+        "evidence": [
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: a missing guard command made relay refuse the first stop (stop_hook_active false); Claude Code retried once with stop_hook_active true, relay let it stop, and the session ended after two model requests with no loop"
+        ]
+      },
+      "outerFailure": {
+        "status": "passed",
+        "evidence": [
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: claude -p with hanging SessionStart, Stop and SessionEnd subscribers: harness timeout lowered to 3 s: Claude Code logged the hooks as timed out and proceeded; relay killed by SIGTERM while waiting: Claude Code logged status code 1 and proceeded; in both, claude -p exited 0 after one model request, no subscriber outlived relay and relay reap found nothing"
+        ]
+      },
+      "policyEquivalence": {
+        "status": "passed",
+        "evidence": [
+          "guard tasks-claim-guard: tasks-d41ccb owner replay 2026-11-24 (records 7917159cca25f3bee2d0fad37a3bf1ddcb680146:tasks/tasks/files/tasks-d41ccb/claude-owner-replay-report.md, sha256 1216649717bc15806f9bfff5acb021f2dee1f598f5f9270849395d59a26ccb79; raw journals corpus.jsonl and cwd-confirmation.jsonl attached there): isolated replay through relay 1f1c28da62e7867caf3acaddf16ba13079a37e85's release bin/relay.js hook dispatch with donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b's two tasks entries (tasks hook claim-guard 12000 ms, tasks hook halt-notice 1000 ms), tasks 0.4.0 from e300fb3664042d1a53bc222f730aba58d6593383, against the displaced native policy (ops f1c08d8008a0f1117d01d9913f8d20951d9be7df claim-guard and SessionStart halt_notice), with templates from relay-d487c1's live 2.1.331 captures: Stop print passed 49 paired comparisons with 0 unresolved mismatches, and its one malformed fixture was rejected by the decoder as expected; no policy timeout; tasks-d41ccb accepted this contribution",
+          "observer harness-state-refresh: hq-a83688 ruling 2026-11-24: policyEquivalence passed for hq-owned roles (lore-profile-notice, lore-stale-notice, git-index-repair, mindful-capture-notice, harness-state-refresh) in claude-code 2.1.331 non-interactive (-p), relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b; hq-a83688 attachment donor-2-c1c68ea7-equivalence.txt (sha256 f0c88261840f8621bd59b9d48a5f6d5143d20aa0a62517bf75c750380dc7977e), replayed at hq c1c68ea7 from relay-d487c1's live-2.1.331 selection-baseline payload captures",
+          "observer familiar: relay's ruling on relay-d487c1 (2026-11-24) that no policy equivalence is owed, because familiar is relay's already-deployed observer line with no native counterpart and no displaced policy, as hq-a83688 recorded on 2026-11-24 when declining to replay it; its ownership and clean run in donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b at relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, claude-code 2.1.331 print, are in relay-d487c1's attachment donor-2-live-composition-report.md"
+        ]
+      }
+    },
+    {
+      "event": "Stop",
+      "role": "observer",
+      "outerMs": 600000,
+      "decode": {
+        "status": "passed",
+        "evidence": [
+          "test/fixtures/hook-events/claude-code.Stop.input.json at 1f1c28da62e7867caf3acaddf16ba13079a37e85",
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: the live native payload decoded and relay answered it"
+        ]
+      },
+      "nativeReply": {
+        "status": "passed",
+        "evidence": [
+          "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js) on Node 22.23.2 and 26.5.0 at 1f1c28da62e7867caf3acaddf16ba13079a37e85 (89 tests, 2026-11-24)",
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: decision block encoding honoured live (stop-retry probe)"
+        ]
+      },
+      "liveDelivery": {
+        "status": "passed",
+        "evidence": [
+          "host-a live composition 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, the hq donor-2 subscriber file 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b byte-for-byte with the real policy commands in a scratch home; report attached to relay-d487c1 as donor-2-live-composition-report.md: familiar's observer, tasks-claim-guard and harness-state-refresh ran on Stop with no relay diagnostic or subscriber failure; familiar's session row proves ownership"
+        ]
+      },
+      "failure": {
+        "status": "passed",
+        "evidence": [
+          "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) on Node 22.23.2 and 26.5.0 at 1f1c28da62e7867caf3acaddf16ba13079a37e85 (89 tests, 2026-11-24)"
+        ]
+      },
+      "cleanup": {
+        "status": "passed",
+        "evidence": [
+          "test/child-containment.test.js on Node 22.23.2 and 26.5.0 at 1f1c28da62e7867caf3acaddf16ba13079a37e85 (89 tests, 2026-11-24)",
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: no subscriber survived and relay reap found nothing"
+        ]
+      },
+      "latency": {
+        "status": "passed",
+        "evidence": [
+          "host=host-a outerMs=20000 runtime=v22.23.2 claude-code Stop commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 10.4 p99 delta 11.2 max delta -66.8 ms",
+          "host=host-a outerMs=20000 runtime=v26.5.0 claude-code Stop commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 8.9 p99 delta 7.6 max delta 15.5 ms",
+          "host=host-b outerMs=20000 runtime=v22.23.2 claude-code Stop commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 11.3 p99 delta 7.5 max delta 5.4 ms",
+          "host=host-b outerMs=20000 runtime=v26.13.1 claude-code Stop commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 9.4 p99 delta 12.3 max delta 9.7 ms",
+          "judge.mjs at 1f1c28da62e7867caf3acaddf16ba13079a37e85: passed on host-a and host-b, each on Node 22 and a development runtime, against its own deployed composition (synthetic fixtures; transport evidence); judge and timing report attached to relay-d487c1 as stop-two-host-judge.json and stop-two-host-timing-report.md",
+          "supported under design spec revision 7 and plan amendment 3 revision 4 (records fbdc0a8db7, both user-accepted 2026-11-24); evidence attached to relay-d487c1: the plan amendment 3 host-a evidence report (selection, timing variant, input), amendment-3-wiring-check.py (sha256 6f4fec37056b8a79) with the final per-host outputs attached as amendment-3-wiring-check-*.out (host-a 5dfe445e312db245, host-b 670187162a1ab9ac), the decoder replay decode-timed-inputs.out (73fa5f404c32469e) in the task scratch, and task notes for the user's hooks-only digest and the method rulings",
+          "candidate config bf96a94e7940fe497310388a472238b3fdc7fbecb95f0f4c626f08355e6c8340, normalized from the donor-2 subscriber file",
+          "expected decoded event of the timed input (rebuilt with each run's own cwd, padded session_crons[0].prompt 686 bytes host-a and 683 host-b, decoded at 1f1c28da): kind turn-end, identity valid, stopHookActive valid false, backgroundTasks valid with two entries, sessionCrons valid with one entry",
+          "support for host-a (recorded claude-code 2.1.331, mode interactive) at row claude-code 2.1.331 -p: relay commit 1f1c28da62e7 measured; wiring by host-a's check: hq HEAD 0cf989b1 and blob 3a40b806 as recorded, filtered live file = index = HEAD, blob hooks = frozen snapshot 76bd222d hooks, package 7aa175c2, config 8b6b51ee, outerMs 600000; selection at 2.1.331 -p from the byte-identical frozen snapshot and donor-2 settings 355613ee fired exactly the expected entries for both turns, every branch accounted for through the recorded mapping; baseline timing variant: turn-pause (5 s) cut at 5000 ms, the other entries past 8 s, candidate-side timeouts being the same configured fields; scheduling parallel at 2.1.331 -p by run-print-schedule.sh (f4be5820) and concurrent starts in the print sleep8 selection run; input: live -p payloads carry no decoded field or entry shape the timed input lacks",
+          "support for host-b (recorded claude-code 2.1.304, mode interactive) at row claude-code 2.1.331 -p: relay commit 1f1c28da62e7 measured; wiring by host-b's check (read-only over ssh, user go-ahead): the same identities, plus the user's hooks-only digest fa401e42 of the live settings, equal to the frozen snapshot's; selection at 2.1.331 -p from the byte-identical frozen snapshot and donor-2 settings 355613ee fired exactly the expected entries for both turns, every branch accounted for through the recorded mapping; baseline timing variant: turn-pause (5 s) cut at 5000 ms, the other entries past 8 s, candidate-side timeouts being the same configured fields; scheduling parallel at 2.1.331 -p by run-print-schedule.sh (f4be5820) and concurrent starts in the print sleep8 selection run; input: live -p payloads carry no decoded field or entry shape the timed input lacks",
+          "payload size and list lengths are benchmark parameters: this pass qualifies the binding's transport cost as timed on the benchmark; install enforces no payload limit"
+        ]
+      },
+      "retryFlag": {
+        "status": "passed",
+        "evidence": [
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: a missing guard command made relay refuse the first stop (stop_hook_active false); Claude Code retried once with stop_hook_active true, relay let it stop, and the session ended after two model requests with no loop"
+        ]
+      },
+      "outerFailure": {
+        "status": "passed",
+        "evidence": [
+          "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: claude -p with hanging SessionStart, Stop and SessionEnd subscribers: harness timeout lowered to 3 s: Claude Code logged the hooks as timed out and proceeded; relay killed by SIGTERM while waiting: Claude Code logged status code 1 and proceeded; in both, claude -p exited 0 after one model request, no subscriber outlived relay and relay reap found nothing"
+        ]
+      },
+      "policyEquivalence": {
+        "status": "passed",
+        "evidence": [
+          "guard tasks-claim-guard: tasks-d41ccb owner replay 2026-11-24 (records 7917159cca25f3bee2d0fad37a3bf1ddcb680146:tasks/tasks/files/tasks-d41ccb/claude-owner-replay-report.md, sha256 1216649717bc15806f9bfff5acb021f2dee1f598f5f9270849395d59a26ccb79; raw journals corpus.jsonl and cwd-confirmation.jsonl attached there): isolated replay through relay 1f1c28da62e7867caf3acaddf16ba13079a37e85's release bin/relay.js hook dispatch with donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b's two tasks entries (tasks hook claim-guard 12000 ms, tasks hook halt-notice 1000 ms), tasks 0.4.0 from e300fb3664042d1a53bc222f730aba58d6593383, against the displaced native policy (ops f1c08d8008a0f1117d01d9913f8d20951d9be7df claim-guard and SessionStart halt_notice), with templates from relay-d487c1's live 2.1.331 captures: Stop print passed 49 paired comparisons with 0 unresolved mismatches, and its one malformed fixture was rejected by the decoder as expected; no policy timeout; tasks-d41ccb accepted this contribution",
+          "observer harness-state-refresh: hq-a83688 ruling 2026-11-24: policyEquivalence passed for hq-owned roles (lore-profile-notice, lore-stale-notice, git-index-repair, mindful-capture-notice, harness-state-refresh) in claude-code 2.1.331 non-interactive (-p), relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b; hq-a83688 attachment donor-2-c1c68ea7-equivalence.txt (sha256 f0c88261840f8621bd59b9d48a5f6d5143d20aa0a62517bf75c750380dc7977e), replayed at hq c1c68ea7 from relay-d487c1's live-2.1.331 selection-baseline payload captures",
+          "observer familiar: relay's ruling on relay-d487c1 (2026-11-24) that no policy equivalence is owed, because familiar is relay's already-deployed observer line with no native counterpart and no displaced policy, as hq-a83688 recorded on 2026-11-24 when declining to replay it; its ownership and clean run in donor-2 19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b at relay 1f1c28da62e7867caf3acaddf16ba13079a37e85, claude-code 2.1.331 print, are in relay-d487c1's attachment donor-2-live-composition-report.md"
+        ]
+      }
+    }
+  ]
+}

@@ -83,7 +83,6 @@ def test_bridge_references_every_delegate():
 
 @pytest.mark.parametrize(("donor", "kind", "binding"), [
     ("claim-guard", "binding", "codex:Stop"),
-    ("claude-sessionstart", "binding", "claude:SessionStart"),
     ("capture-notice", "binding", "codex:SessionStart"),
 ])
 def test_today_ops_references(donor, kind, binding):
@@ -100,8 +99,19 @@ def test_agy_notice_bridge_releases_both_donor_references():
     table = load(TABLE)
     for donor in (_ops_donor("capture-notice"), f"~/{Path('d', 'lore', 'hooks', 'claude-profile')}"):
         refs = donor_references(table, donor)
-        assert any(ref.where.startswith("claude:SessionStart") for ref in refs)
-        assert not any(ref.where.startswith("agy:") for ref in refs)
+        assert any(ref.where.startswith("codex:SessionStart") for ref in refs)
+        assert not any(ref.where.startswith(("agy:", "claude:")) for ref in refs)
+
+
+@pytest.mark.parametrize("donor", ["claude-sessionstart", "claim-guard", "capture-notice"])
+def test_claude_cutover_releases_ops_donor_references(donor):
+    # hq-8185d3 moved Claude Code SessionStart and Stop onto the donor-2 relay composition.
+    from hook_routes.references import donor_references
+
+    refs = donor_references(load(TABLE), _ops_donor(donor))
+    assert not any(ref.where.startswith("claude:") for ref in refs)
+    if donor == "claude-sessionstart":
+        assert refs == []
 
 
 def test_claude_posttooluse_donor_has_no_references():

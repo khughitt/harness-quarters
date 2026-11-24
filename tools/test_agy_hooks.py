@@ -59,7 +59,7 @@ def test_hooks_json_declares_session_start_pre_tool_use_and_stop():
     def assert_relay_handler(entry, expected_event):
         assert entry["type"] == "command"
         assert entry["timeout"] == 60
-        assert parse_relay_command(entry["command"], "v0.5.0") == ("agy", 60000, expected_event)
+        assert parse_relay_command(entry["command"], "v0.5.0") == ("agy", 60000, expected_event, "shared")
 
     session_start = hq["SessionStart"]
     assert len(session_start) == 2
@@ -134,6 +134,7 @@ def test_pre_tool_use_emits_empty_stdout_noop_and_rejects_extra_args(tmp_path):
 
 def test_relay_agy_dispatch_with_rendered_subscribers(tmp_path):
     from hook_routes.deploy import deploy, live_files
+    from hook_routes.render import subscriber_address, subscriber_bytes
     from hook_routes.table import load
 
     install_root = os.environ.get("HQ_TEST_RELAY_ROOT")
@@ -160,7 +161,11 @@ with Path({str(familiar_log)!r}).open("a") as f:
     )
 
     table = load(ROOT / "harnesses/hook-routes.toml")
-    subscribers, = deploy(live_files(table, home), home)
+    # agy relays through the shared file; the donor-2 file serves only Claude Code SessionStart and Stop.
+    deployed = deploy(live_files(table, home), home)
+    shared = table.subscriber_files["shared-v0.5.0-retired-guard"]
+    subscribers = home / ".config/relay" / subscriber_address(shared, subscriber_bytes(table, shared, home), home)
+    assert subscribers in deployed and len(deployed) == 2
 
     relay_state = tmp_path / "relay-state"
     relay_state.mkdir(mode=0o700)

@@ -111,6 +111,55 @@ registry = "snapshot"
 argv = ["env", "~/d/familiar/bin/familiar", "observe"]
 timeoutMs = 2000
 
+[subscribers.tasks-halt-notice]
+policy = "claude-sessionstart"
+role = "notice"
+argv = ["tasks", "hook", "halt-notice"]
+timeoutMs = 1000
+
+[subscribers.lore-stale-notice]
+policy = "claude-sessionstart"
+role = "notice"
+argv = ["lore", "hook", "stale-notice"]
+timeoutMs = 12000
+
+[subscribers.git-index-repair]
+policy = "claude-sessionstart"
+role = "notice"
+argv = ["git-index-health", "--session-start"]
+timeoutMs = 6000
+
+[subscribers.lore-profile-notice]
+policy = "claude-profile"
+role = "notice"
+argv = ["lore", "hook", "profile-notice"]
+timeoutMs = 3000
+
+[subscribers.mindful-capture-notice]
+policy = "capture-notice"
+role = "notice"
+argv = ["mindful", "notice", "session-start"]
+timeoutMs = 2000
+
+[subscribers.tasks-claim-guard]
+policy = "claim-guard"
+role = "guard"
+argv = ["tasks", "hook", "claim-guard"]
+timeoutMs = 12000
+
+[subscribers.tasks-claim-guard-codex]
+policy = "claim-guard"
+role = "guard"
+argv = ["tasks", "hook", "claim-guard"]
+timeoutMs = 12000
+
+[subscribers.harness-state-refresh]
+policy = "harness-state-refresh"
+role = "observer"
+argv = ["harness-state-refresh"]
+timeoutMs = 6000
+registry = "occurrence"
+
 [subscriber_files."shared-v0.5.0-retired-guard"]
 runtime = "v0.5.0"
 output = "relay/subscribers.template.json"
@@ -122,14 +171,29 @@ subscribers = [
   { name = "familiar-agy", harnesses = ["agy"], kinds = ["session-start", "before-tool", "turn-end"] },
 ]
 
+# hq donor-2 composition (frozen hq-a83688 candidates/donor-2, sha256 19b427ac...),
+# qualified by relay-d487c1 for Claude Code 2.1.331 SessionStart and Stop.
+[subscriber_files."donor-2-shared"]
+runtime = "v0.5.0"
+output = "relay/subscribers.donor-2.template.json"
+subscribers = [
+  { name = "familiar", harnesses = ["claude-code", "codex"], kinds = ["session-start", "turn-end"] },
+  { name = "familiar-codex-workers", harnesses = ["codex"], kinds = ["child-stop"] },
+  { name = "tasks-halt-notice", harnesses = ["claude-code"], kinds = ["session-start"] },
+  { name = "lore-stale-notice", harnesses = ["claude-code"], kinds = ["session-start"] },
+  { name = "git-index-repair", harnesses = ["claude-code"], kinds = ["session-start"] },
+  { name = "lore-profile-notice", harnesses = ["claude-code", "codex"], kinds = ["session-start"] },
+  { name = "mindful-capture-notice", harnesses = ["claude-code", "codex"], kinds = ["session-start"] },
+  { name = "tasks-claim-guard", harnesses = ["claude-code"], kinds = ["turn-end"] },
+  { name = "tasks-claim-guard-codex", harnesses = ["codex"], kinds = ["turn-end", "child-stop"] },
+  { name = "harness-state-refresh", harnesses = ["claude-code", "codex"], kinds = ["turn-end"] },
+]
+
 [homes.claude]
 harness = "claude-code"
 path = "harnesses/claude/settings.json"
 bindings = [
-  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["claude-sessionstart"], command = "~/d/ops/hooks/claude-sessionstart" }] },
-  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["claude-profile"], command = "~/d/lore/hooks/claude-profile" }] },
-  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["capture-notice"], command = "~/d/ops/hooks/capture-notice" }] },
-  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["relay-provenance", "familiar"], runtime = "v0.5.0", relay_kind = "session-start", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600 }] },
+  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["relay-provenance", "familiar", "claude-sessionstart", "claude-profile", "capture-notice"], runtime = "v0.5.0", relay_kind = "session-start", subscriber_file = "donor-2-shared", outer_ms = 600000, timeout = 600, states = { "claude-sessionstart" = { state = "relay", records = ["claude-code-2.1.331-interactive-v0.5.0-19b427ac306a.json", "claude-code-2.1.331-non-interactive-v0.5.0-19b427ac306a.json"], activation = "hq-a83688:claude-donor-activation" }, "claude-profile" = { state = "relay", records = ["claude-code-2.1.331-interactive-v0.5.0-19b427ac306a.json", "claude-code-2.1.331-non-interactive-v0.5.0-19b427ac306a.json"], activation = "hq-a83688:claude-donor-activation" }, "capture-notice" = { state = "relay", records = ["claude-code-2.1.331-interactive-v0.5.0-19b427ac306a.json", "claude-code-2.1.331-non-interactive-v0.5.0-19b427ac306a.json"], activation = "hq-a83688:claude-donor-activation" } } }] },
   { event = "PostModelSwitch", lines = [{ policies = ["relay-provenance"], runtime = "v0.5.0", relay_kind = "model-change", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 60000, timeout = 60 }] },
   { event = "UserPromptSubmit", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "prompt", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600 }] },
   { event = "UserPromptSubmit", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code UserPromptSubmit", timeout = 5 }] },
@@ -137,9 +201,7 @@ bindings = [
   { event = "PreToolUse", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code PreToolUse", timeout = 5 }] },
   { event = "Notification", matcher = "idle_prompt", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "needs-input", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600, relay_event = "Notification:idle_prompt" }] },
   { event = "Notification", matcher = "permission_prompt", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "needs-approval", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600, relay_event = "Notification:permission_prompt" }] },
-  { event = "Stop", lines = [{ policies = ["claim-guard"], command = "~/d/ops/hooks/claim-guard --harness claude-code" }] },
-  { event = "Stop", lines = [{ policies = ["harness-state-refresh"], command = "~/.local/bin/harness-state-refresh" }] },
-  { event = "Stop", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "turn-end", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600 }] },
+  { event = "Stop", lines = [{ policies = ["relay-hooks", "familiar", "claim-guard", "harness-state-refresh"], runtime = "v0.5.0", relay_kind = "turn-end", subscriber_file = "donor-2-shared", outer_ms = 600000, timeout = 600, states = { "claim-guard" = { state = "relay", records = ["claude-code-2.1.331-interactive-v0.5.0-19b427ac306a.json", "claude-code-2.1.331-non-interactive-v0.5.0-19b427ac306a.json"], activation = "hq-a83688:claude-donor-activation" }, "harness-state-refresh" = { state = "relay", records = ["claude-code-2.1.331-interactive-v0.5.0-19b427ac306a.json", "claude-code-2.1.331-non-interactive-v0.5.0-19b427ac306a.json"], activation = "hq-a83688:claude-donor-activation" } } }] },
   { event = "Stop", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code Stop", timeout = 5 }] },
   { event = "StopFailure", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "turn-error", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600 }] },
   { event = "SessionEnd", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "session-end", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 60000, timeout = 60 }] },
