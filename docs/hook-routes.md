@@ -209,7 +209,9 @@ delivery and failure, instruction drift, missing-index repair, empty and
 nonempty capture queues, and Stop refresh. A recorded event describes one
 target version and session mode. The shipped synthetic inputs cover the
 interactive Claude Code 2.1.325 and Codex 0.168.0 fixture targets documented
-by relay. Other targets require sourced fixtures of their own. These strings
+by relay, and Claude Code 2.1.331 in both interactive and non-interactive
+(`claude -p`) mode, derived from relay's live payload captures at that version.
+Other targets require sourced fixtures of their own. These strings
 supply the policy check in a qualification row. Live delivery and latency
 have their own evidence requirements.
 

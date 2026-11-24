@@ -340,11 +340,16 @@ def test_evidence_identifies_local_event_and_synthetic_changes(portable_replay, 
     assert f"payloadSha256={sha256(received.encode()).hexdigest()}" in row.line
     assert "model" not in json.loads(received)
     templates = json.loads((CASES / "events.json").read_bytes())
-    stops = {t["harness"]: t for t in templates if t["event"] == "Stop"}
-    assert stops["codex"]["payload"]["stop_hook_active"] is False
-    assert "stop_hook_active changed from true to false" in stops["codex"]["changes"]
-    assert stops["claude-code"]["payload"]["background_tasks"] == []
-    assert "session_crons omitted" in stops["claude-code"]["changes"]
+    stops = {(t["harness"], t["version"], t["sessionMode"]): t for t in templates if t["event"] == "Stop"}
+    assert stops["codex", "0.168.0", "interactive"]["payload"]["stop_hook_active"] is False
+    assert "stop_hook_active changed from true to false" in stops["codex", "0.168.0", "interactive"]["changes"]
+    assert stops["claude-code", "2.1.325", "interactive"]["payload"]["background_tasks"] == []
+    assert "session_crons omitted" in stops["claude-code", "2.1.325", "interactive"]["changes"]
+    for mode in ("interactive", "non-interactive"):
+        current = stops["claude-code", "2.1.331", mode]
+        assert current["payload"]["prompt_id"] == "fixture-prompt"
+        assert "prompt_id replaced with fixture-prompt" in current["changes"]
+        assert "sha256=" in current["upstream"]
 
 
 @pytest.mark.parametrize("diagnostics, delivered, code, profile_status", [
