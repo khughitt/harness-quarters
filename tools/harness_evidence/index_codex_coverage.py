@@ -92,7 +92,8 @@ APPLIED = {
     "exec_end": ("call_id", "exit_code", "duration"),   # each exec_command_end
     "patch_end": ("call_id", "success"),                # each patch_apply_end
     "mcp_end": ("call_id", "result"),                   # each mcp_tool_call_end
-    "command_item": ("id", "exit_code", "process_id", "started_at_ms", "completed_at_ms"),
+    "command_item": ("id", "exit_code", "process_id", "started_at_ms", "completed_at_ms",
+                     "command", "output"),
     "tool_item": ("status",),                  # each FileChange / McpToolCall item
     "shell_arguments": ("workdir",),           # each shell function call's JSON arguments
 }
@@ -124,11 +125,15 @@ UNWATCHED = {
                                     "payload.result": "applied:mcp_end",
                                     "payload.result.Err": "applied:mcp_end",
                                     "payload.result.Ok": "applied:mcp_end",
-                                    "payload.result.Ok.isError": "applied:mcp_end"},
+                                    "payload.result.Ok.isError": "applied:mcp_end",
+                                    "payload.result.Ok.content": "applied:mcp_end",
+                                    "payload.result.Ok.content[].text": "applied:mcp_end"},
     "event_msg:item_completed": {"payload.item": "applied:command_item",
                                  "payload.item.type": "dimension",
                                  # a command item's id, and the key of a FileChange's writes
                                  "payload.item.id": ("applied:command_item", "dimension"),
+                                 "payload.item.command": "applied:command_item",
+                                 "payload.item.aggregated_output": "applied:command_item",
                                  "payload.item.exit_code": "applied:command_item",
                                  "payload.item.process_id": "applied:command_item",
                                  "payload.item.status": "applied:tool_item",

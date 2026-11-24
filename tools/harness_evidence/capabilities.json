@@ -1,12 +1,13 @@
 {
  "built_from": {
   "catalogue_sha256": "77d9bd48145c700ea1070b268740153e5ca4f60d310794fe43d1fc2042206e47",
-  "index_catalogue_sha256": "0dcbaeb1f5afa1625b4c949ac419f94359507c9467f876f12298aff579142906",
+  "index_catalogue_sha256": "f2c789ffa479f92b1cebf2be3e8c664fb8caf67befad7bfa20d473bbab1ae6a4",
   "index_samples": {
    "codex-basic.jsonl": "a7238f2c4cc4903f0247967deb9b95360302563cbf315624ae92ac2cb588fe76",
    "codex-compaction.jsonl": "acfb33d93e23fcafa976b624cf251f4305b315409fcc78f43bb779a2d109ab5d",
    "codex-context.jsonl": "dcbe4630c1b00f0afc13d26e20c08d7ee5e37eb562204828d5204872194135d8",
-   "codex-execution.jsonl": "210585b77ecc3ed7da3b06146a0db214d98d11aa3922cd54dc1f6bb15ec50191"
+   "codex-execution.jsonl": "210585b77ecc3ed7da3b06146a0db214d98d11aa3922cd54dc1f6bb15ec50191",
+   "codex-failure.jsonl": "890705ea02a8f63add0eaff97168483b726875361f9eec4e10c8d12917623cdd"
   },
   "samples": {
    "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000001/.system_generated/logs/transcript_full.jsonl": "665c7874fd0d6fd14d98b5d65ab52c6aa0257d634231a80d166a2ddea6b0eb54",
@@ -255,7 +256,7 @@
    "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl": "30b550b6f035815a4123c8a8fd18fbbf7059ec89c04b0749ecda738e24b2fde3"
   }
  },
- "decoder_version": "23",
+ "decoder_version": "24",
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
   "agy": {
@@ -642,6 +643,14 @@
       "content"
      ]
     },
+    "results[].diagnostic": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "results[].empty": {
+     "coverage_keys": [],
+     "provenance": []
+    },
     "results[].error": {
      "coverage_keys": [],
      "provenance": [
@@ -655,6 +664,10 @@
      "provenance": [
       "content"
      ]
+    },
+    "results[].harness_text": {
+     "coverage_keys": [],
+     "provenance": []
     },
     "results[].interrupted": {
      "coverage_keys": [],
@@ -696,6 +709,9 @@
      "response.usage.cache_write": "not_recorded",
      "response.usage.thinking": "not_recorded",
      "results[].agent": "not_recorded",
+     "results[].diagnostic": "not_decoded",
+     "results[].empty": "not_decoded",
+     "results[].harness_text": "not_decoded",
      "results[].interrupted": "not_recorded",
      "turn_end": "no_turn_end_records"
     },
@@ -1731,6 +1747,25 @@
       "toolUseResult.agentId"
      ]
     },
+    "results[].diagnostic": {
+     "coverage_keys": [
+      "applied:tool_result/input:content"
+     ],
+     "provenance": [
+      "message.content[].content",
+      "message.content[].content[].text",
+      "message.content[].is_error"
+     ]
+    },
+    "results[].empty": {
+     "coverage_keys": [
+      "applied:tool_result/input:content"
+     ],
+     "provenance": [
+      "message.content[].content",
+      "message.content[].content[].text"
+     ]
+    },
     "results[].error": {
      "coverage_keys": [],
      "provenance": [
@@ -1740,6 +1775,13 @@
     "results[].exit_code": {
      "coverage_keys": [],
      "provenance": []
+    },
+    "results[].harness_text": {
+     "coverage_keys": [],
+     "provenance": [
+      "toolUseResult.stderr",
+      "toolUseResult.stdout"
+     ]
     },
     "results[].interrupted": {
      "coverage_keys": [],
@@ -2073,6 +2115,7 @@
       "isMeta": "flag",
       "message.content[].content": "applied:tool_result",
       "message.content[].content[].text": "dimension",
+      "message.content[].content[].type": "dimension",
       "message.content[].is_error": "flag",
       "message.content[].text": "applied:text_block",
       "message.content[].tool_use_id": "applied:tool_result",
@@ -2086,6 +2129,8 @@
       "toolUseResult.durationMs": "applied:tool_result_meta",
       "toolUseResult.interrupted": "flag",
       "toolUseResult.persistedOutputSize": "applied:truncation",
+      "toolUseResult.stderr": "flag",
+      "toolUseResult.stdout": "flag",
       "uuid": "dimension"
      }
     },
@@ -2336,6 +2381,7 @@
        "results[].answers",
        "results[].bytes",
        "results[].call_id",
+       "results[].empty",
        "results[].native_duration_ms",
        "results[].truncation",
        "session",
@@ -2612,7 +2658,10 @@
        "results[].bytes",
        "results[].call_id",
        "results[].child_session",
+       "results[].diagnostic",
+       "results[].empty",
        "results[].error",
+       "results[].harness_text",
        "results[].interrupted",
        "results[].native_duration_ms",
        "results[].truncation",
@@ -3146,6 +3195,15 @@
       "timestamp"
      ]
     },
+    "execution.call_updates[].diagnostic": {
+     "coverage_keys": [
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.result.Err",
+      "payload.result.Ok.content[].text"
+     ]
+    },
     "execution.call_updates[].error": {
      "coverage_keys": [
       "applied:command_item/input:exit_code"
@@ -3182,6 +3240,24 @@
       "payload.success",
       "payload.timestamp",
       "timestamp"
+     ]
+    },
+    "execution.commands[].command": {
+     "coverage_keys": [
+      "applied:command_item/input:command"
+     ],
+     "provenance": [
+      "payload.item.command"
+     ]
+    },
+    "execution.commands[].diagnostic": {
+     "coverage_keys": [
+      "applied:command_item/input:output",
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.item.aggregated_output",
+      "payload.output"
      ]
     },
     "execution.diagnostics": {
@@ -4143,6 +4219,24 @@
       "payload.output"
      ]
     },
+    "results[].diagnostic": {
+     "coverage_keys": [
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
+    },
+    "results[].empty": {
+     "coverage_keys": [
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
+    },
     "results[].error": {
      "coverage_keys": [
       "applied:tool_output/input:output"
@@ -4155,6 +4249,15 @@
     "results[].exit_code": {
      "coverage_keys": [],
      "provenance": []
+    },
+    "results[].harness_text": {
+     "coverage_keys": [
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
     },
     "results[].interrupted": {
      "coverage_keys": [
@@ -4253,7 +4356,9 @@
       "exit_code",
       "process_id",
       "started_at_ms",
-      "completed_at_ms"
+      "completed_at_ms",
+      "command",
+      "output"
      ],
      "exec_end": [
       "call_id",
@@ -4390,7 +4495,9 @@
      "event_msg:item_completed": {
       "payload.completed_at_ms": "applied:command_item",
       "payload.item": "applied:command_item",
+      "payload.item.aggregated_output": "applied:command_item",
       "payload.item.changes": "dimension",
+      "payload.item.command": "applied:command_item",
       "payload.item.exit_code": "applied:command_item",
       "payload.item.id": [
        "applied:command_item",
@@ -4406,6 +4513,8 @@
       "payload.result": "applied:mcp_end",
       "payload.result.Err": "applied:mcp_end",
       "payload.result.Ok": "applied:mcp_end",
+      "payload.result.Ok.content": "applied:mcp_end",
+      "payload.result.Ok.content[].text": "applied:mcp_end",
       "payload.result.Ok.isError": "applied:mcp_end"
      },
      "event_msg:patch_apply_end": {
@@ -4883,8 +4992,11 @@
        "eligible",
        "execution",
        "execution.call_updates",
+       "execution.call_updates[].diagnostic",
        "execution.call_updates[].error",
        "execution.commands",
+       "execution.commands[].command",
+       "execution.commands[].diagnostic",
        "execution.diagnostics",
        "execution.operations",
        "execution.runs",
@@ -4948,7 +5060,10 @@
        "response.usage_present.uncached_total",
        "results[].bytes",
        "results[].call_id",
+       "results[].diagnostic",
+       "results[].empty",
        "results[].error",
+       "results[].harness_text",
        "results[].interrupted",
        "results[].truncation",
        "session",
@@ -4962,6 +5077,7 @@
      "synthetic": [
       "index:codex-basic.jsonl",
       "index:codex-execution.jsonl",
+      "index:codex-failure.jsonl",
       "origin/codex-agents_md.jsonl",
       "origin/codex-child-prompt.jsonl",
       "origin/codex-collaboration_mode.jsonl",

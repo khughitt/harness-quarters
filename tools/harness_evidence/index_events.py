@@ -129,6 +129,10 @@ PROVENANCE = {
     "results[].truncation": ["message.content[].content", "toolUseResult.persistedOutputSize"],
     # Shared with harnesses that report a foreground exit status; v18 Claude reads none.
     "results[].exit_code": [],
+    "results[].empty": ["message.content[].content", "message.content[].content[].text"],
+    "results[].diagnostic": ["message.content[].is_error", "message.content[].content",
+                             "message.content[].content[].text"],
+    "results[].harness_text": ["toolUseResult.stdout", "toolUseResult.stderr"],
     "injections": [
         "attachment",
         "attachment.type",
@@ -170,6 +174,8 @@ COVERAGE_KEYS = {
     "results[].native_duration_ms": ["applied:tool_result_meta/input:duration"],
     "results[].answers": ["applied:answers/input:answers"],
     "results[].truncation": ["applied:truncation/input:persisted_size"],
+    "results[].empty": ["applied:tool_result/input:content"],
+    "results[].diagnostic": ["applied:tool_result/input:content"],
     "injections": ["applied:attachment/input:body"],
     "turn_end": [
         "applied:turn_end/input:id",
@@ -599,10 +605,24 @@ def _message(record, kind):
     }
 
 
+def _result_text(content):
+    """A tool result's text; None when any part of it is not text."""
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return None
+    texts = [block.get("text") for block in content
+             if isinstance(block, dict) and block.get("type") == "text"]
+    if not all(isinstance(text, str) for text in texts) or (content and not texts):
+        return None
+    return "\n".join(texts)
+
+
 _CONVENTION_PROOFS = frozenset({
     "context", "execution", "response.phase", "message.origin", "flush_response", "identity.index_session", "identity.parent",
     "identity.subagent", "calls[].kind", "calls[].paths", "calls[].paths_complete",
     "results[].child_session", "results[].truncation", "notifications",
+    "results[].empty", "results[].harness_text",
 })
 # Fields of the shared stream schema this extractor never fills, with the reason.
 _ABSENT = {"results[].exit_code": "not_decoded"}
@@ -690,6 +710,7 @@ def _without_text(event):
             call.pop(key)
     for result in event["results"]:
         result.pop("answers")
+        result.pop("diagnostic")
     for injection in event["injections"]:
         injection.pop("source")
     if event["turn_end"]:
@@ -1025,6 +1046,7 @@ def extract(lines, state, *, place: Place, text: bool):
                                     "truncation",
                                     {"persisted_size": cut["original_bytes"] is not None},
                                 )
+                            shown = _result_text(block.get("content"))
                             agent = meta.get("agentId")
                             event["results"].append(
                                 {
@@ -1045,6 +1067,9 @@ def extract(lines, state, *, place: Place, text: bool):
                                     "answers": meta.get("answers"),
                                     "truncation": cut,
                                     "exit_code": None,
+                                    "empty": labels.empty_output(shown),
+                                    "diagnostic": shown if block.get("is_error") else None,
+                                    "harness_text": not {"stdout", "stderr"} & meta.keys(),
                                 }
                             )
                     else:

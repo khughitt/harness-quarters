@@ -859,7 +859,19 @@ def check_claude_additions(event):
 # Shared stream additions made after the frozen oracle (spec rev 2 §4.4). Claude emits
 # `results[].exit_code` as null and declares it absent, so the oracle compares without it.
 POST_ORACLE_DECLARATIONS = {"results[].exit_code": {
-    "native_paths": [], "coverage_keys": [], "basis": "native", "rule": "absent:not_decoded"}}
+    "native_paths": [], "coverage_keys": [], "basis": "native", "rule": "absent:not_decoded"},
+    # Failure text facts (hq-0e4fa3).
+    "results[].empty": {
+        "native_paths": ["message.content[].content", "message.content[].content[].text"],
+        "coverage_keys": ["applied:tool_result/input:content"],
+        "basis": "convention", "rule": "claude_results_empty"},
+    "results[].diagnostic": {
+        "native_paths": ["message.content[].is_error", "message.content[].content",
+                         "message.content[].content[].text"],
+        "coverage_keys": ["applied:tool_result/input:content"], "basis": "native", "rule": "claude_native"},
+    "results[].harness_text": {
+        "native_paths": ["toolUseResult.stdout", "toolUseResult.stderr"],
+        "coverage_keys": [], "basis": "convention", "rule": "claude_results_harness_text"}}
 
 
 # Declarations widened after the oracle: the current value, then the oracle's. Claude's
@@ -890,6 +902,8 @@ def pre_oracle_row(value):
     if value["object"] == "index_event":
         for result in value["results"]:
             assert result.pop("exit_code") is None
+            for key in ("empty", "diagnostic", "harness_text"):
+                result.pop(key, None)  # the text-free profile has no diagnostic
         if value["compaction"] is not None:
             for key in POST_ORACLE_COMPACTION_KEYS:
                 assert value["compaction"].pop(key) is None, key
@@ -1073,3 +1087,57 @@ def test_claude_compaction_trigger_is_null_only_when_absent():
         rows = [v for v in extract([(0, (json.dumps(record) + "\n").encode())], {}, place=place,
                                    text=False) if v["object"] == "index_event"]
         assert rows[0]["compaction"]["trigger"] is None
+
+
+def failure_result(tmp_path, content, is_error=True, meta=None, *, text=True):
+    """The one result fact of a paired Bash call, through the command route."""
+    common = {"sessionId": "s", "version": "2", "cwd": "/w"}
+    records = [
+        {**common, "type": "assistant", "timestamp": "2026-11-24T10:00:00Z", "requestId": "r", "uuid": "a",
+         "message": {"id": "m", "model": "claude", "role": "assistant",
+                     "usage": {"input_tokens": 1, "output_tokens": 1},
+                     "content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "rg x"}}]}},
+        {**common, "type": "user", "timestamp": "2026-11-24T10:00:01Z", "uuid": "b",
+         **({} if meta is None else {"toolUseResult": meta}),
+         "message": {"role": "user", "content": [
+             {"type": "tool_result", "tool_use_id": "t1", "is_error": is_error, "content": content}]}}]
+    source = tmp_path / "failure.jsonl"
+    source.write_text("".join(json.dumps(record) + "\n" for record in records))
+    result = command(tmp_path, source, text=text)
+    assert result.returncode == 0, result.stderr
+    rows = [json.loads(line) for line in result.stdout.splitlines()]
+    state = next(row for row in rows if row["object"] == "file_end")["state"]
+    return next(row for row in rows if row["object"] == "index_event" and row["results"])["results"][0], state
+
+
+def test_claude_failed_result_carries_text_and_origin(tmp_path):
+    result, state = failure_result(tmp_path, "Exit code 1\nPRIVATE", meta={"stdout": "", "stderr": "PRIVATE"})
+    assert (result["diagnostic"], result["harness_text"], result["empty"], result["exit_code"]) == (
+        "Exit code 1\nPRIVATE", False, False, None)
+    assert "PRIVATE" not in json.dumps(state)
+
+
+@pytest.mark.parametrize(("content", "is_error", "meta", "expected"), [
+    ("ok", False, {"stdout": "ok"}, (None, False, False)),
+    ("", False, {"stdout": ""}, (None, False, True)),
+    ("(Bash completed with no output)", False, {"stdout": ""}, (None, False, True)),
+    ("refused", True, "Error: refused", ("refused", True, False)),
+    ("refused", True, None, ("refused", True, False)),
+    ([{"type": "text", "text": "a"}, {"type": "text", "text": "b"}], True, None, ("a\nb", True, False)),
+    ([], True, None, ("", True, True)),
+    ([{"type": "image", "source": {}}], True, None, (None, True, None)),
+    ([{"type": "text", "text": 3}], True, None, (None, True, None)),
+])
+def test_claude_result_text_origin_and_emptiness(tmp_path, content, is_error, meta, expected):
+    result, _ = failure_result(tmp_path, content, is_error, meta)
+    assert (result["diagnostic"], result["harness_text"], result["empty"]) == expected
+
+
+def test_long_and_non_ascii_diagnostics_round_trip_the_command_route(tmp_path):
+    for text in ("\U0001f600\x00\x1b[31m boom", "x" * 1_000_000):
+        assert failure_result(tmp_path, text)[0]["diagnostic"] == text
+
+
+def test_claude_text_free_profile_drops_the_diagnostic(tmp_path):
+    result, _ = failure_result(tmp_path, "boom", text=False)
+    assert "diagnostic" not in result and result["empty"] is False

@@ -632,6 +632,9 @@ def test_shared_additions_preserve_original_agy_capability_block():
         assert agy["fields"].pop(field) == {"coverage_keys": [], "provenance": []}
     for field in ("context", "execution"):
         assert agy["index"]["absent"].pop(field) == "not_recorded"
+    for field in ("results[].empty", "results[].diagnostic", "results[].harness_text"):
+        assert agy["fields"].pop(field) == {"coverage_keys": [], "provenance": []}
+        assert agy["index"]["absent"].pop(field) == "not_decoded"
     from harness_evidence import index_agy
     assert agy["index"].pop("origin_kinds") == index_agy.ORIGIN_KINDS  # main e8f16150's checked addition
     assert agy.pop("discovery") == {"default_roots": [".gemini/antigravity-cli/brain"]}

@@ -33,3 +33,12 @@ version = "0.164.0"
 provenance = "synthetic"
 profile = "index"
 source = "obs 7a2804cec979543182b402f2f97efd96c513f0bc tests/harness/test_codex.py IdentityTests compaction cases"
+
+[[sample]]
+path = "codex-failure.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+source = "hq-0e4fa3: failure text and command identity facts"
+control = "codex-conformance.json"
