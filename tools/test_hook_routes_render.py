@@ -143,63 +143,69 @@ def test_promoted_preflight_refuses_settings_rendered_for_another_home(checkout)
     assert CODEX in result.stderr and 'hook-drift' in result.stderr
 
 
-def test_check_reports_codex_drift(checkout):
-    path = checkout[0] / CODEX
+def test_qualified_checkout_passes_unmodified(qualified_checkout):
+    # The negative checks below rely on this baseline: only their drift fails.
+    result = _check(qualified_checkout)
+    assert result.returncode == 0, result.stderr
+
+
+def test_check_reports_codex_drift(qualified_checkout):
+    path = qualified_checkout[0] / CODEX
     settings = json.loads(path.read_bytes())
     settings['hooks']['SessionStart'].reverse()
     path.write_text(json.dumps(settings, indent=2) + '\n')
-    result = _check(checkout)
+    result = _check(qualified_checkout)
     assert result.returncode == 1
     assert CODEX in result.stderr
 
 
-def test_check_reports_a_missing_policy_reference(checkout):
-    path = checkout[0] / 'harnesses/hook-routes.toml'
+def test_check_reports_a_missing_policy_reference(qualified_checkout):
+    path = qualified_checkout[0] / 'harnesses/hook-routes.toml'
     path.write_text(path.read_text().replace('policies = ["claim-guard"]',
                                              'policies = ["unknown-policy"]'))
-    result = _check(checkout)
+    result = _check(qualified_checkout)
     assert result.returncode == 1
     assert 'unknown-policy' in result.stderr
 
 
-def test_check_reports_an_unexpected_claude_event(checkout):
-    path = checkout[0] / CLAUDE
+def test_check_reports_an_unexpected_claude_event(qualified_checkout):
+    path = qualified_checkout[0] / CLAUDE
     settings = json.loads(path.read_bytes())
     settings['hooks']['UnknownEvent'] = None
     path.write_text(json.dumps(settings))
-    result = _check(checkout)
+    result = _check(qualified_checkout)
     assert result.returncode == 1
     assert 'UnknownEvent' in result.stderr
 
 
-def test_check_requires_the_codex_work_destination(checkout):
-    root, _ = checkout
+def test_check_requires_the_codex_work_destination(qualified_checkout):
+    root, _ = qualified_checkout
     path = root / 'harnesses/hook-routes.toml'
     before, _, tail = path.read_text().partition('[homes.codex-work]')
     _, _, after = tail.partition('[homes.agy]')
     path.write_text(before + '[homes.agy]' + after)
 
-    result = _check(checkout)
+    result = _check(qualified_checkout)
 
     assert result.returncode == 1
     assert CODEX_WORK in result.stderr
 
 
-def test_check_requires_the_legacy_subscriber_destination(checkout):
-    root, _ = checkout
+def test_check_requires_the_legacy_subscriber_destination(qualified_checkout):
+    root, _ = qualified_checkout
     path = root / 'harnesses/hook-routes.toml'
     alternate = 'relay/alternate.template.json'
     path.write_text(path.read_text().replace(f'output = "{SUBSCRIBERS}"', f'output = "{alternate}"'))
     shutil.copyfile(root / SUBSCRIBERS, root / alternate)
 
-    result = _check(checkout)
+    result = _check(qualified_checkout)
 
     assert result.returncode == 1
     assert SUBSCRIBERS in result.stderr
 
 
-def test_check_rejects_a_subscriber_role_override(checkout):
-    root, _ = checkout
+def test_check_rejects_a_subscriber_role_override(qualified_checkout):
+    root, _ = qualified_checkout
     path = root / 'harnesses/hook-routes.toml'
     path.write_text(path.read_text().replace('{ name = "familiar",',
                                              '{ name = "familiar", role = "guard",'))
@@ -208,7 +214,7 @@ def test_check_rejects_a_subscriber_role_override(checkout):
     template['subscribers'][0]['role'] = 'guard'
     template_path.write_text(json.dumps(template, indent=2) + '\n')
 
-    result = _check(checkout)
+    result = _check(qualified_checkout)
 
     assert result.returncode == 1
     assert 'familiar' in result.stderr and 'role' in result.stderr

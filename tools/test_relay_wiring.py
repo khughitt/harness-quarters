@@ -210,3 +210,17 @@ def test_agy_statusline():
         'type': 'command', 'command': '~/d/familiar/bin/familiar statusline',
         'enabled': True,
     }
+
+
+def test_donor_2_template_matches_its_qualification_records():
+    # Portable drift guard: the records bind the frozen donor-2 bytes as expanded for the
+    # home the checked-in settings were rendered for, which hosted CI cannot otherwise see.
+    commands = [hook['command'] for _, _, hook in hook_entries(FILES[0])
+                if (parsed := parse_relay_command(hook['command'], 'v0.5.0')) and parsed[3] == 'donor-2']
+    assert len(commands) == 2
+    root = next(parent.parent for parent in Path(shlex.split(commands[0])[1]).parents if parent.name == '.local')
+    data = (ROOT / TEMPLATES['donor-2']).read_bytes().replace(b'@HOME@', str(root).encode())
+    records = sorted((ROOT / 'harnesses/qualification').glob('claude-code-2.1.331-*-v0.5.0-19b427ac306a.json'))
+    assert [json.loads(r.read_text())['sessionMode'] for r in records] == ['interactive', 'non-interactive']
+    for record in records:
+        assert json.loads(record.read_text())['configDigest'] == sha256(data).hexdigest()
