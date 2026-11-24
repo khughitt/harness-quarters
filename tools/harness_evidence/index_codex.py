@@ -162,7 +162,7 @@ for _field in ("operations", "skills"):
     COVERAGE_KEYS["calls[]." + _field] = ["applied:tool_call/input:name", "applied:tool_call/input:value"]
     CONVENTIONS |= {"calls[]." + _field}
 for _field in ("call_id", "bytes", "error", "interrupted", "native_duration_ms", "background_id",
-               "agent", "child_session", "answers", "truncation"):
+               "agent", "child_session", "answers", "truncation", "empty", "diagnostic", "harness_text"):
     PROVENANCE["results[]." + _field] = ["payload.call_id", "payload.output"]
     COVERAGE_KEYS["results[]." + _field] = ["applied:tool_output/input:call_id", "applied:tool_output/input:output"]
     CONVENTIONS |= {"results[]." + _field}
@@ -174,7 +174,7 @@ COVERAGE_KEYS.update({
     "results[].error": ["applied:tool_output/input:output"],
     "execution.call_updates[].error": ["applied:command_item/input:exit_code"],
     **{f"results[].{name}": ["applied:tool_output/input:output"] for name in
-       ("bytes", "interrupted", "truncation")},
+       ("bytes", "interrupted", "truncation", "empty", "diagnostic", "harness_text")},
 })
 # A function output records no exit code of its own (spec §5.2 null-for-absent); command
 # exits stay on the associated execution facts.
@@ -182,6 +182,18 @@ PROVENANCE["results[].exit_code"] = []
 PROVENANCE["execution.call_updates[].error"] = ["payload.item.exit_code", "payload.exit_code",
                                                 "payload.success", "payload.result", "payload.output"]
 CONVENTIONS |= {"execution.call_updates[].error"}
+PROVENANCE.update({
+    "execution.commands[].command": ["payload.item.command"],
+    "execution.commands[].diagnostic": ["payload.item.aggregated_output", "payload.output"],
+    "execution.call_updates[].diagnostic": ["payload.result.Err", "payload.result.Ok.content[].text"],
+})
+COVERAGE_KEYS.update({
+    "execution.commands[].command": ["applied:command_item/input:command"],
+    "execution.commands[].diagnostic": ["applied:command_item/input:output", "applied:tool_output/input:output"],
+    "execution.call_updates[].diagnostic": ["applied:mcp_end/input:result"],
+})
+CONVENTIONS |= {"execution.commands[].command", "execution.commands[].diagnostic",
+                "execution.call_updates[].diagnostic"}
 
 METADATA_PROVENANCE = {
     "metadata.identity.thread_id": ["payload.id"],
@@ -503,6 +515,10 @@ def extract(lines, state, *, place: Place, text: bool):
             for call in event["calls"]:
                 for key in ("input_text", "command", "commands", "operations", "patch_paths", "paths", "prompt"):
                     call.pop(key, None)
+            for fact in (*event["results"], *event["execution"]["commands"],
+                         *event["execution"]["call_updates"]):
+                for key in ("command", "diagnostic"):
+                    fact.pop(key, None)
             for injection in event["injections"]:
                 injection.pop("source")
         yield event

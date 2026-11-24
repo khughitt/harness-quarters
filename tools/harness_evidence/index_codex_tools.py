@@ -8,6 +8,7 @@ import re
 from . import index_codex_runs as runs, _index_codex_outcomes as outcomes
 from .index_codex_coverage import applied
 from .index_events import _size
+from .labels import empty_output
 
 PATCH_PATH = re.compile(r"\*\*\* (?:(?:Update|Add|Delete) File|Move to): (.+?)(?=\\n|\n|[\"'`]|$)")
 CODEX_SHELL = ("exec_command", "shell_command", "shell")
@@ -136,7 +137,7 @@ KEPT = ('session_id', 'call_id', 'at_ms', 'error', 'interrupted', 'duration_ms')
 def _update(call):
     return {'session_id': call['session_id'], 'call_id': call['call_id'],
             'error': call['outcome']['error'], 'interrupted': call['outcome']['interrupted'],
-            'duration_ms': call.get('duration_ms')}
+            'duration_ms': call.get('duration_ms'), 'diagnostic': None}
 
 
 def _retire(state, call):
@@ -157,12 +158,12 @@ def _named_call(state, call_id):
     return None, entry
 
 
-def _mark(state, call_id, exit_code=None, failed=False):
+def _mark(state, call_id, exit_code=None, failed=False, diagnostic=None):
     pending, entry = _named_call(state, call_id)
     if pending is not None:
         outcomes.add_exit(pending['outcome'], exit_code)
         pending['outcome']['error'] = pending['outcome']['error'] or failed
-        return [_update(pending)]
+        return [{**_update(pending), 'diagnostic': diagnostic}]
     if entry is None:
         return None
     update = dict(zip(KEPT, entry, strict=True))
@@ -171,7 +172,7 @@ def _mark(state, call_id, exit_code=None, failed=False):
     update.update(outcome)
     entry[:] = [update[key] for key in KEPT]
     update.pop('at_ms')
-    return [update]
+    return [{**update, 'diagnostic': diagnostic}]
 
 
 def _positional_failure(state):
@@ -333,12 +334,18 @@ def on_output(state, event, payload, day):
         if call['usage_id'] is not None:
             _retire(state, state['pending_tools'].pop(call_id))
     # A result's status belongs to its own call, distinct from associated command exits.
+    shown = runs.shown_text(output) if call is not None else None
+    result = outcomes.result_text(call['tool'], shown) if shown is not None else None
     cut, tokens, size = outcomes.truncation(payload.get('output', ''))
     event['results'].append({'call_id': call_id, 'bytes': _size(payload.get('output', '')),
         'error': own['error'] if call is not None else None,
         'interrupted': own['interrupted'] if call is not None else None,
         'native_duration_ms': None, 'background_id': None, 'agent': None,
         'child_session': None, 'answers': None, 'exit_code': None,
+        # A script's own result says nothing of its commands' output.
+        'empty': empty_output(result) if call is not None and call['tool'] != 'exec' else None,
+        'diagnostic': result,
+        'harness_text': shown.startswith(outcomes.ARGUMENTS_FAILED) if shown is not None else None,
         'truncation': {'kind': cut, 'original_tokens': tokens, 'original_bytes': size}})
     _add(event['execution'], facts)
 
@@ -404,21 +411,25 @@ def _item(state, session, payload, at_ms, day):
     applied(state, session_id, day, "command_item",
                      {"id": item.get("id") is not None, "exit_code": exit_code is not None,
                       "process_id": process_id is not None, "started_at_ms": started is not None,
-                      "completed_at_ms": completed is not None})
+                      "completed_at_ms": completed is not None,
+                      "command": item.get("command") is not None,
+                      "output": item.get("aggregated_output") is not None})
     state["command_items_seen"] = True
     timed = type(started) is int and type(completed) is int
     info = {"id": item.get("id"), "process_id": None if process_id is None else str(process_id),
             "timed": timed, "started_ms": started if timed else None,
             "completed_ms": completed if timed else at_ms,
             "exit_code": exit_code if type(exit_code) is int else None}
+    # The item's own text goes into this event's facts; `info` is what state may keep.
+    text = outcomes.item_evidence(item, info["exit_code"])
     if info["id"] in state.setdefault("call_ids", {}):
         # A direct call's own item: joined by id, never by position.
-        rows, named = runs.join_direct_item(state, info, session_id)
+        rows, named = runs.join_direct_item(state, info, session_id, text)
         yield from rows
         if named == "foreground":
             yield from _mark(state, info["id"], exit_code=info["exit_code"]) or []
         return
-    rows = runs.join_item(state, info) if timed else None
+    rows = runs.join_item(state, info, text) if timed else None
     if rows is not None:
         yield from rows
         return
@@ -431,7 +442,7 @@ def _item(state, session, payload, at_ms, day):
             runs.keep_loose(state, info, counter)
         yield outcomes.command(session_id, info["id"], None, info["started_ms"],
                                          info["completed_ms"], "exact" if timed else "end_only",
-                                         info["exit_code"], "item", "none")
+                                         info["exit_code"], "item", "none", **text)
         return
     pending = state.setdefault("pending_tools", {}).get(origin)
     if origin in origins and pending is not None:
@@ -444,7 +455,7 @@ def _item(state, session, payload, at_ms, day):
         timing = "bounds" if start_ms is not None else "end_only"
     yield outcomes.command(session_id, info["id"], origin, start_ms,
                                      info["completed_ms"], timing, info["exit_code"],
-                                     "item", "position")
+                                     "item", "position", **text)
 
 def _patch_end(state, session, payload, day):
     call_id, success = payload.get("call_id"), payload.get("success")
@@ -468,7 +479,7 @@ def _mcp_end(state, session, payload, day):
                      {"call_id": call_id is not None, "result": result is not None})
     if not outcomes.mcp_end_failed(result):
         return
-    rows = _mark(state, call_id, failed=True)
+    rows = _mark(state, call_id, failed=True, diagnostic=outcomes.mcp_diagnostic(result))
     if rows is None:
         yield from _unmatched(state, call_id)
         return

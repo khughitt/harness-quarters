@@ -13,6 +13,7 @@ from harness_evidence.index_events import _at_ms
 from harness_evidence.lines import Place
 from test_harness_evidence_index_codex import environment, request
 
+TEXT_FACTS = ("operation_seq", "command", "empty", "diagnostic")
 COUNTERS = ("unattributed_scripts", "unmatched_poll", "session_reused", "unmatched_wait")
 
 
@@ -36,7 +37,8 @@ def extract_rows(lines, state):
             yield dict(call)
         for group, table in (("runs", "tool_runs"), ("commands", "tool_commands"), ("writes", "file_writes")):
             for fact in event["execution"][group]:
-                yield {"table": table, **{k:v for k,v in fact.items() if k != "operation_seq"}}
+                # The text facts (hq-0e4fa3) have their own tests; the original rows predate them.
+                yield {"table": table, **{k:v for k,v in fact.items() if k not in TEXT_FACTS}}
 
 
 def run(lines, state=None):
@@ -1021,7 +1023,7 @@ class OutcomeTests(unittest.TestCase):
         self.assertEqual(co.command("s", "c#s7", "c", 1, 2, "bounds", 1, "poll", "session"), {
             "session_id": "s", "command_id": "c#s7", "call_id": "c",
             "start_ms": 1, "end_ms": 2, "timing": "bounds", "exit_code": 1, "source": "poll",
-            "attribution": "session"})
+            "attribution": "session", **dict.fromkeys(TEXT_FACTS)})
         state = {}
         co.diagnostics(state)["commands_unattributed"] += 1
         self.assertEqual(state["command_diagnostics"],
@@ -1438,23 +1440,23 @@ class ResultTests(unittest.TestCase):
             chunk(1.001159528, session=16384, output="/x/aurora.BYb5\n"),
             chunk(0.0, exit_code=0, output="done")])
         self.assertEqual(cr.results(text), [
-            {"session": "16384", "exit_code": None, "wall_ms": 1001},
-            {"session": None, "exit_code": 0, "wall_ms": 0}])
+            {"session": "16384", "exit_code": None, "wall_ms": 1001, "output": "/x/aurora.BYb5\n"},
+            {"session": None, "exit_code": 0, "wall_ms": 0, "output": "done"}])
 
     def test_property_order_does_not_matter(self):
         text = json.dumps({"chunk_id": "c", "output": "x", "session_id": 7,
                            "wall_time_seconds": 2.0})
-        self.assertEqual(cr.results(text), [{"session": "7", "exit_code": None, "wall_ms": 2000}])
+        self.assertEqual(cr.results(text), [{"session": "7", "exit_code": None, "wall_ms": 2000, "output": "x"}])
 
     def test_objects_inside_output_text_are_ignored(self):
         inner = json.dumps({"chunk_id": "z", "session_id": 99, "exit_code": None})
         text = chunk(0.2, exit_code=0, output=inner) + "\n{not json} {\"other\": 1}"
-        self.assertEqual(cr.results(text), [{"session": None, "exit_code": 0, "wall_ms": 200}])
+        self.assertEqual(cr.results(text), [{"session": None, "exit_code": 0, "wall_ms": 200, "output": inner}])
 
     def test_pretty_printed_results(self):
         text = json.dumps({"chunk_id": "c", "wall_time_seconds": 30.0, "session_id": 7,
                            "original_token_count": 1, "output": "x"}, indent=2)
-        self.assertEqual(cr.results(text), [{"session": "7", "exit_code": None, "wall_ms": 30000}])
+        self.assertEqual(cr.results(text), [{"session": "7", "exit_code": None, "wall_ms": 30000, "output": "x"}])
 
 
 def test_empty_unpairable_and_patch_scripts_keep_native_kind_and_operation_positions(tmp_path):
@@ -1989,3 +1991,147 @@ def test_named_call_and_agent_wait_survive_long_gap_of_execution_scripts():
     assert update['error'] is True and update['interrupted'] is True
     assert not any(r.get('call_id') == 'agent-wait' for r in execution(resumed, 'call_updates'))
     assert resumed[-1]['malformed'] == 0
+
+
+class FailureEvidenceTests(unittest.TestCase):
+    """Failed text and command identity (hq-0e4fa3): published with the event, never in state."""
+
+    def events(self, lines, state=None, text=True):
+        state = {} if state is None else state
+        place = Place("codex", "file", None, "explicit", "control", Path("control"))
+        found = [event for event in index_codex.extract(enumerate([META, CTX, *lines]), state, place=place, text=text)
+                 if event["object"] == "index_event"]
+        return found, state
+
+    def results(self, lines, **kw):
+        found, state = self.events(lines, **kw)
+        return {r["call_id"]: r for e in found for r in e["results"]}, state
+
+    def commands(self, lines, **kw):
+        found, state = self.events(lines, **kw)
+        return {c["command_id"]: c for e in found for c in e["execution"]["commands"]}, state
+
+    def test_codex_result_text_is_kept_when_output_looks_successful(self):
+        results, state = self.results([exec_command_call("e1", "cat missing", T0),
+            fn_output("e1", exited(0) + "cat: missing: No such file or directory", T1)])
+        self.assertEqual((results["e1"]["diagnostic"], results["e1"]["error"], results["e1"]["harness_text"]),
+                         ("cat: missing: No such file or directory", False, False))
+        self.assertNotIn("No such file", json.dumps(state))
+        self.assertNotIn("cat missing", json.dumps(state))
+
+    def test_direct_output_emptiness_follows_the_body(self):
+        results, _ = self.results([exec_command_call("e1", "rg x", T0), fn_output("e1", exited(1), T1)])
+        self.assertIs(results["e1"]["empty"], True)
+
+    def test_json_wrapped_and_unframed_shell_outputs(self):
+        results, _ = self.results([shell_command_call("s1", "x", T0),
+            fn_output("s1", json.dumps({"output": "boom", "metadata": {"exit_code": 1}}), T1),
+            shell_command_call("s2", "x", T2), fn_output("s2", "no header", T3)])
+        self.assertEqual((results["s1"]["diagnostic"], results["s2"]["diagnostic"], results["s2"]["empty"]),
+                         ("boom", None, None))
+
+    def test_completed_script_has_no_call_text_but_its_failed_command_does(self):
+        lines = [exec_script("x1", 'text(await tools.exec_command({cmd:"rg needle"}));', T0),
+                 exec_output("x1", T1, "Script completed\nWall time 1 seconds\nOutput:\n",
+                             chunk(1, exit_code=1, output="PRIVATE boom"))]
+        results, state = self.results(lines)
+        commands, _ = self.commands(lines)
+        self.assertEqual((results["x1"]["diagnostic"], results["x1"]["empty"]), (None, None))
+        self.assertEqual({k: commands["x1#r0"][k] for k in
+                          ("exit_code", "operation_seq", "diagnostic", "command", "empty")},
+                         {"exit_code": 1, "operation_seq": 0, "diagnostic": "PRIVATE boom", "command": None, "empty": False})
+        self.assertNotIn("PRIVATE", json.dumps(state))
+
+    def test_failed_script_keeps_its_whole_text(self):
+        text = "Script failed\nWall time 1 seconds\nOutput:\nScript error: TypeError: x"
+        results, _ = self.results([exec_script("x1", "boom()", T0), fn_output("x1", text, T1)])
+        self.assertEqual(results["x1"]["diagnostic"], text)
+
+    def test_image_outputs_have_no_text_and_mixed_outputs_keep_only_theirs(self):
+        image = {"type": "input_image", "image_url": "data:x"}
+        for output, text, empty in (([image], None, None), ([{"type": "input_text", "text": "a"}, image], "a", False),
+                                    ([], "", True), (None, None, None)):
+            results, _ = self.results([fn_call("v1", "view_image", {"path": "/a"}, T0), fn_output("v1", output, T1)])
+            self.assertEqual((results["v1"]["diagnostic"], results["v1"]["empty"]), (text, empty), output)
+
+    def test_script_results_never_claim_emptiness(self):
+        for text in ("Script failed\nOutput:\n", "failed to parse function arguments: x"):
+            results, _ = self.results([exec_script("x1", "boom()", T0), fn_output("x1", text, T1)])
+            self.assertIsNone(results["x1"]["empty"])
+
+    def test_a_last_empty_chunk_does_not_make_a_session_command_empty(self):
+        commands, _ = self.commands([exec_command_call("e1", "rg x", T0), fn_output("e1", running(5) + "a match", T1),
+            fn_call("p1", "write_stdin", {"session_id": 5, "chars": ""}, T2), fn_output("p1", exited(1), T3)])
+        self.assertIsNone(commands["e1#s5"]["empty"])
+
+    def test_successful_command_carries_no_diagnostic(self):
+        commands, _ = self.commands([exec_script("x1", 'text(await tools.exec_command({cmd:"ls"}));', T0),
+            exec_output("x1", T1, "Script completed\nOutput:\n", chunk(1, exit_code=0, output=""))])
+        self.assertEqual((commands["x1#r0"]["diagnostic"], commands["x1#r0"]["empty"]), (None, True))
+
+    def item(self, argv, output="PRIVATE out", exit_code=1, item_id="i1"):
+        return rec("event_msg", {"type": "item_completed", "started_at_ms": at(T0), "completed_at_ms": at(T1),
+            "item": {"type": "CommandExecution", "id": item_id, "exit_code": exit_code, "process_id": "7",
+                     "command": argv, "aggregated_output": output}}, T1)
+
+    def test_item_command_text_is_transient(self):
+        script = exec_script("x1", "run()", T0)
+        for argv, text in ((["/bin/zsh", "-lc", "cat PRIVATE"], "cat PRIVATE"), ("cat PRIVATE", "cat PRIVATE"),
+                           (["cat", "PRIVATE x"], "cat 'PRIVATE x'"), (["cat", 3], None), (None, None)):
+            with self.subTest(argv=argv):
+                commands, state = self.commands([script, self.item(argv)])
+                self.assertEqual((commands["i1"]["command"], commands["i1"]["diagnostic"], commands["i1"]["empty"]),
+                                 (text, "PRIVATE out", False))
+                self.assertNotIn("PRIVATE", json.dumps(state))
+
+    def test_unattributed_item_keeps_no_text_in_the_loose_window(self):
+        commands, state = self.commands([self.item("cat PRIVATE")])
+        self.assertEqual(commands["i1"]["command"], "cat PRIVATE")
+        self.assertIn("loose_items", state)
+        self.assertNotIn("PRIVATE", json.dumps(state))
+
+    def test_direct_item_before_and_after_its_output_carries_its_text(self):
+        call, out_ = exec_command_call("e1", "cat PRIVATE", T0), fn_output("e1", exited(1) + "PRIVATE", T1)
+        item = self.item("cat PRIVATE", item_id="e1")
+        for lines in ([call, item, out_], [call, out_, item]):
+            found, state = self.events(lines)
+            facts = [c for e in found for c in e["execution"]["commands"] if c["source"] == "item"]
+            self.assertEqual([(c["command"], c["diagnostic"]) for c in facts], [("cat PRIVATE", "PRIVATE out")])
+            self.assertNotIn("PRIVATE", json.dumps(state))
+
+    def test_poll_end_gives_its_text_to_the_launched_command(self):
+        commands, state = self.commands([exec_command_call("e1", "sleep 9", T0), fn_output("e1", running(5), T1),
+            fn_call("p1", "write_stdin", {"session_id": 5, "chars": ""}, T2),
+            fn_output("p1", exited(1) + "PRIVATE late", T3)])
+        self.assertEqual((commands["e1#s5"]["diagnostic"], commands["e1#s5"]["exit_code"]), ("PRIVATE late", 1))
+        self.assertNotIn("PRIVATE", json.dumps(state))
+
+    def test_failed_mcp_end_update_carries_its_error(self):
+        call = fn_call("m1", "mcp__x__y", {}, T0)
+        for result, text in (({"Err": "HTTP 502"}, "HTTP 502"), ({"Err": {"a": 1}}, None),
+                ({"Ok": {"isError": True, "content": [{"type": "text", "text": "a"}, {"text": 3}, {"text": "b"}]}}, "a\nb")):
+            found, state = self.events([call, rec("event_msg", {"type": "mcp_tool_call_end", "call_id": "m1",
+                                                                "result": result}, T1)])
+            updates = [u for e in found for u in e["execution"]["call_updates"]]
+            # The call's own opening update carries nothing.
+            self.assertEqual([u["diagnostic"] for u in updates], [None, text])
+            self.assertNotIn("HTTP 502", json.dumps(state))
+
+    def test_other_updates_carry_no_text(self):
+        found, _ = self.events([exec_command_call("e1", "x", T0), fn_output("e1", exited(1) + "boom", T1)])
+        self.assertEqual([u["diagnostic"] for e in found for u in e["execution"]["call_updates"]], [None, None])
+
+    def test_argument_parse_failure_is_harness_text_and_collab_is_not(self):
+        for text, harness in (("failed to parse function arguments: x", True), ("collab spawn failed: x", False)):
+            results, _ = self.results([exec_command_call("e1", "x", T0), fn_output("e1", text, T1)])
+            self.assertEqual((results["e1"]["harness_text"], results["e1"]["error"]), (harness, True))
+            self.assertEqual(results["e1"]["diagnostic"], text if harness else None)
+
+    def test_text_free_profile_drops_diagnostics_and_commands(self):
+        found, _ = self.events([exec_script("x1", "run()", T0), self.item("cat PRIVATE"),
+                                fn_call("m1", "mcp__x__y", {}, T0), fn_output("m1", "PRIVATE", T1)], text=False)
+        self.assertNotIn("PRIVATE", json.dumps(found))
+        for event in found:
+            for fact in (*event["results"], *event["execution"]["commands"], *event["execution"]["call_updates"]):
+                self.assertNotIn("diagnostic", fact)
+                self.assertNotIn("command", fact)

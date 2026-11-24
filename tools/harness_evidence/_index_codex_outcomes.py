@@ -7,15 +7,20 @@ No command text or output is kept.
 """
 
 import json
+import posixpath
 import re
+import shlex
+
+from .labels import empty_output
 
 SCRIPT = re.compile(r"Script (completed|failed|terminated)")
 EXIT_CODE = re.compile(r"Exit code: (-?\d+)")
 PROCESS_EXITED = re.compile(r"Process exited with code (-?\d+)")
 PROCESS_RUNNING = re.compile(r"Process running with session ID (\d+)")
-CALL_FAILED = ("failed to parse function arguments", "collab spawn failed:")
+ARGUMENTS_FAILED = "failed to parse function arguments"
+CALL_FAILED = (ARGUMENTS_FAILED, "collab spawn failed:")
 POLLS = frozenset({"write_stdin", "wait", "wait_agent"})
-SHELL_TOOLS = ("exec_command", "shell_command")
+SHELL_TOOLS = ("exec_command", "shell_command", "shell")
 INTERRUPT = 130
 RECENT = 256
 COUNTERS = ("commands_unattributed", "commands_ambiguous", "late_event_unmatched")
@@ -114,10 +119,67 @@ def duration_ms(duration):
 
 
 def command(session_id, command_id, call_id, start_ms, end_ms, timing, exit_code, source,
-                attribution):
+                attribution, *, operation_seq=None, command=None, empty=None, diagnostic=None):
     return {"session_id": session_id, "command_id": command_id,
             "call_id": call_id, "start_ms": start_ms, "end_ms": end_ms, "timing": timing,
-            "exit_code": exit_code, "source": source, "attribution": attribution}
+            "exit_code": exit_code, "source": source, "attribution": attribution,
+            "operation_seq": operation_seq, "command": command, "empty": empty,
+            "diagnostic": diagnostic}
+
+
+def output_evidence(exit_code, output):
+    """What a command's completing record says of its own output: never kept in state."""
+    return {"empty": empty_output(output),
+            "diagnostic": output if exit_code not in (None, 0) else None}
+
+
+def item_evidence(item, exit_code):
+    """A native command item's own command text and output."""
+    argv, output = item.get("command"), item.get("aggregated_output")
+    text = argv if isinstance(argv, str) else None
+    if isinstance(argv, list) and all(isinstance(part, str) for part in argv):
+        shell = (len(argv) == 3 and posixpath.basename(argv[0]) in ("sh", "bash", "zsh")
+                 and argv[1] in ("-c", "-lc"))
+        text = argv[2] if shell else shlex.join(argv)
+    return {"command": text,
+            **output_evidence(exit_code, output if isinstance(output, str) else None)}
+
+
+def diagnostic_text(text):
+    """A shell tool's output without the harness's header; None when it has no such frame."""
+    lines = text.split("\n")
+    if "Output:" in lines:
+        return "\n".join(lines[lines.index("Output:") + 1:])
+    if text.startswith("{"):
+        try:
+            value = json.loads(text)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(value, dict) and isinstance(value.get("output"), str):
+            return value["output"]
+    return None
+
+
+def result_text(tool, text):
+    """The text that explains a call: a completed script's output is its commands'."""
+    if text.startswith(ARGUMENTS_FAILED):
+        return text
+    if tool in SHELL_TOOLS:
+        return diagnostic_text(text)
+    if tool == "exec":
+        return text if harness_status(text)["script"] in ("failed", "terminated") else None
+    return text
+
+
+def mcp_diagnostic(result):
+    if isinstance(result.get("Err"), str):
+        return result["Err"]
+    ok = result.get("Ok")
+    content = ok.get("content") if isinstance(ok, dict) else None
+    if isinstance(content, list):
+        return "\n".join(piece["text"] for piece in content
+                         if isinstance(piece, dict) and isinstance(piece.get("text"), str))
+    return None
 
 
 def diagnostics(state):

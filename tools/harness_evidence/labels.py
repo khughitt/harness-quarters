@@ -77,3 +77,12 @@ def label(record: dict) -> None:
             role, rule, basis = 'unknown', 'conflict', 'heuristic'
             record['conflict'] = [{'native_kind': native}, {'markers': conflict}]
     record.update(role=role, rule=rule, role_basis=rule, basis=basis)
+
+
+# What a harness writes in place of a result that had no output.
+_EMPTY_OUTPUT = frozenset({"", "(Bash completed with no output)", "No matches found", "No files found"})
+
+
+def empty_output(text):
+    """Whether a result's text reports no output; None when it has no text."""
+    return None if text is None else text.strip() in _EMPTY_OUTPUT

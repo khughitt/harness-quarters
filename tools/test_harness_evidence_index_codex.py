@@ -263,7 +263,7 @@ def undeclared_reads(monkeypatch, source):
 
 
 @pytest.mark.parametrize("sample", ["codex-basic.jsonl", "codex-context.jsonl", "codex-execution.jsonl",
-                                    "codex-compaction.jsonl"])
+                                    "codex-compaction.jsonl", "codex-failure.jsonl"])
 def test_basic_native_reads_are_declared_without_parent_wildcards(monkeypatch, sample):
     """Original support.tracing read audit, over this step's implemented controls."""
     from harness_evidence import index_codex_coverage as cv

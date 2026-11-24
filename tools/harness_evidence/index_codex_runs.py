@@ -233,6 +233,17 @@ def output_text(output):
     return ""
 
 
+def shown_text(output):
+    """An output's own text blocks; None when it shows no text (an image, or no output)."""
+    if isinstance(output, str):
+        return output
+    if not isinstance(output, list):
+        return None
+    texts = [block["text"] for block in output
+             if isinstance(block, dict) and isinstance(block.get("text"), str)]
+    return "\n".join(texts) if texts or not output else None
+
+
 def results(text):
     """Result objects the script printed, in order, read with the JSON decoder.
 
@@ -255,7 +266,8 @@ def results(text):
             found.append({
                 "session": str(session) if type(session) is int else None,
                 "exit_code": exit_code if type(exit_code) is int else None,
-                "wall_ms": round(wall * 1000) if type(wall) in (int, float) else 0})
+                "wall_ms": round(wall * 1000) if type(wall) in (int, float) else 0,
+                "output": value["output"] if isinstance(value.get("output"), str) else None})
         i = end
 
 
@@ -361,7 +373,7 @@ def origin_start(state, origin_call_id):
     return None
 
 
-def join_item(state, info):
+def join_item(state, info, text):
     """The rows for an item that reports a launched session's end: the
     launch whose session id is the item's process id, whose start window holds the
     item's start, and that no item has joined yet. None when none fits."""
@@ -380,7 +392,8 @@ def join_item(state, info):
     return [_exact_run(run, info["started_ms"], info["completed_ms"], info["exit_code"], "item"),
             outcomes.command(run["session_id"], run["run_id"], run["call_id"],
                                        info["started_ms"], info["completed_ms"], "exact",
-                                       info["exit_code"], "item", "process_id")]
+                                       info["exit_code"], "item", "process_id",
+                                       operation_seq=run["operation_seq"], **text)]
 
 
 def _origin(call, call_id, run_id, mode):
@@ -407,7 +420,9 @@ def _finished_launch(state, origin, result, delivered_ms, outcome):
     return [outcomes.command(origin["session_id"],
                                        f"{origin['call_id']}#r{origin['paired'] - 1}",
                                        origin["call_id"], origin["start_ms"], delivered_ms,
-                                       "bounds", result["exit_code"], "result", "position")]
+                                       "bounds", result["exit_code"], "result", "position",
+                                       operation_seq=origin["paired"] - 1,
+                                       **outcomes.output_evidence(result["exit_code"], result["output"]))]
 
 
 def _join_early_item(origin, run):
@@ -443,7 +458,7 @@ def _join_loose_item(state, run):
                     outcomes.command(run["session_id"], item["id"], run["call_id"],
                                                item["started_ms"], item["completed_ms"],
                                                "exact", item["exit_code"], "item",
-                                               "process_id")]
+                                               "process_id", operation_seq=run["operation_seq"])]
     return []
 
 
@@ -491,7 +506,7 @@ def _deliver(state, origin, text, delivered_ms, outcome=None):
         if run["closed"]:
             continue
         rows.extend(_close_by_poll(state, run, run["end_lo_ms"], delivered_ms,
-                                   result["exit_code"], "poll"))
+                                   result["exit_code"], "poll", result["output"]))
     return rows
 
 
@@ -527,10 +542,12 @@ def on_exec_end(state, call_id, exit_code, start_ms, end_ms):
         return [_row(run, end_ms, end_ms, "exec_end", "exited", exit_code),
                 outcomes.command(run["session_id"], run["run_id"], call_id,
                                            run["start_ms"], end_ms, "bounds", exit_code,
-                                           "exec_end", "call_id")], True
+                                           "exec_end", "call_id",
+                                           operation_seq=run["operation_seq"])], True
     return [_exact_run(run, start_ms, end_ms, exit_code, "exec_end"),
             outcomes.command(run["session_id"], run["run_id"], call_id, start_ms,
-                                       end_ms, "exact", exit_code, "exec_end", "call_id")], True
+                                       end_ms, "exact", exit_code, "exec_end", "call_id",
+                                       operation_seq=run["operation_seq"])], True
 
 
 # A kept foreground run, for an exec_command_end after its output: every rollout keeps up
@@ -558,7 +575,7 @@ def _foreground_exec_end(state, call_id, exit_code):
     return [_kept_run_row(entry)]
 
 
-def _foreground_run(state, call, call_id, status, at_ms, outcome):
+def _foreground_run(state, call, call_id, status, at_ms, outcome, text):
     """A direct command's run and command row, closed at its output. A completion held
     from an item or exec_command_end wins over the header."""
     held = call.get("held")
@@ -571,7 +588,8 @@ def _foreground_run(state, call, call_id, status, at_ms, outcome):
     elif exit_code is not None:
         rows.append(outcomes.command(call["session_id"], call_id, call_id,
                                                call["at_ms"], at_ms, "bounds", exit_code,
-                                               "header", "call_id"))
+                                               "header", "call_id",
+                                               **outcomes.output_evidence(exit_code, outcomes.diagnostic_text(text))))
     run = {"session_id": call["session_id"], "call_id": call_id, "run_id": call_id,
            "start_ms": call["at_ms"], "start_hi_ms": call["at_ms"], "mode": "foreground",
            "operation_seq": call["operation_seq"]}
@@ -587,7 +605,7 @@ def _foreground_run(state, call, call_id, status, at_ms, outcome):
 RANK = {"item": 2, "exec_end": 1}
 
 
-def _hold(state, call_id, source, exit_code, start_ms, end_ms):
+def _hold(state, call_id, source, exit_code, start_ms, end_ms, text=None):
     """A direct call's completion that arrived before its output: its command row is
     written now, under the call id, so it survives a call that never gets an output; the
     completion is kept for the output to say whether the run was foreground or a session.
@@ -602,16 +620,17 @@ def _hold(state, call_id, source, exit_code, start_ms, end_ms):
     call["held"] = {"source": source, "exit_code": exit_code, "timing": timing,
                     "start_ms": start_ms if start_ms is not None else call["at_ms"],
                     "end_ms": end_ms}
-    return [_held_row(call, call_id, call_id, call["held"])]
+    return [_held_row(call, call_id, call_id, call["held"], text)]
 
 
-def _held_row(call, command_id, call_id, held):
+def _held_row(call, command_id, call_id, held, text=None):
     return outcomes.command(call["session_id"], command_id, call_id,
                                       held["start_ms"], held["end_ms"], held["timing"],
-                                      held["exit_code"], held["source"], "call_id")
+                                      held["exit_code"], held["source"], "call_id",
+                                      operation_seq=call["operation_seq"], **(text or {}))
 
 
-def _close_direct(run, held, command=True):
+def _close_direct(run, held, command=True, text=None):
     """A direct session closed by its own item or exec_command_end; `command`
     False when the command row was already written under the call id (_hold)."""
     if held["timing"] == "exact":
@@ -622,10 +641,10 @@ def _close_direct(run, held, command=True):
                    held["exit_code"])
     if not command:
         return [row]
-    return [row, _held_row(run, run["run_id"], run["call_id"], held)]
+    return [row, _held_row(run, run["run_id"], run["call_id"], held, text)]
 
 
-def join_direct_item(state, info, session_id):
+def join_direct_item(state, info, session_id, text):
     """An item whose id is a direct call's id (never positional). Returns the rows
     and what the item named: "session" (it closed the call's session), "held" (the
     call's output has not arrived), or "foreground" (a finished call; the caller marks
@@ -644,8 +663,8 @@ def join_direct_item(state, info, session_id):
                 "timing": "exact" if info["timed"] else "bounds",
                 "start_ms": start_ms if info["timed"] else run["start_ms"],
                 "end_ms": info["completed_ms"]}
-        return _close_direct(run, held), "session"
-    held = _hold(state, call_id, "item", info["exit_code"], start_ms, info["completed_ms"])
+        return _close_direct(run, held, text=text), "session"
+    held = _hold(state, call_id, "item", info["exit_code"], start_ms, info["completed_ms"], text)
     if held is not None:
         return held, "held"
     rows = _foreground_exec_end(state, call_id, info["exit_code"])
@@ -653,7 +672,7 @@ def join_direct_item(state, info, session_id):
     timing = "exact" if info["timed"] else ("bounds" if start is not None else "end_only")
     rows.append(outcomes.command(session_id, call_id, call_id, start,
                                            info["completed_ms"], timing, info["exit_code"],
-                                           "item", "call_id"))
+                                           "item", "call_id", **text))
     return rows, "foreground"
 
 
@@ -670,13 +689,17 @@ def _remember(state, run):
     state.setdefault("past_launches", []).append(run)
 
 
-def _close_by_poll(state, run, end_lo_ms, end_ms, exit_code, source):
+def _close_by_poll(state, run, end_lo_ms, end_ms, exit_code, source, output):
     """A session a poll saw exit: bounds only, until an exact report replaces them."""
     _remember(state, run)
     return [_row(run, end_lo_ms, end_ms, "exit_poll", "exited", exit_code),
             outcomes.command(run["session_id"], run["run_id"], run["call_id"],
                                        run["start_ms"], end_ms, "bounds", exit_code, source,
-                                       "session")]
+                                       "session", operation_seq=run["operation_seq"],
+                                       # Earlier chunks were not kept, so an empty last one
+                                       # does not make the command's output empty.
+                                       **{**outcomes.output_evidence(exit_code, output),
+                                          "empty": False if output and output.strip() else None})]
 
 
 def on_output(state, call_id, output, at_ms, outcome=None):
@@ -688,7 +711,7 @@ def on_output(state, call_id, output, at_ms, outcome=None):
     if call["kind"] == "command":
         status = outcomes.harness_status(text)
         if status["session"] is None:
-            return _foreground_run(state, call, call_id, status, at_ms, outcome)
+            return _foreground_run(state, call, call_id, status, at_ms, outcome, text)
         sessions = state.setdefault("command_sessions", {})
         previous = sessions.get(status["session"])
         if previous is not None and not previous["closed"]:
@@ -718,7 +741,8 @@ def on_output(state, call_id, output, at_ms, outcome=None):
         del sessions[call["session"]]
         if run["closed"]:
             return []
-        return _close_by_poll(state, run, run["end_lo_ms"], at_ms, status["exit_code"], "header")
+        return _close_by_poll(state, run, run["end_lo_ms"], at_ms, status["exit_code"], "header",
+                              outcomes.diagnostic_text(text))
     if call["kind"] == "exec":
         running = RUNNING.match(text)
         if running:

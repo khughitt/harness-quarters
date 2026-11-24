@@ -30,7 +30,8 @@ RULES = ("decoder", "catalogue_path", "identity")
 # Fields added after the base, projected out before comparison and asserted null for Claude.
 ADDED_RESULT_FIELDS = ("exit_code",)
 ADDED_FILE_START_FIELDS = ("side_inputs",)
-ADDED_PROVENANCE = ("results[].exit_code",)
+ADDED_TEXT_FIELDS = ("empty", "diagnostic", "harness_text")  # valued, with their own tests (hq-0e4fa3)
+ADDED_PROVENANCE = ("results[].exit_code", *(f"results[].{name}" for name in ADDED_TEXT_FIELDS))
 # Compaction keys added after the base; null on every base sample (none holds a boundary).
 ADDED_COMPACTION_KEYS = ("id", "trigger", "reason")
 # Declarations widened after the base: field -> (current, base).
@@ -45,7 +46,9 @@ ADDED_RECORD_KINDS = ("system/compact_boundary", "system/informational")
 # Index reads declared after the base for compaction pairing: kind -> path -> (current, base),
 # base None when the read is new.
 CHANGED_UNWATCHED = {
-    "user": {"uuid": ("dimension", None), "parentUuid": ("dimension", None)},
+    "user": {"uuid": ("dimension", None), "parentUuid": ("dimension", None),
+             "toolUseResult.stdout": ("flag", None), "toolUseResult.stderr": ("flag", None),
+             "message.content[].content[].type": ("dimension", None)},
     "attachment": {"uuid": ("dimension", None), "parentUuid": ("dimension", None)},
     "system": {"uuid": (["applied:turn_end", "dimension"], "applied:turn_end"),
                "parentUuid": ("dimension", None), "compactMetadata.trigger": ("dimension", None),
@@ -120,6 +123,8 @@ def project(obj: dict) -> tuple[dict, list]:
         for result in obj.get("results") or []:
             for key in ADDED_RESULT_FIELDS:
                 removed.append(result.pop(key))
+            for key in ADDED_TEXT_FIELDS:
+                result.pop(key, None)  # the text-free profile has no diagnostic
         for field in ADDED_PROVENANCE:  # Claude never overrides an added field's default.
             assert field not in obj["provenance"], field
         if obj["compaction"] is not None:
@@ -168,7 +173,14 @@ def observe(normalize: Normalizer):
 
 
 # The capabilities fields entry each post-base addition creates for Claude.
-ADDED_CAPABILITY_FIELDS = {"results[].exit_code": {"coverage_keys": [], "provenance": []}}
+_RESULT_TEXT = ["message.content[].content", "message.content[].content[].text"]
+ADDED_CAPABILITY_FIELDS = {
+    "results[].exit_code": {"coverage_keys": [], "provenance": []},
+    "results[].empty": {"coverage_keys": ["applied:tool_result/input:content"], "provenance": _RESULT_TEXT},
+    "results[].diagnostic": {"coverage_keys": ["applied:tool_result/input:content"],
+                             "provenance": [*_RESULT_TEXT, "message.content[].is_error"]},
+    "results[].harness_text": {"coverage_keys": [],
+                               "provenance": ["toolUseResult.stderr", "toolUseResult.stdout"]}}
 
 
 def claude_capability_blocks():
@@ -181,6 +193,9 @@ def claude_capability_blocks():
     assert claude.pop("discovery") == {"default_roots": [".claude/projects", ".claude-work/projects"]}
     for version in ("unknown", "2.1.281"):
         claude["versions"][version]["fields_seen"]["synthetic"].remove("response.phase")
+    for version in claude["versions"].values():
+        for seen in version.get("fields_seen", {}).values():
+            seen[:] = [field for field in seen if field not in ADDED_PROVENANCE]
     for field, (current, base) in CHANGED_PROVENANCE.items():
         assert claude["fields"][field]["provenance"] == sorted(current), field
         claude["fields"][field]["provenance"] = sorted(base)

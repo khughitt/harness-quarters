@@ -294,9 +294,25 @@ checked even with empty changes. Omitted fields inherit checked declarations; an
 independent frozen full-proof oracle checks for accidentally omitted dynamic changes.
 Declarations reset on each file and resume request, outside opaque state and terminal
 counts. Both command and import routes use this framing. `text:true` requests
-message, command, path, question, answer and dispatch text; with it disabled those
-values are omitted. No human-turn, active-time, task/review or recommendation verdict
+message, command, path, question, answer, dispatch and diagnostic text; with it
+disabled those values are omitted. No human-turn, active-time, task/review or recommendation verdict
 is produced. Default reader requests retain their existing object/state shapes.
+
+Results carry `empty`, `diagnostic` and `harness_text`; Codex command facts carry
+`operation_seq`, `command`, `empty` and `diagnostic`; Codex call updates carry
+`diagnostic`. They explain failures to a consumer and never enter decoder state.
+`empty` says the text is empty or the harness's own no-output marker, and is null when
+there is no text (an image), for a Codex script, and for a session command whose last
+chunk was blank. Claude's `diagnostic` is a failed result's text. Codex's is any
+result's text, since a later event can still fail the call: a shell tool's body after
+its header, a failed or terminated script's whole text (a completed script's text is
+its commands'), and any other tool's whole text. A command's `diagnostic` is its
+completing record's output on a nonzero exit; an update's is a named failed MCP end's
+error, not one attributed by position. `harness_text` is true when Claude's native
+result has neither `stdout` nor `stderr`, or Codex could not parse the call's
+arguments. A command is named by its own text (native items) or its operation index.
+A later fact for the same command can carry nulls here: it replaces timing and
+association, not what an earlier fact explained. Antigravity declares these absent.
 
 Native byte sizes use UTF-8 strings or `json.dumps(value, ensure_ascii=False)` with
 its default spaced separators for other values, independently of compact wire JSON.

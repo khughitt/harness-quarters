@@ -190,6 +190,7 @@ _ABSENT = {
     "response.usage.cache_write": "not_recorded",
     "response.usage.thinking": "not_recorded", "calls[].background": "known_after_call",
     "results[].interrupted": "not_recorded", "results[].agent": "not_recorded",
+    **dict.fromkeys(("results[].empty", "results[].diagnostic", "results[].harness_text"), "not_decoded"),
     "fork_boundary": "no_fork_records", "turn_end": "no_turn_end_records",
 }
 ABSENT = _ABSENT  # Published in the capabilities index block (spec rev 2 §7).
@@ -225,6 +226,7 @@ PROVENANCE = {
     "results[].interrupted": [], "results[].native_duration_ms": ["content"],
     "results[].background_id": ["content"], "results[].agent": [], "results[].child_session": ["content"],
     "results[].answers": ["content"], "results[].truncation": ["content"], "results[].exit_code": ["content"],
+    "results[].empty": [], "results[].diagnostic": [], "results[].harness_text": [],
     "injections": ["content", "source"], "notifications": ["content"], "compaction": ["type"],
     "interruption": ["error"], "fork_boundary": [], "turn_end": [],
 }
@@ -400,7 +402,8 @@ def _result(state, session, day, call_id, name, step, content) -> dict:
     return {"call_id": call_id, "bytes": _size(content), "error": status == "ERROR", "interrupted": None,
             "native_duration_ms": None if created is None or completed is None else completed - created,
             "background_id": background, "agent": None, "child_session": child, "answers": answers,
-            "truncation": truncation, "exit_code": exit_code}
+            "truncation": truncation, "exit_code": exit_code,
+            "empty": None, "diagnostic": None, "harness_text": None}
 
 
 def _wake_up(content):
