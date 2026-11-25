@@ -64,7 +64,7 @@ resolved entry for `<harness>:<root>` (including in a `partial` run) is due or
 pending and no counter limit pauses first, `PreToolUse` pauses the turn with
 reason `spend`, formatting root refusals (`turn paused: spend...`) from the
 turn's snapshot to stop started work, record value/threshold/episode with
-single-line `tasks note` calls, park `--waiting-on user --reason decision`,
+single-line `tasks note` calls, park `--waiting-on user --reason decision` with an inline `question` decision,
 report the signal and end the turn, while children get the child pause text
 naming `spend` (a child-only pause leaves `delivered_value` null). Only a
 genuine root human prompt lifts and acknowledges a delivered pause at
