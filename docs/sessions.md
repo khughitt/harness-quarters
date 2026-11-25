@@ -268,10 +268,11 @@ child-parent naming; `read_path` determines physical bytes.
 
 Live spend can opt into `append_only:true` at the request level. Every file must
 use its original path under a declared Codex root in `roots`, including custom
-sessions roots and native `archived_sessions` roots. Omit `read_path` or leave
-it null. With a matching checkpoint the decoder seeks to `next_offset` without
-reading earlier bytes. File identity
-and the declared fixed span are still checked against the held descriptor.
+sessions roots and native `archived_sessions` roots. A declared root can be a
+symlink. Below that root, parent traversal and symlink remaps are refused. Omit
+`read_path` or leave it null. With a matching checkpoint the decoder seeks to
+`next_offset`. The held descriptor must match the supplied file identity and
+span, and raw reads start at that offset and stop at the declared `size`.
 The checkpoint and any restart seed carry `index.append_only:true`. Their
 `digest` is the SHA-256 of empty input, an opaque marker. Leave `append_only`
 out or set it to false for the normal full-prefix proof and verified checkpoint

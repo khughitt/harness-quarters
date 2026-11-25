@@ -1,8 +1,10 @@
 """Bounded held-source index framing, prefix-proved resume and terminal restarts."""
 from dataclasses import asdict, replace
 from collections.abc import Callable
+from contextlib import nullcontext
 import copy
 import hashlib
+from io import BufferedReader, RawIOBase
 import os
 from pathlib import Path
 
@@ -103,6 +105,34 @@ def _compatible(old, binding):
             and isinstance(index.get("native"), dict))
 
 
+def _direct_codex_path(path, roots):
+    root = discover._root_of(path, roots)
+    if root is None or root.harness != "codex" or root.store not in {"live", "archived"}:
+        return False
+    relative = path.relative_to(root.path)
+    return (bool(relative.parts) and ".." not in relative.parts
+            and path.resolve() == root.path.resolve() / relative)
+
+
+class _AppendSpan(RawIOBase):
+    """Cap buffer fills over the borrowed descriptor, starting at its current offset."""
+
+    def __init__(self, handle, remaining):
+        super().__init__()
+        self._handle = handle
+        self._remaining = remaining
+
+    def readable(self):
+        return True
+
+    def readinto(self, target):
+        if not self._remaining:
+            return 0
+        count = self._handle.readinto(memoryview(target)[:self._remaining])
+        self._remaining -= count
+        return count
+
+
 def _file(source, number, roots, request, envelope):
     logical = Path(source["path"])
     physical = Path(source.get("read_path") or source["path"])
@@ -111,7 +141,7 @@ def _file(source, number, roots, request, envelope):
     except ValueError:
         place = Place("claude-code", "file", None, "explicit", str(logical), logical)
     append_only = request.get("append_only", False)
-    if append_only and (place.harness != "codex" or place.store not in {"live", "archived"}):
+    if append_only and not _direct_codex_path(logical, roots):
         raise ProtocolError("append_only requires a direct Codex path under a declared root")
     adapter = index_adapters.for_source(place, extract=True)
     place = replace(place, read_path=physical)
@@ -133,7 +163,7 @@ def _file(source, number, roots, request, envelope):
              "place": location, "filename_identity": None,
              "path_facts": facts, "side_inputs": side_inputs, "replaces": "all"}
     try:
-        handle = physical.open("rb")
+        handle = physical.open("rb", buffering=0) if append_only else physical.open("rb")
     except (OSError, UnicodeError) as error:
         yield start
         yield {**base, "object": "coverage", "key": "coverage", "records": [], "fields": [],
@@ -167,17 +197,20 @@ def _file(source, number, roots, request, envelope):
         yield start
 
         def physical_lines():
-            offset = state["next_offset"]
-            while offset < source["size"]:
-                remaining = source["size"] - offset
-                raw = handle.readline(remaining)
-                if not raw or not raw.endswith(b"\n") and len(raw) < remaining:
-                    raise IndexShortRead("short read within index fixed span")
-                # The append-only checkpoint uses the empty SHA-256 as an opaque marker.
-                if not append_only and raw.endswith(b"\n"):
-                    digest.update(raw)
-                yield offset, raw
-                offset += len(raw)
+            offset, end = state["next_offset"], source["size"]
+            reader = (BufferedReader(_AppendSpan(handle, end - offset))
+                      if append_only else nullcontext(handle))
+            with reader as held:
+                while offset < end:
+                    remaining = end - offset
+                    raw = held.readline(remaining)
+                    if not raw or not raw.endswith(b"\n") and len(raw) < remaining:
+                        raise IndexShortRead("short read within index fixed span")
+                    # The append-only checkpoint uses the empty SHA-256 as an opaque marker.
+                    if not append_only and raw.endswith(b"\n"):
+                        digest.update(raw)
+                    yield offset, raw
+                    offset += len(raw)
 
         count, restart = 0, None
         try:

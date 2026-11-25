@@ -1443,9 +1443,11 @@ def test_append_only_resume_reads_exact_append_bytes(tmp_path, monkeypatch, padd
     state = initial[-2]["state"]
     assert state["index"]["append_only"] is True
     assert state["digest"] == state["index"]["digest"] == hashlib.sha256(b"").hexdigest()
+    trailing = b'{"type":"later"}\n' * 1_000
     with path.open("ab") as handle:
-        handle.write(append)
-    fresh = read(codex_append_request(path, append_only=None))
+        handle.write(append + trailing)
+    held_size = len(prefix) + len(append)
+    fresh = read(codex_append_request(path, append_only=None, size=held_size))
 
     raw_reads = []
 
@@ -1461,21 +1463,23 @@ def test_append_only_resume_reads_exact_append_bytes(tmp_path, monkeypatch, padd
 
     def observe_file(self, mode="r", *args, **kwargs):
         if self == path and mode == "rb":
-            return io.BufferedReader(ObservedFile(self, mode))
+            raw = ObservedFile(self, mode)
+            return raw if kwargs.get("buffering") == 0 else io.BufferedReader(raw)
         return open_path(self, mode, *args, **kwargs)
 
     monkeypatch.setattr(Path, "open", observe_file)
     started = time.perf_counter()
-    resumed = read(codex_append_request(path, state=state))
+    resumed = read(codex_append_request(path, state=state, size=held_size))
     elapsed = time.perf_counter() - started
     assert raw_reads and min(offset for offset, _ in raw_reads) == len(prefix)
     assert sum(size for _, size in raw_reads) == len(append)
+    assert max(offset + size for offset, size in raw_reads) == held_size
     assert resumed[0]["replaces"] == {"from_line": 2}
     assert resumed[1] == next(v for v in fresh if v.get("line") == 2)
     assert coverage(resumed) == coverage(fresh)
-    assert resumed[-2]["offset"] == len(prefix) + len(append)
-    print(f"Prior prefix {len(prefix)} bytes, append {len(append)} bytes, descriptor read "
-          f"{sum(size for _, size in raw_reads)} bytes, resumed request {elapsed:.6f}s")
+    assert resumed[-2]["offset"] == held_size
+    print(f"Prior prefix {len(prefix)} bytes, admitted {len(append)} bytes, trailing {len(trailing)} bytes, "
+          f"descriptor read {sum(size for _, size in raw_reads)} bytes, resumed request {elapsed:.6f}s")
 
 
 @pytest.mark.parametrize("prefix", [b"", b'{"type":"session_meta","payload":{"id":"s"}}\n'])
@@ -1635,3 +1639,41 @@ def test_append_only_accepts_native_archived_root_and_rejects_replay_remap(tmp_p
     remap["files"][0]["read_path"] = str(tmp_path / "replay-copy.jsonl")
     with pytest.raises(stream.ProtocolError, match="append_only cannot use read_path"):
         stream.validate(remap)
+
+
+@pytest.mark.parametrize("kind", ["parent-traversal", "external-file-link", "external-directory-link", "internal-file-link"])
+def test_append_only_rejects_escaped_or_remapped_codex_paths(tmp_path, kind):
+    root = tmp_path / "sessions"
+    root.mkdir()
+    outside = tmp_path / "outside.jsonl"
+    outside.write_bytes(b"{}\n")
+    if kind == "parent-traversal":
+        path = root / ".." / outside.name
+    elif kind == "external-directory-link":
+        link = root / "link"
+        link.symlink_to(tmp_path, target_is_directory=True)
+        path = link / outside.name
+    else:
+        path = root / "linked.jsonl"
+        target = outside
+        if kind == "internal-file-link":
+            target = root / "real.jsonl"
+            target.write_bytes(b"{}\n")
+        path.symlink_to(target)
+    req = codex_append_request(path)
+    req["roots"][0]["path"] = str(root)
+    with pytest.raises(stream.ProtocolError, match="append_only requires a direct Codex path"):
+        next(stream.objects(stream.validate(req), ENVELOPE))
+
+
+def test_append_only_accepts_the_declared_root_alias_without_changing_refs(tmp_path):
+    store = tmp_path / "store"
+    store.mkdir()
+    (store / "rollout.jsonl").write_bytes(b"{}\n")
+    alias = tmp_path / "config" / "sessions"
+    alias.parent.mkdir()
+    alias.symlink_to(store, target_is_directory=True)
+    path = alias / "rollout.jsonl"
+    values = read(codex_append_request(path))
+    assert values[0]["path"] == str(path)
+    assert values[1]["ref"] == "config:sessions/rollout.jsonl#L1"
