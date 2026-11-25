@@ -9,7 +9,6 @@ import pytest
 from hook_routes.render import render_live
 from test_hook_routes_relay import shared_table
 
-TABLE = Path(__file__).resolve().parents[1] / "harnesses/hook-routes.toml"
 
 
 def _ops_donor(name):
