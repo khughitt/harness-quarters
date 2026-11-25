@@ -13,7 +13,7 @@ hook wiring and the relay subscriber template.
 | `runtimes` | Each version names the command, runtime script and relay commit in that runtime's lock. `subscriber_schema` is the subscriber file schema that relay reads, 2 by default or 3. |
 | `search_path` | The host's ordered command directories, each starting with `/` or `~/`. Every file whose runtime reads schema 3 is rendered with it, and needs it nonempty. |
 | `subscribers` | Each subscriber names its policy, role, argv and `timeoutMs`. Observers can declare a registry and event-specific `privateFields`. |
-| `subscriber_files` | Each file names a runtime for digest addressing or a literal deployed path, a repository-relative template output and ordered named selections. A selection can carry `harnesses`, `kinds`, `tools` and `nativeEvents` filters. A file declared by path renders schema 2, so it cannot serve a schema-3 runtime. `reconciliation_file` names the shared file for reconciliation. |
+| `subscriber_files` | Each file names a runtime for digest addressing or a literal deployed path, a repository-relative template output and ordered named selections. A selection can carry `harnesses`, `kinds`, `tools` and `nativeEvents` filters. A file declared by path renders schema 2, so it cannot serve a schema-3 runtime. `reconciliation_file` names the file the standalone relay reconciles through, in the schema its pin reads. |
 | `target_files` | New compositions name a runtime version and ordered subscriber selections. `reconciliation_next` selects a target composition for reconciliation. |
 | `removals` | Each retirement names a subscriber and the authorizing owner task. Move every binding whose file contains that subscriber, and move reconciliation if it uses the file. |
 | `rollback_bases` | Retained subscriber file names and literal commands that still count as donor references. |
@@ -162,7 +162,8 @@ Static checks use the versions in the records. Host version probes run in
   record with its fresh exact-version proof. Preflight exits 1 on a finding.
 - `tools/hook-routes reconcile-base` prints the live reconciliation file's XDG
   config base. `just relay-reap` uses it. Reverting a cutover restores the
-  previous reconciliation selection with the hook settings.
+  reconciliation selection that cutover moved. The selection follows the standalone pin,
+  so the two revert together.
 
 The bridge can call `relay_runtime.call(package, "project", payload)` with
 `harness`, `event`, raw native JSON text in `raw`, `invokingCwd`, `subscriber`
