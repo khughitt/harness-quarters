@@ -346,7 +346,7 @@ def test_ask_line_renders_relay_ask_command_and_validates_shape(tmp_path):
         '  { event = "PreToolUse", matcher = "*", lines = [{ policies = ["claude-ask"], runtime = "v0.7.0", ask = true, timeout = 86400 }] },',
         '  { event = "PreToolUse", matcher = "AskUserQuestion", lines = [{ policies = ["claude-ask"], command = "echo", handback = true }] },',
     ]:
-        base = '[states.claude-ask]\nstate = "ask"\nowner = "relay-f58531"\nevidence = "probe"\n\n'
+        base = '[states.claude-ask]\nstate = "ask"\nowner = "relay-f58531"\nevidence = "probe@2.1.332"\n\n'
         target = '[homes.codex]\nharness = "codex"\npath = "harnesses/codex/hooks.json"\nbindings = [' if bad.startswith('[homes.codex]') else '  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["tasks-notices"], command = "tasks notices --pretty", timeout = 5 }] },'
         replacement = bad if bad.startswith('[homes.codex]') else f'{target}\n{bad}'
         path = edited_table(tmp_path / str(abs(hash(bad))), ('[states.claude-sessionstart]\n', base + '[states.claude-sessionstart]\n'), (target, replacement))
