@@ -510,3 +510,20 @@ def test_target_agy_session_start_bridge_checks_only_declared_commands(tmp_path,
     (tmp_path / "mindful").unlink()
     findings = run(table, **options)
     assert [(f.code, f.message) for f in findings] == [("missing-command", "cannot execute mindful")]
+
+
+def test_preflight_checks_ask_line_runtime(tmp_path, deployed_host):
+    from hook_routes.preflight import run
+    from hook_routes.table import RouteState
+
+    line = Line(("claude-ask",), runtime="v0.7.0", ask=True, handback=True, timeout=86400)
+    claude = replace(deployed_host.homes["claude"],
+                     bindings=(*deployed_host.homes["claude"].bindings, Binding("PreToolUse", "AskUserQuestion", (line,))))
+    state = RouteState("ask", owner="relay-f58531", evidence="probe")
+    table = replace(deployed_host, states={**deployed_host.states, "claude-ask": state},
+                    homes={**deployed_host.homes, "claude": claude})
+    assert not run(table, home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)
+    broken = replace(table.runtimes["v0.7.0"], script=str(tmp_path / "missing/relay.js"))
+    findings = run(replace(table, runtimes={**table.runtimes, "v0.7.0": broken}),
+                   home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)
+    assert any(f.code == "runtime" and "claude:PreToolUse" in f.where for f in findings)

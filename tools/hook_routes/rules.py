@@ -98,7 +98,9 @@ def _state_problem(state, kind, *, records):
         return None
     if state.kind == kind == "bridge" and _text(state.evidence):
         return None
-    return f"{state.kind} state on a {kind} line needs its owner and reason, owner and grant, records or bridge evidence"
+    if state.kind == kind == "ask" and _text(state.owner) and _text(state.evidence):
+        return None
+    return f"{state.kind} state on a {kind} line needs its owner and reason, owner and grant, records, ask owner and evidence, or bridge evidence"
 
 
 def _text(value):
@@ -148,7 +150,7 @@ def _repository_tokens(table, binding, line, home, render_home):
         args.extend(command)
     for argv in line.delegates:
         args.extend(argv)
-    if line.kind == "relay":
+    if line.kind in ("relay", "ask"):
         args.extend(table.runtimes[line.runtime].argv(render_home))
     return [arg for arg in args if _repository_paths(arg, render_home)]
 

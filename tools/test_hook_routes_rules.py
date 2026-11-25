@@ -567,3 +567,22 @@ def test_new_reconcile_observer_needs_effective_reconciliation_file(table, moves
         reconciliation_next="target" if moves_reconciliation else None,
     )
     assert _findings(table) == ([] if moves_reconciliation else ["reconciliation"])
+
+
+def test_ask_route_requires_ask_state_owner_and_evidence(table, tmp_path):
+    from hook_routes.table import RouteState
+
+    state = RouteState("ask", owner="relay-f58531", evidence="probe")
+    line = Line(("claude-ask",), runtime="v0.7.0", ask=True, handback=True, timeout=86400)
+    claude = replace(shared_table().homes["claude"], bindings=(Binding("PreToolUse", "AskUserQuestion", (line,)),))
+    valid = replace(table, states={**table.states, "claude-ask": state}, homes={"claude": claude})
+    assert _findings(valid) == []
+    for bad in (RouteState("native", owner="relay-f58531", reason="wrong"),
+                RouteState("ask", owner="relay-f58531"),
+                RouteState("ask", evidence="probe")):
+        assert _findings(replace(valid, states={**table.states, "claude-ask": bad})) == ["route-state"]
+    donor = Path("d", "fixture", "relay.js")
+    bad_rt = replace(valid.runtimes["v0.7.0"], script=f"~/{donor}")
+    assert _findings(replace(valid, runtimes={**valid.runtimes, "v0.7.0": bad_rt})) == ["repository-path"]
+    dropped = replace(claude, bindings=(Binding("PreToolUse", "AskUserQuestion", (line,), next=()),))
+    assert _findings(replace(valid, homes={"claude": dropped})) == ["missing-route"]
