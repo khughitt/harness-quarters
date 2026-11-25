@@ -28,7 +28,8 @@ def _path(value):
 
 def validate(value):
     """Reject the complete request before any response for it is emitted."""
-    _fields(value, {"id", "files", "roots", "context", "cross_file", "text", "raw", "extract"}, {"id", "files"})
+    _fields(value, {"id", "files", "roots", "context", "cross_file", "text", "raw", "extract",
+                    "append_only"}, {"id", "files"})
     if type(value["id"]) is not int:
         raise ProtocolError("id must be an integer")
     if not isinstance(value["files"], list):
@@ -38,6 +39,11 @@ def validate(value):
     meters = profile == "meters"
     if "extract" in value and not (index or meters):
         raise ProtocolError("unsupported extraction profile")
+    if "append_only" in value and not index:
+        raise ProtocolError("append_only requires extract:index")
+    append_only = value.get("append_only", False)
+    if type(append_only) is not bool:
+        raise ProtocolError("append_only must be boolean")
     if index and (value.get("cross_file", False) or value.get("raw", False) or value.get("context")):
         raise ProtocolError("index extraction requires cross_file:false, raw:false and no context")
     if meters and any(value.get(key, False) for key in ("cross_file", "raw", "text", "context")):
@@ -52,6 +58,8 @@ def validate(value):
                 _integer(number, 0)
         _path(file["path"])
         if file.get("read_path") is not None:
+            if append_only:
+                raise ProtocolError("append_only cannot use read_path")
             _path(file["read_path"])
         _integer(file["size"], 0)
         state = file.get("state")

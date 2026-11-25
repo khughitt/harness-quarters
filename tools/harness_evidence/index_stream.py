@@ -96,7 +96,8 @@ def _checkpoint(state, digest, binding, *, seed=False):
 
 def _compatible(old, binding):
     index = old["index"]
-    return (all(index.get(k) == v for k, v in binding.items())
+    return (index.get("append_only", False) is binding.get("append_only", False)
+            and all(index.get(k) == v for k, v in binding.items())
             and index.get("digest") == old["digest"]
             and index.get("mode") in {"resume", "restart"}
             and isinstance(index.get("native"), dict))
@@ -109,11 +110,16 @@ def _file(source, number, roots, request, envelope):
         place = discover.place_of(logical, roots)
     except ValueError:
         place = Place("claude-code", "file", None, "explicit", str(logical), logical)
+    append_only = request.get("append_only", False)
+    if append_only and (place.harness != "codex" or place.store not in {"live", "archived"}):
+        raise ProtocolError("append_only requires a direct Codex path under a declared root")
     adapter = index_adapters.for_source(place, extract=True)
     place = replace(place, read_path=physical)
     facts = adapter.path_facts(place)  # One snapshot serves binding, file_start and events.
     side_inputs = adapter.side_inputs(facts)
     binding = _binding(source, place, envelope, request.get("text", False), facts, side_inputs)
+    if append_only:
+        binding["append_only"] = True
     base = {**envelope, "request": request["id"], "file": number,
             "harness": place.harness, "harness_version": None}
     location = asdict(place)
@@ -145,11 +151,15 @@ def _file(source, number, roots, request, envelope):
         old = source.get("state")
         digest, state = hashlib.sha256(), {"next_line": 1, "next_offset": 0}
         if old is not None and old["next_offset"] <= source["size"] and _compatible(old, binding):
-            prior, lines, boundary = _prefix(handle, old["next_offset"])
-            if boundary and lines + 1 == old["next_line"] and prior.hexdigest() == old["digest"]:
+            resume = True
+            if not append_only:
+                prior, lines, boundary = _prefix(handle, old["next_offset"])
+                resume = boundary and lines + 1 == old["next_line"] and prior.hexdigest() == old["digest"]
+                if resume:
+                    digest = prior
+            if resume:
                 state = copy.deepcopy(old["index"]["native"])
                 state.update(next_line=old["next_line"], next_offset=old["next_offset"])
-                digest = prior
                 if old["index"]["mode"] == "resume":
                     start["replaces"] = {"from_line": old["next_line"]}
         adapter.bind(state, facts)
@@ -163,7 +173,8 @@ def _file(source, number, roots, request, envelope):
                 raw = handle.readline(remaining)
                 if not raw or not raw.endswith(b"\n") and len(raw) < remaining:
                     raise IndexShortRead("short read within index fixed span")
-                if raw.endswith(b"\n"):
+                # The append-only checkpoint uses the empty SHA-256 as an opaque marker.
+                if not append_only and raw.endswith(b"\n"):
                     digest.update(raw)
                 yield offset, raw
                 offset += len(raw)

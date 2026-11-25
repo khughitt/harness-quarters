@@ -249,11 +249,13 @@ def test_held_handle_reads_original_source_after_path_replacement(tmp_path):
     assert [v["native_kind"] for v in out if v["object"] == "index_event"] == ["user", "assistant", "user"]
 
 
+@pytest.mark.parametrize("append_only", [False, True])
 @pytest.mark.parametrize("truncated", [b"", b"{}\n{"])
-def test_short_read_fails_without_file_terminal(tmp_path, truncated):
+def test_short_read_fails_without_file_terminal(tmp_path, truncated, append_only):
     path = tmp_path / "truncated"
     path.write_bytes(b"{}\n{}\n")
-    iterator = stream.objects(stream.validate(request(source(path))), ENVELOPE)
+    req = codex_append_request(path) if append_only else request(source(path))
+    iterator = stream.objects(stream.validate(req), ENVELOPE)
     assert next(iterator)["object"] == "file_start"
     path.write_bytes(truncated)
     emitted = []
@@ -1416,3 +1418,220 @@ def test_strict_codex_unparsed_frames_keep_only_normalized_meter_evidence(tmp_pa
                                          "balance": 3.5, "weekly_used_percent": None,
                                          "basis": "native", "rule": "codex_rate_limits"}
     assert all("rate_limits" not in row for row in rejected[2:])
+
+
+def codex_append_request(path, *, state=None, size=None, append_only=True, text=True):
+    src = source(path, state=state, size=size)
+    del src["read_path"]
+    options = {"append_only": append_only} if append_only is not None else {}
+    return request(src, roots=[{"harness": "codex", "path": str(path.parent)}], text=text, **options)
+
+
+@pytest.mark.parametrize("padding", [4_096, 1_048_576])
+def test_append_only_resume_reads_exact_append_bytes(tmp_path, monkeypatch, padding):
+    import io
+    import time
+
+    root = tmp_path / "configured-rollouts"
+    root.mkdir()
+    path = root / "rollout.jsonl"
+    prefix = b'{"type":"session_meta","payload":{"id":"s","padding":"' + b"x" * padding + b'"}}\n'
+    append = (b'{"type":"event_msg","timestamp":"2026-09-04T09:38:28Z","payload":'
+              b'{"type":"token_count","rate_limits":{"credits":{"balance":"3.5"}}}}\n')
+    path.write_bytes(prefix)
+    initial = read(codex_append_request(path))
+    state = initial[-2]["state"]
+    assert state["index"]["append_only"] is True
+    assert state["digest"] == state["index"]["digest"] == hashlib.sha256(b"").hexdigest()
+    with path.open("ab") as handle:
+        handle.write(append)
+    fresh = read(codex_append_request(path, append_only=None))
+
+    raw_reads = []
+
+    class ObservedFile(io.FileIO):
+        def readinto(self, buffer):
+            offset = self.tell()
+            count = super().readinto(buffer)
+            if count:
+                raw_reads.append((offset, count))
+            return count
+
+    open_path = Path.open
+
+    def observe_file(self, mode="r", *args, **kwargs):
+        if self == path and mode == "rb":
+            return io.BufferedReader(ObservedFile(self, mode))
+        return open_path(self, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", observe_file)
+    started = time.perf_counter()
+    resumed = read(codex_append_request(path, state=state))
+    elapsed = time.perf_counter() - started
+    assert raw_reads and min(offset for offset, _ in raw_reads) == len(prefix)
+    assert sum(size for _, size in raw_reads) == len(append)
+    assert resumed[0]["replaces"] == {"from_line": 2}
+    assert resumed[1] == next(v for v in fresh if v.get("line") == 2)
+    assert coverage(resumed) == coverage(fresh)
+    assert resumed[-2]["offset"] == len(prefix) + len(append)
+    print(f"Prior prefix {len(prefix)} bytes, append {len(append)} bytes, descriptor read "
+          f"{sum(size for _, size in raw_reads)} bytes, resumed request {elapsed:.6f}s")
+
+
+@pytest.mark.parametrize("prefix", [b"", b'{"type":"session_meta","payload":{"id":"s"}}\n'])
+def test_append_only_and_verified_checkpoints_do_not_resume_across_modes(tmp_path, prefix):
+    path = tmp_path / "rollout.jsonl"
+    path.write_bytes(prefix)
+    verified = read(codex_append_request(path, append_only=None))[-2]["state"]
+    appended = read(codex_append_request(path))[-2]["state"]
+    assert "append_only" not in verified["index"]
+    assert appended["index"]["append_only"] is True
+    assert verified["digest"] == hashlib.sha256(prefix).hexdigest()
+    if not prefix:
+        assert appended["digest"] == verified["digest"]
+    path.write_bytes(prefix + b'{"type":"future"}\n')
+    for mode, foreign in ((True, verified), (None, appended)):
+        rebuilt = read(codex_append_request(path, append_only=mode, state=foreign))
+        assert rebuilt[0]["replaces"] == "all"
+        assert rebuilt[1]["offset"] == 0
+        assert rebuilt[-2]["state"]["index"].get("append_only", False) is bool(mode)
+
+
+def test_verified_index_proves_prefix_while_append_only_requires_caller_contract(tmp_path):
+    path = tmp_path / "rollout.jsonl"
+    old = b'{"type":"session_meta","payload":{"id":"old"}}\n'
+    new = old.replace(b'"old"', b'"new"')
+    path.write_bytes(old)
+    default_state = read(codex_append_request(path, append_only=None))[-2]["state"]
+    append_state = read(codex_append_request(path))[-2]["state"]
+    assert source(path)["size"] == len(new)
+    path.write_bytes(new + b'{"type":"future"}\n')
+
+    verified = read(codex_append_request(path, state=default_state, append_only=False))
+    assert verified[0]["replaces"] == "all" and verified[1]["identity"]["session"] == "new"
+    assert verified[-2]["state"]["digest"] == hashlib.sha256(path.read_bytes()).hexdigest()
+    resumed = read(codex_append_request(path, state=append_state))
+    assert resumed[0]["replaces"] == {"from_line": 2}
+    assert resumed[1]["offset"] == len(old) and resumed[1]["identity"]["session"] == "old"
+
+
+@pytest.mark.parametrize("change", ["truncated", "inode", "logical-path", "decoder", "options"])
+def test_append_only_rebuilds_when_bound_checkpoint_does_not_match(tmp_path, change):
+    path = tmp_path / "rollout.jsonl"
+    path.write_bytes(b'{"type":"session_meta","payload":{"id":"old"}}\n')
+    state = read(codex_append_request(path))[-2]["state"]
+    envelope, text = ENVELOPE, True
+    if change == "truncated":
+        path.write_bytes(b"{}\n")
+    elif change == "inode":
+        other = path.with_name("replacement")
+        other.write_bytes(path.read_bytes())
+        other.replace(path)
+    elif change == "logical-path":
+        other = path.with_name("renamed.jsonl")
+        path.rename(other)
+        path = other
+    elif change == "decoder":
+        envelope = {**ENVELOPE, "decoder": {**ENVELOPE["decoder"], "revision": "changed"}}
+    else:
+        text = False
+    resumed = read(codex_append_request(path, state=state, text=text), envelope)
+    assert resumed[0]["replaces"] == "all" and resumed[1]["offset"] == 0
+
+
+def test_append_only_partial_tail_and_native_restart_seed(tmp_path):
+    path = tmp_path / "rollout.jsonl"
+    meta = b'{"type":"session_meta","payload":{"id":"s"}}\n'
+    counted = (b'{"type":"event_msg","payload":{"type":"token_count","info":'
+               b'{"total_token_usage":{"input_tokens":5},"last_token_usage":{"input_tokens":5}}}}\n')
+    native_usage = b'{"type":"token_usage_record","payload":{"response_id":"recorded","usage":{"input_tokens":7}}}\n'
+    all_bytes = meta + counted + native_usage
+    path.write_bytes(all_bytes)
+    observed = read(codex_append_request(path, size=len(meta + counted) - 1))
+    state = observed[-2]["state"]
+    assert state["next_offset"] == len(meta)
+    assert coverage(observed)["partial_tail"]
+    assert all(row.get("native_kind") != "token_usage_record" for row in observed)
+    resumed = read(codex_append_request(path, state=state, size=len(meta + counted)))
+    assert resumed[0]["replaces"] == {"from_line": 2}
+    assert resumed[1]["response"]["usage"]["context_total"] == 5
+    assert resumed[-2]["metadata"]["usage_source"] == "count"
+
+    invalidated = read(codex_append_request(path, state=resumed[-2]["state"]))
+    seed = invalidated[-2]["restart"]["seed"]
+    assert invalidated[-2]["state"] is None
+    assert seed["next_offset"] == 0 and seed["next_line"] == 1
+    assert seed["index"]["append_only"] is True and seed["index"]["mode"] == "restart"
+    replayed = read(codex_append_request(path, state=seed))
+    assert replayed[0]["replaces"] == "all" and replayed[-2]["restart"] is None
+    assert replayed[-2]["metadata"]["usage_source"] == "record"
+    assert [v["response"]["id"] for v in replayed if v.get("response")] == ["recorded"]
+
+    mismatched = read(codex_append_request(path, state=seed, append_only=None))
+    assert mismatched[0]["replaces"] == "all"
+    assert mismatched[-2]["restart"]["seed"]["index"]["mode"] == "restart"
+    assert "append_only" not in mismatched[-2]["restart"]["seed"]["index"]
+
+
+@pytest.mark.parametrize("kind", ["reader", "meters", "nonboolean", "read-path", "rootless", "claude"])
+def test_append_only_rejects_requests_outside_direct_codex_index(tmp_path, kind):
+    root = tmp_path / "configured-rollouts"
+    root.mkdir()
+    path = root / "rollout.jsonl"
+    path.write_bytes(b"{}\n")
+    req = codex_append_request(path)
+    if kind in {"reader", "meters"}:
+        req.pop("extract")
+        if kind == "meters":
+            req["extract"] = "meters"
+        match = "append_only requires extract:index"
+    elif kind == "nonboolean":
+        req["append_only"] = 1
+        match = "append_only must be boolean"
+    elif kind == "read-path":
+        req["files"][0]["read_path"] = str(path)
+        match = "append_only cannot use read_path"
+    else:
+        if kind == "rootless":
+            req["roots"] = []
+        elif kind == "claude":
+            req["roots"][0]["harness"] = "claude-code"
+        match = "append_only requires a direct Codex path"
+    with pytest.raises(stream.ProtocolError, match=match):
+        next(stream.objects(stream.validate(req), ENVELOPE))
+
+
+@pytest.mark.parametrize("bad", ["identity", "size"])
+def test_append_only_enforces_held_identity_and_size_before_framing(tmp_path, bad):
+    path = tmp_path / "rollout.jsonl"
+    path.write_bytes(b"{}\n")
+    req = codex_append_request(path)
+    if bad == "identity":
+        req["files"][0]["identity"]["inode"] += 1
+        match = "index source identity changed"
+    else:
+        req["files"][0]["size"] += 1
+        match = "index source is shorter than its fixed span"
+    with pytest.raises(stream.ProtocolError, match=match):
+        next(stream.objects(stream.validate(req), ENVELOPE))
+
+
+def test_append_only_accepts_native_archived_root_and_rejects_replay_remap(tmp_path):
+    root = tmp_path / "archived_sessions"
+    root.mkdir()
+    path = root / "rollout.jsonl"
+    path.write_bytes(b"{}\n")
+    initial = codex_append_request(path)
+    initial["files"][0]["read_path"] = None
+    first = read(initial)
+    assert first[0]["place"]["store"] == "archived"
+    with path.open("ab") as handle:
+        handle.write(b'{"type":"future"}\n')
+    resumed = read(codex_append_request(path, state=first[-2]["state"]))
+    assert resumed[0]["replaces"] == {"from_line": 2}
+    assert resumed[1]["offset"] == 3
+
+    remap = codex_append_request(path)
+    remap["files"][0]["read_path"] = str(tmp_path / "replay-copy.jsonl")
+    with pytest.raises(stream.ProtocolError, match="append_only cannot use read_path"):
+        stream.validate(remap)

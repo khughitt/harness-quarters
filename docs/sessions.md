@@ -258,12 +258,30 @@ evidence through the adapter registered for the declared harness and place.
 Codex supplies terminal usage and stateful native execution facts. Include each
 file's `identity: {"device": ..., "inode": ...}`, keep
 `cross_file` and `raw` false, and omit `context`. Pass a saved index `state` whole:
-`next_line`, `next_offset` and `digest` describe the complete raw prefix, while
+`next_line` and `next_offset` mark the end of the complete raw prefix, and
 `index` is opaque. The held descriptor must match the supplied identity and fixed
-byte span. Resume proves that prefix in bounded reads and decodes complete lines
-from its checkpoint; incompatible decoder revision, identity, logical path, options
-or prefix explicitly returns `replaces:"all"`. Logical paths determine refs and
+byte span. By default, resume proves the checkpoint's `digest` against that prefix
+in bounded reads, then decodes complete lines from the checkpoint. An incompatible
+decoder revision, identity, logical path, option or prefix returns `replaces:"all"`.
+Logical paths determine refs and
 child-parent naming; `read_path` determines physical bytes.
+
+Live spend can opt into `append_only:true` at the request level. Every file must
+use its original path under a declared Codex root in `roots`, including custom
+sessions roots and native `archived_sessions` roots. Omit `read_path` or leave
+it null. With a matching checkpoint the decoder seeks to `next_offset` without
+reading earlier bytes. File identity
+and the declared fixed span are still checked against the held descriptor.
+The checkpoint and any restart seed carry `index.append_only:true`. Their
+`digest` is the SHA-256 of empty input, an opaque marker. Leave `append_only`
+out or set it to false for the normal full-prefix proof and verified checkpoint
+shape. A checkpoint or restart seed from the other mode rebuilds from zero.
+
+Use append-only mode when complete bytes before the checkpoint remain
+unchanged. A rewrite at the same inode and path that leaves the file large
+enough to resume can go undetected. A changed inode, path, decoder or decode
+options, or a declared span shorter than the checkpoint, rebuilds from zero.
+Partial tails stay provisional and resume from their starting offset.
 
 This profile emits `file_start`, one `index_event` per complete JSON object (key
 `E<byte offset>`), `unparsed` evidence for malformed lines or a partial tail, a final
