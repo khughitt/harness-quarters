@@ -119,6 +119,12 @@ def _hooks(table, settings, home):
     return events
 
 
+def _placed(text, home):
+    # A ~/ path takes the template's placeholder, expanded when the home is known.
+    placed = f"@HOME@/{text[2:]}" if text.startswith("~/") else text
+    return placed if home is None else placed.replace("@HOME@", str(home))
+
+
 def subscriber_bytes(table, source, home=None):
     subscribers = []
     for entry in source.subscribers:
@@ -133,13 +139,12 @@ def subscriber_bytes(table, source, home=None):
                 result[key] = value
         if subscriber.privateFields:
             result["privateFields"] = subscriber.privateFields
-        argv = [f"@HOME@/{arg[2:]}" if arg.startswith("~/") else arg for arg in subscriber.argv]
-        if home is not None:
-            argv = [arg.replace("@HOME@", str(home)) for arg in argv]
-        result["argv"] = argv
+        result["argv"] = [_placed(arg, home) for arg in subscriber.argv]
         result["timeoutMs"] = subscriber.timeoutMs
         subscribers.append(result)
-    return _json_file({"schema": 2, "subscribers": subscribers})
+    schema = table.subscriber_schema(source)
+    listed = {} if schema == 2 else {"searchPath": [_placed(entry, home) for entry in table.search_path]}
+    return _json_file({"schema": schema, **listed, "subscribers": subscribers})
 
 
 def subscriber_address(source, data, home):
@@ -192,7 +197,7 @@ def _render_target(table, home, *, records):
         address = subscriber_address(source, data, home)
         if address in files and files[address] != data:
             raise ValueError(f"digest address collision: {address}")
-        targets[name] = SubscriberFile(f"~/.config/relay/{address}", address, source.subscribers)
+        targets[name] = SubscriberFile(f"~/.config/relay/{address}", address, source.subscribers, source.runtime)
         files[address] = data
     homes = {
         name: replace(settings, bindings=tuple(replace(binding, lines=binding.target) for binding in settings.bindings))

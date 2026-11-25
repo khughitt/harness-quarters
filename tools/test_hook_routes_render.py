@@ -1,4 +1,5 @@
 """The route table reproduces the tracked hook wiring and detects drift."""
+from dataclasses import replace
 from hashlib import sha256
 import json
 import os
@@ -10,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from hook_routes.render import render_live, splice_claude_hooks, subscriber_bytes
-from hook_routes.table import load
+from hook_routes.render import render_live, render_next, splice_claude_hooks, subscriber_bytes
+from hook_routes.table import TargetSubscriberFile, load
 from test_hook_routes_relay import runtime  # noqa: F401  (pytest fixture)
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -58,6 +59,105 @@ def test_splice_preserves_noncanonical_bytes():
 def test_render_reproduces_subscriber_template():
     rendered = render_live(load(TABLE), Path.home())
     assert rendered[SUBSCRIBERS] == (ROOT / SUBSCRIBERS).read_bytes()
+
+
+def schema_3(table, search_path=('~/.local/bin', '/usr/bin')):
+    """The table with a relay whose subscriber files are schema 3 behind the live runtime's name."""
+    runtimes = {**table.runtimes, 'v0.5.0': replace(table.runtimes['v0.5.0'], subscriber_schema=3)}
+    return replace(table, runtimes=runtimes, search_path=search_path)
+
+
+@pytest.mark.parametrize('home, listed', [(None, '@HOME@/.local/bin'), (Path('/h'), '/h/.local/bin')])
+def test_schema_3_runtime_renders_the_search_path(home, listed):
+    table = load(TABLE)
+    source = table.subscriber_files[table.reconciliation_file]
+    before = json.loads(subscriber_bytes(table, source, home))
+    after = json.loads(subscriber_bytes(schema_3(table), source, home))
+    assert list(after) == ['schema', 'searchPath', 'subscribers']
+    assert after == {**before, 'schema': 3, 'searchPath': [listed, '/usr/bin']}
+    # The same list says nothing to a runtime that reads schema 2.
+    assert json.loads(subscriber_bytes(replace(table, search_path=('/usr/bin',)), source, home)) == before
+    assert before['schema'] == 2 and 'searchPath' not in before
+
+
+def test_a_target_file_keeps_its_runtimes_schema(tmp_path):
+    table = schema_3(load(TABLE))
+    source = table.subscriber_files[table.reconciliation_file]
+    home = table.homes['codex']
+    index, binding = next((i, b) for i, b in enumerate(home.bindings) if b.event == 'UserPromptSubmit' and b.lines[0].kind == 'relay')
+    moved = replace(binding, next=(replace(binding.lines[0], subscriber_file='candidate'),))
+    bindings = (*home.bindings[:index], moved, *home.bindings[index + 1:])
+    table = replace(table, homes={'codex': replace(home, bindings=bindings)},
+                    target_files={'candidate': TargetSubscriberFile('v0.5.0', source.subscribers)})
+    rendered = render_next(table, tmp_path)
+    address, = (name for name in rendered if name.startswith('v0.5.0-'))
+    data = json.loads(rendered[address])
+    assert data['schema'] == 3 and data['searchPath'] == [f'{tmp_path}/.local/bin', '/usr/bin']
+    assert address.startswith('v0.5.0-' + sha256(rendered[address]).hexdigest()[:12])
+    command = json.loads(rendered[CODEX])['hooks']['UserPromptSubmit'][0]['hooks'][0]['command']
+    assert shlex.split(command)[-2] == f'{tmp_path}/.config/relay/{address}'
+
+
+def edited_table(tmp_path, *changes):
+    text = TABLE.read_text()
+    for before, after in changes:
+        assert before in text
+        text = text.replace(before, after)
+    path = tmp_path / 'harnesses/hook-routes.toml'
+    path.parent.mkdir(parents=True)
+    path.write_text(text)
+    return path
+
+
+RUNTIME = '[runtimes."v0.5.0"]\n'
+
+
+def declared(entries):
+    """The tracked search_path line, replaced."""
+    current = next(line for line in TABLE.read_text().splitlines() if line.startswith('search_path = '))
+    return current, '' if entries is None else f'search_path = {json.dumps(entries)}'
+
+
+def test_a_schema_3_runtime_needs_a_search_path(tmp_path):
+    current, removed = declared(None)
+    path = edited_table(tmp_path, (RUNTIME, RUNTIME + 'subscriber_schema = 3\n'), (current, removed))
+    with pytest.raises(ValueError, match='search_path'):
+        load(path)
+    path.write_text(path.read_text().replace('subscriber_schema = 3\n', ''))
+    load(path)
+
+
+@pytest.mark.parametrize('entries', [
+    ['bin'], ['./bin'], ['$HOME/bin'], ['~'], ['~other/bin'], [''], [7],
+    ['~/bin', '~/bin'], ['/usr/bin/'], ['/usr//bin'], ['//usr/bin'], ['/usr/../bin'], ['~/bin/'], ['~/../bin'], ['/a:b'],
+])
+def test_a_search_path_relay_would_refuse_is_refused(tmp_path, entries):
+    with pytest.raises(ValueError, match='search_path'):
+        load(edited_table(tmp_path, declared(entries)))
+
+
+def test_a_search_path_is_distinct_once_home_is_expanded(tmp_path, monkeypatch):
+    monkeypatch.setenv('HOME', '/h')
+    path = edited_table(tmp_path, declared(['~/bin', '/h/bin']))
+    with pytest.raises(ValueError, match='search_path'):
+        load(path)
+    monkeypatch.setenv('HOME', '/other')
+    assert load(path).search_path == ('~/bin', '/h/bin')
+
+
+@pytest.mark.parametrize('schema', ['1', '4', '"3"', 'true'])
+def test_an_unknown_subscriber_schema_is_refused(tmp_path, schema):
+    with pytest.raises(ValueError, match='subscriber_schema'):
+        load(edited_table(tmp_path, (RUNTIME, f'{RUNTIME}subscriber_schema = {schema}\n')))
+
+
+def test_a_path_file_cannot_bind_a_schema_3_runtime(tmp_path):
+    pinned = '[subscriber_files."shared-v0.5.0-retired-guard"]\nruntime = "v0.5.0"\n'
+    by_path = pinned.replace('runtime = "v0.5.0"', 'path = "~/.config/relay/v0.5.0/relay/subscribers.json"')
+    load(edited_table(tmp_path / 'schema-2', (pinned, by_path)))
+    path = edited_table(tmp_path / 'schema-3', (pinned, by_path), (RUNTIME, RUNTIME + 'subscriber_schema = 3\n'))
+    with pytest.raises(ValueError, match='schema 3'):
+        load(path)
 
 
 @pytest.fixture

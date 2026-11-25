@@ -67,6 +67,62 @@ def qualified_table(tmp_path, runtime):
     return table, binding, record_dir
 
 
+@pytest.fixture
+def candidate(tmp_path, monkeypatch):
+    """The live table with the unreleased relay behind v0.6.0, the version its package still has."""
+    if not (root := os.environ.get("HQ_TEST_RELAY_CANDIDATE")):
+        pytest.skip("HQ_TEST_RELAY_CANDIDATE names no relay package")
+    package = Path(root)
+    assert (package / "bin/relay.js").is_file(), f"missing relay candidate: {package}"
+    monkeypatch.setenv("HOME", str(tmp_path))
+    lock = json.loads((package.parents[1] / "package-lock.json").read_bytes())
+    table = load(TABLE)
+    # A tarball's lock entry names no commit; its resolved value identifies the package.
+    table.runtimes["v0.6.0"] = replace(table.runtimes["v0.6.0"], script=str(package / "bin/relay.js"), subscriber_schema=3,
+                                       commit=lock["packages"]["node_modules/relay"]["resolved"])
+    return table, package
+
+
+def test_candidate_package_passes_the_pin_checks(candidate, tmp_path):
+    from hook_routes.relay_runtime import package_for
+    table, package = candidate
+    assert package_for(table, "v0.6.0", tmp_path) == package
+
+
+def test_candidate_loads_the_rendered_schema_3_file(candidate, tmp_path):
+    from hook_routes.relay_runtime import call
+    from hook_routes.render import subscriber_bytes
+    table, package = candidate
+    for name, source in table.subscriber_files.items():
+        data = subscriber_bytes(table, replace(source, runtime="v0.6.0"), tmp_path)
+        config = json.loads(data)
+        assert config["schema"] == 3 and config["searchPath"][0] == f"{tmp_path}/.local/bin"
+        path = tmp_path / name / "relay/subscribers.json"
+        path.parent.mkdir(parents=True, mode=0o700)
+        path.write_bytes(data)
+        path.chmod(0o600)
+        call(package, "load", {"path": str(path)})
+        # The same bytes with a list relay refuses do not load, so the check above is the list's too.
+        path.write_bytes(json.dumps(dict(config, searchPath=["~/bin"])).encode())
+        with pytest.raises(ValueError, match=r"searchPath\[0\]"):
+            call(package, "load", {"path": str(path)})
+
+
+def test_candidate_admits_todays_bindings(candidate, tmp_path):
+    from hook_routes.qualification import admit_binding
+    from hook_routes.render import subscriber_bytes
+    table, package = candidate
+    files = {name: replace(source, runtime="v0.6.0") for name, source in table.subscriber_files.items()}
+    bindings = set()
+    for _, home, _, binding in table.bindings():
+        for line in binding.lines:
+            if line.kind == "relay":
+                data = subscriber_bytes(table, files[line.subscriber_file], tmp_path)
+                admit_binding(table, home, binding, replace(line, runtime="v0.6.0"), files, data, package)
+                bindings.add((home.harness, line.relay_event or binding.event, line.outer_ms))
+    assert len(bindings) >= 15
+
+
 def test_helper_refuses_unexported_path(runtime):
     from hook_routes.relay_runtime import call
     with pytest.raises(ValueError, match="unsupported operation"):
