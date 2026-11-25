@@ -23,6 +23,9 @@ a warning alone is not a pause or request for a new budget.
 
 Calls count the root controller's attempts, including refusals, not workers' tool
 calls. Spawns count started children across the tree, deduplicated by native keys.
+A session launched from the shell (`codex exec`, `claude -p`) is its own root with its
+own limits: it adds nothing to the launcher's calls or spawns, and the launcher counts
+it by hand, while the launcher's wait for it counts as the launcher's active time.
 Active time advances for in-flight work and short idle gaps; user-input waits are
 excluded. Countability depends on observed native hooks; an uncounted value is
 unknown/null, never a guessed zero. Record manual unhooked counts separately.
