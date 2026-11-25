@@ -68,10 +68,10 @@ description = "The kinds of child (shell: a background command; subagent) on whi
 [facts.idle-wait-kinds.harness.agy]
 status = "probed"
 value = ["shell", "subagent"]
-version = "1.5.9"
-date = 2026-11-16
-evidence = "hq-46ed26"
-note = "Isolated interactive sessions, one 1800 s job per kind, small default context (about 10k tokens). Shell (run_command background, not daemon): no controller call between WAITING and the SYSTEM_MESSAGE wake, which took one call (10713 input tokens, none cached). Subagent (invoke_subagent self): the child backgrounded the command, ended its turn, made no calls for 30 minutes, was woken by its own task and answered; the controller made no calls until the child's answer woke it (one call, 11427 input tokens, none cached). So 0 calls and 0 tokens per hour of waiting. Longest single wait: no limit reached or documented."
+version = "1.5.17"
+date = 2026-11-25
+evidence = "hq-45aaf4; hq-46ed26"
+note = "Interactive TUI against a loopback Gemini fixture, dummy key, scratch home and loopback-only network namespace. After 90 s pilots, one 1800 s background run_command (WaitMsBeforeAsync 500, IsDaemon false) and one invoke_subagent self whose child backgrounded that command. No requests during either wait after WAITING; shell completion woke the controller once, and child shell completion woke the child, whose has-gone-idle notice woke the parent once. Both parents returned the command's nonce. Four fixture requests total for shell (including a startup title request), seven for subagent. Parent wake request bodies: 44000 and 44011 bytes; these are request sizes, not token/cache measurements. Usage is synthetic; wake-call-cached remains at its earlier account-backed observation. No limit reached; waits beyond 1800 s not tested. Portable native traces and reusable driver: hq-45aaf4 files:wait-evidence.json."
 
 [facts.idle-wait-kinds.harness.claude-code]
 status = "probed"
@@ -1408,3 +1408,11 @@ version = "2.1.332"
 date = 2026-11-25
 evidence = "hq-35df5d"
 note = "SIGKILL and, in another run, SIGTERM of claude -p blocked in a foreground relay peer wait (exit 137 and 143): no peer wait process left, and the lead's next peer wait exited 4, 0.13 s after the SIGKILL. SIGTERM runs SessionEnd, so its registry row goes."
+
+[facts.headless-long-wait.harness.pi]
+status = "probed"
+value = ["blocking-call"]
+version = "1.1.0"
+date = 2026-11-25
+evidence = "hq-45aaf4"
+note = "RPC mode against a loopback Anthropic fixture, dummy key, scratch home and loopback-only network namespace. After a 90 s pilot, one bash call without timeout held a sleep 1800 command and returned its nonce; the continuation echoed the tool result and settled. Exactly two fixture requests, separated by 1800.087 s, with none during the wait. An interactive TUI pilot and 1800 s run also passed (two requests, 1800.071 s apart). Short independent RPC cases: timeout 2 on a 10 s command returned Command timed out after 2 seconds; abort at about 2 s returned Command aborted. Both shell PIDs were absent afterwards. No background-command or post-process wake claim, no pi-durable coverage, no account/cache measurement. Portable native traces and driver: hq-45aaf4 files:wait-evidence.json."
