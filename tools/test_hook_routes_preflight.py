@@ -78,6 +78,91 @@ def test_preflight_refuses_digest_mismatch(tmp_path):
     assert "deployed-digest" in {f.code for f in run(table, home=tmp_path, path_env=str(tmp_path), next_dir=None)}
 
 
+COMMANDS = ("missing-command", "unusable-command")
+
+
+def listed_commands(tmp_path, argv, search_path, *, schema=3, path_env=""):
+    """The command findings for one subscriber of a file whose runtime reads this schema."""
+    from hook_routes.preflight import run
+    table = today(tmp_path)
+    runtimes = {**table.runtimes, "v0.5.0": replace(table.runtimes["v0.5.0"], subscriber_schema=schema)}
+    source = table.subscriber_files[table.reconciliation_file]
+    entry = source.subscribers[0]
+    subscriber = replace(table.subscribers[entry.name], argv=tuple(argv))
+    table = replace(table, homes={}, runtimes=runtimes, search_path=tuple(search_path),
+                    subscribers={**table.subscribers, entry.name: subscriber},
+                    subscriber_files={table.reconciliation_file: replace(source, subscribers=(entry,))})
+    findings = run(table, home=tmp_path, path_env=path_env, next_dir=None)
+    return [(f.code, f.message) for f in findings if f.code in COMMANDS]
+
+
+def program(path, text="#!/bin/sh\n", mode=0o755):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    path.chmod(mode)
+    return path
+
+
+def test_preflight_finds_schema_3_commands_only_in_the_list(tmp_path):
+    program(tmp_path / "listed/guard")
+    program(tmp_path / "inherited/other")
+    options = dict(search_path=["~/absent", "~/listed"], path_env=str(tmp_path / "inherited"))
+    assert listed_commands(tmp_path, ["guard", "run"], **options) == []
+    assert listed_commands(tmp_path, ["other"], **options) == [("missing-command", "cannot execute other")]
+    # A schema-2 file still runs what the inherited PATH holds.
+    assert listed_commands(tmp_path, ["other"], schema=2, **options) == []
+    assert listed_commands(tmp_path, ["guard"], schema=2, **options) == [("missing-command", "cannot execute guard")]
+
+
+@pytest.mark.parametrize("bad", ["not-executable", "broken-link", "directory"])
+def test_preflight_names_the_first_unusable_candidate(tmp_path, bad):
+    first = tmp_path / "first/guard"
+    if bad == "not-executable":
+        program(first, mode=0o644)
+    elif bad == "broken-link":
+        first.parent.mkdir()
+        first.symlink_to(tmp_path / "absent")
+    else:
+        first.mkdir(parents=True)
+    program(tmp_path / "later/guard")
+    (code, message), = listed_commands(tmp_path, ["guard"], ["~/first", "~/later"])
+    assert code == "unusable-command" and str(first) in message
+    # A schema-2 lookup skips it, as the relay it is for does not decide here.
+    assert listed_commands(tmp_path, ["guard"], [], schema=2, path_env=f"{first.parent}:{tmp_path / 'later'}") == []
+
+
+def test_preflight_checks_a_listed_scripts_env_interpreter(tmp_path):
+    program(tmp_path / "bin/guard", "#!/usr/bin/env relay-interp\n")
+    program(tmp_path / "inherited/relay-interp")
+    options = dict(search_path=["~/bin"], path_env=str(tmp_path / "inherited"))
+    (code, message), = listed_commands(tmp_path, ["guard"], **options)
+    assert code == "missing-command" and "relay-interp" in message
+    # env itself skips a candidate it cannot execute.
+    program(tmp_path / "bin/relay-interp", mode=0o644)
+    program(tmp_path / "tools/relay-interp")
+    assert listed_commands(tmp_path, ["guard"], ["~/bin", "~/tools"]) == []
+    for shebang in ("#!/usr/bin/env -S relay-interp --flag\n", "#!/usr/bin/env -S X=1 relay-interp\n", "#! /usr/bin/env relay-interp\n"):
+        program(tmp_path / "bin/guard", shebang)
+        assert listed_commands(tmp_path, ["guard"], ["~/bin", "~/tools"]) == [], shebang
+        assert "relay-interp" in str(listed_commands(tmp_path, ["guard"], ["~/bin"])), shebang
+    program(tmp_path / "bin/guard", "#!/bin/sh\n")
+    assert listed_commands(tmp_path, ["guard"], ["~/bin"]) == []
+
+
+def test_preflight_checks_the_shipped_env_wrapper_through_the_list(tmp_path):
+    launcher = Path("d", "familiar", "bin", "familiar")
+    familiar = program(tmp_path / launcher, "#!/usr/bin/env node\n")
+    program(tmp_path / "inherited/node")
+    program(tmp_path / "bin/env")
+    argv = ["env", f"~/{launcher}", "observe"]
+    (code, message), = listed_commands(tmp_path, argv, ["~/bin"], path_env=str(tmp_path / "inherited"))
+    assert code == "missing-command" and "node" in message and str(familiar) in message
+    program(tmp_path / "bin/node")
+    assert listed_commands(tmp_path, argv, ["~/bin"]) == []
+    familiar.unlink()
+    assert listed_commands(tmp_path, argv, ["~/bin"]) == [("missing-command", f"cannot execute {familiar}")]
+
+
 def version_command(tmp_path):
     claude = tmp_path / "claude"
     claude.write_text("#!/bin/sh\necho '9.8.7 (Claude Code)'\n")

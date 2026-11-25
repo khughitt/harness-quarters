@@ -1,6 +1,7 @@
 """Read the declared hook routes and their rendering inputs."""
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+import posixpath
 import shlex
 import tomllib
 from typing import Literal
@@ -139,6 +140,8 @@ class _Runtime:
     command: str
     script: str
     commit: str
+    # The subscriber file schema this relay reads.
+    subscriber_schema: int = 2
 
     def argv(self, home: Path) -> tuple[str, str]:
         return expand_path(self.command, home), expand_path(self.script, home)
@@ -160,6 +163,15 @@ class Table:
     reconciliation_next: str | None = None
     removals: tuple[Removal, ...] = ()
     rollback_bases: dict[str, RollbackBase] = field(default_factory=dict)
+    # Where a schema-3 relay finds subscriber commands, in order.
+    search_path: tuple[str, ...] = ()
+
+    def subscriber_schema(self, source) -> int:
+        return 2 if source.runtime is None else self.runtimes[source.runtime].subscriber_schema
+
+    def search_directories(self, home: Path) -> list[str]:
+        # Textual, as the renderer expands it: a Path would hide what relay refuses.
+        return [f"{home}{entry[1:]}" if entry.startswith("~/") else entry for entry in self.search_path]
 
     def bindings(self):
         for name, home in self.homes.items():
@@ -229,6 +241,27 @@ def _named(data, construct):
     return {name: construct(**fields) for name, fields in data.items()}
 
 
+def _validate_search_path(table):
+    for name, runtime in table.runtimes.items():
+        if type(runtime.subscriber_schema) is not int or runtime.subscriber_schema not in (2, 3):
+            raise ValueError(f"runtimes.{name}: subscriber_schema must be 2 or 3")
+    for entry in table.search_path:
+        if not isinstance(entry, str) or not entry.startswith(("/", "~/")):
+            raise ValueError(f"search_path: {entry!r} must start with / or ~/")
+    # relay's own rules for the list, on the directories this home gives it.
+    directories = table.search_directories(Path.home())
+    for entry, directory in zip(table.search_path, directories):
+        if (posixpath.normpath(directory) != directory or directory.startswith("//")
+                or ":" in directory or "\0" in directory):
+            raise ValueError(f"search_path: {entry!r} must be a normalized directory without ':'")
+    if len(set(directories)) != len(directories):
+        raise ValueError("search_path repeats a directory")
+    if not table.search_path:
+        for name, source in (table.subscriber_files | table.target_files).items():
+            if source.runtime in table.runtimes and table.subscriber_schema(source) == 3:
+                raise ValueError(f"subscriber_files.{name}: a schema 3 runtime needs a search_path")
+
+
 def _validate_structure(table, *, required_outputs):
     if table.reconciliation_file not in table.subscriber_files:
         raise ValueError(f"unknown reconciliation file {table.reconciliation_file!r}")
@@ -295,6 +328,8 @@ def _validate_structure(table, *, required_outputs):
                     raise ValueError(f"{where}: relay line needs a known runtime and subscriber file, budget and timeout")
                 else:
                     file_runtime = files[line.subscriber_file].runtime
+                    if file_runtime is None and table.runtimes[line.runtime].subscriber_schema == 3:
+                        raise ValueError(f"{where}: a subscriber file declared by path cannot serve a schema 3 runtime")
                     if file_runtime is not None and line.runtime != file_runtime:
                         raise ValueError(f"{where}: relay runtime differs from its subscriber file runtime")
 
@@ -312,6 +347,7 @@ def _validate_structure(table, *, required_outputs):
             raise ValueError(f"target_files.{name}: unknown runtime {source.runtime!r}")
         if Path(source.runtime).name != source.runtime or source.runtime == "..":
             raise ValueError(f"target_files.{name}: runtime version cannot contain a path")
+    _validate_search_path(table)
     for name, files in table.rollback_bases.items():
         for source in files.subscriber_files:
             if source not in table.subscriber_files:
@@ -333,6 +369,7 @@ def load(path: Path) -> Table:
         reconciliation_next=data.get("reconciliation_next"),
         removals=tuple(Removal(**fields) for fields in data.get("removals", ())),
         rollback_bases=_named(data.get("rollback_bases", {}), _rollback_base),
+        search_path=tuple(data.get("search_path", ())),
     )
     _validate_structure(table, required_outputs=True)
     return table

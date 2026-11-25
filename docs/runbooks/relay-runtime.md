@@ -45,7 +45,10 @@ holds activation. Keep earlier installations and files until rollback is release
 See [hook routes](../hook-routes.md).
 
 Schema 2 resolves each subscriber's `argv[0]` on `PATH` and passes later arguments
-literally. The active template uses `env` followed by familiar's checkout path
+literally. A relay that reads schema 3 finds it only in the file's `searchPath`, which hq
+renders from `search_path` in `harnesses/hook-routes.toml` for a runtime declaring
+`subscriber_schema = 3`; that list is also the subscriber's `PATH`. Every installed runtime
+reads schema 2. The active template uses `env` followed by familiar's checkout path
 and the `observe` command. The ops command guard is retired and no retained
 configuration names it.
 
