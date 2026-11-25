@@ -58,3 +58,28 @@ def test_meters_rejects_request_options_before_emitting_frames(tmp_path, fields)
     proc = run(tmp_path, {"id": 1, "extract": "meters", "files": [], **fields})
     assert proc.returncode == 2 and not proc.stdout
     assert "meters extraction requires" in proc.stderr
+
+
+@pytest.mark.parametrize("encoded,expected,malformed", [
+    (b'{"credits":{"balance":"3.5"},"limit_name":"\xff"}', None, 1),
+    (b'{"credits":{"balance":"3.5"},"limit_name":NaN}', (3.5, None), 0),
+    (b'{"credits":{"balance":1e999}}', None, 1),
+    (b'{"credits":{"balance":"3.5"},"primary":[],"secondary":{"window_minutes":10080,"used_percent":19}}',
+     (3.5, 19.0), 0),
+], ids=["invalid-utf8", "ignored-nonfinite-native-value", "overflowing-balance", "nonobject-primary"])
+def test_meters_preserve_native_replay_readings(tmp_path, encoded, expected, malformed):
+    path = tmp_path / "rollout.jsonl"
+    prefix = b'{"timestamp":"2026-09-04T09:38:28.000Z","type":"event_msg","payload":{"type":"token_count","rate_limits":'
+    invalid_or_reading = prefix + encoded + b'}}\n'
+    later = prefix + b'{"credits":{"balance":4}}}}\n'
+    path.write_bytes(invalid_or_reading + later)
+    proc = run(tmp_path, {"id": 1, "extract": "meters",
+                         "files": [{"path": str(path), "size": path.stat().st_size}]})
+    assert proc.returncode == 0 and not proc.stderr, proc.stderr
+    rows = [json.loads(line) for line in proc.stdout.splitlines()]
+    readings = [(row["line"], row["offset"], row["balance"], row["weekly_used_percent"])
+                for row in rows if row["object"] == "meter_reading"]
+    first = [] if expected is None else [(1, 0, *expected)]
+    assert readings == [*first, (2, len(invalid_or_reading), 4.0, None)]
+    assert rows[-2]["status"] == "ok" and rows[-2]["count"] == len(readings)
+    assert rows[-2]["malformed_lines"] == malformed

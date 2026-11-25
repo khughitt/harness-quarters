@@ -594,6 +594,9 @@ def meter(rate_limits, timestamp="2026-09-04T09:38:28.000Z"):
     ({"credits": {"balance": 0}, "primary": {"window_minutes": 300, "used_percent": 10},
       "secondary": {"window_minutes": 10080, "used_percent": 18.5}}, (0.0, 18.5)),
     ({"primary": {"window_minutes": 300, "used_percent": 10}}, (None, None)),
+    ({"credits": {"balance": "3.5"}, "primary": [],
+      "secondary": {"window_minutes": 10080, "used_percent": 19}}, (3.5, 19.0)),
+    ({"credits": {"balance": "3.5"}, "primary": False, "secondary": 7}, (3.5, None)),
     ({"credits": None, "primary": None, "secondary": None}, (None, None)),
 ])
 def test_codex_meters_are_emitted_even_before_session_metadata(rate_limits, want):

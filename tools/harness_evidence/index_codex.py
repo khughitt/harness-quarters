@@ -406,11 +406,7 @@ def codex_rate_limits(record: object) -> dict | None:
         weekly = None
         for name in ("primary", "secondary"):
             window = limits.get(name)
-            if window is None:
-                continue
-            if not isinstance(window, dict):
-                raise ValueError(f"{name} must be an object or null")
-            if window.get("window_minutes") == 10080:
+            if isinstance(window, dict) and window.get("window_minutes") == 10080:
                 weekly = _meter_number(window.get("used_percent"), "used_percent")
                 break
     except (ValueError, OverflowError, OSError) as error:
@@ -434,12 +430,21 @@ def extract(lines, state, *, place: Place, text: bool):
             break
         state["next_line"], state["next_offset"] = number + 1, offset + len(raw)
         number += 1
+        line = raw.decode("utf-8", errors="replace")
         try:
-            record = json.loads(raw.decode("utf-8", errors="replace"), parse_float=_finite_float,
-                                parse_constant=_reject_constant)
+            record = json.loads(line, parse_float=_finite_float, parse_constant=_reject_constant)
         except (ValueError, RecursionError):
             state["malformed"] = state.get("malformed", 0) + 1
-            yield {"object": "unparsed", **position, "reason": "malformed", "provisional": False}
+            unparsed = {"object": "unparsed", **position, "reason": "malformed", "provisional": False}
+            # Live spend read meter facts with ordinary JSON numeric parsing.
+            try:
+                meter_record = json.loads(line)
+            except (ValueError, RecursionError):
+                meter_record = None
+            meter = codex_rate_limits(meter_record)
+            if meter is not None:
+                unparsed["rate_limits"] = meter
+            yield unparsed
             continue
         payload, kind = record.get("payload") or {}, record.get("type")
         if kind == "token_usage_record":

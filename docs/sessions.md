@@ -477,18 +477,23 @@ are unwatched dimensions, so `field_presence` and `record_counts` are unchanged.
 Decoder v25 adds `rate_limits` to Codex index events, including token counts before
 session metadata. A native reading carries the observed timestamp as Unix milliseconds,
 the credit balance and the percent used in a 10,080-minute window. The primary window
-takes precedence when both windows have that duration. Unrecorded balances or weekly
-percentages are null. A missing reading is null, and a malformed reading carries
-`status:"malformed"` and its reason. Meter reads add no coverage populations.
+takes precedence when both object windows have that duration. Non-object windows are
+skipped. Unrecorded balances or weekly percentages are null. A missing reading is
+null, and a malformed reading carries `status:"malformed"` and its reason. On a
+complete line rejected by strict index JSON parsing, an `unparsed` frame can carry
+the meter fact recovered by the live reader's numeric parsing rules. It still counts
+as a malformed line and contributes no index event or field-presence rows.
 
 For a bounded historical scan, set `extract:"meters"` on a decode request. Send
 `files` with `path` and `size` and optional `roots`. Keep `cross_file`, `raw` and
 `text` false and omit `context`. The profile emits `file_start`, zero or more
 `meter_reading` frames keyed by physical line (`M1`, for example), then `file_end`
 for each file and `request_end` for the batch. Readings include a physical line number,
-byte offset, source ref, line hash and native meter values. A relevant line that fails
-JSON parsing or has a malformed meter increments `malformed_lines`; later readings
-still appear. Parseable records without a meter are ignored. The file terminal gives
+byte offset, source ref, line hash and native meter values. The scan parses raw
+bytes. A line containing `rate_limits` with invalid JSON or encoding, or with a
+malformed meter, increments `malformed_lines`. Non-finite native values affect the
+meter only when used by the reading. Later readings still appear. Parseable
+records without a meter are ignored. The file terminal gives
 the reading count and `ok`, `vanished` or `unreadable` status.
 
 ### agy index events

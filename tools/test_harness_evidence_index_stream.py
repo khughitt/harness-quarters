@@ -1367,3 +1367,52 @@ def test_decode_short_read_exits_two_without_a_file_terminal(tmp_path):
         assert main(["decode"]) == 2
     assert "short read within index fixed span" in err.getvalue()
     assert [json.loads(line)["object"] for line in out.getvalue().splitlines()] == ["file_start", "index_event"]
+
+
+def test_strict_codex_unparsed_frames_keep_only_normalized_meter_evidence(tmp_path):
+    path = tmp_path / "rollout.jsonl"
+    meta = b'{"type":"session_meta","timestamp":"2026-09-04T09:38:28Z","payload":{"id":"session"}}\n'
+    token_count = b'{"type":"event_msg","timestamp":"2026-09-04T09:38:28Z","payload":{"type":"token_count",'
+    raw = [
+        token_count + b'"rate_limits":{"credits":{"balance":1e999}}}}\n',
+        token_count + b'"rate_limits":{"credits":{"balance":"3.5"},"ignored":NaN}}}\n',
+        token_count + b'"info":{"last_token_usage":{"input_tokens":1e999}}}}\n',
+        token_count + b'"rate_limits":{"credits":\n',
+    ]
+    truncated = (token_count + b'"rate_limits":{"credits":{"balance":1e999}}}}')  # No newline.
+    path.write_bytes(meta + b"".join(raw) + truncated)
+    roots = [{"harness": "codex", "path": str(tmp_path)}]
+    req = request(source(path, size=len(meta)), source(path), roots=roots)
+    proc = subprocess.run([str(TOOLS / "harness-evidence"), "decode"],
+                          input=json.dumps(req) + "\n", text=True, capture_output=True,
+                          env=environment(tmp_path), timeout=60)
+    assert proc.returncode == 0 and not proc.stderr, proc.stderr
+    rows = [json.loads(line) for line in proc.stdout.splitlines()]
+    assert [row["native_kind"] for row in rows if row["object"] == "index_event"] == [
+        "session_meta", "session_meta"]
+    original, current = [row for row in rows if row["object"] == "coverage"]
+    assert current["records"] == original["records"]
+    assert current["fields"] == original["fields"]
+    assert current["malformed"] == 4 and current["partial_tail"] is True
+    terminal = rows[-2]
+    assert terminal["status"] == "ok" and terminal["count"] == 7
+    assert terminal["metadata"]["usage_source"] == "none"
+    assert terminal["offset"] == len(meta) + sum(map(len, raw))
+    assert rows[-1]["object"] == "request_end" and rows[-1]["files"] == 2
+
+    rejected = [row for row in rows if row["object"] == "unparsed"]
+    offset = len(meta)
+    for line, (value, row) in enumerate(zip([*raw, truncated], rejected, strict=True), start=2):
+        assert row["key"] == f"E{offset}" and row["line"] == line
+        assert row["offset"] == offset and row["end"] == offset + len(value)
+        assert row["sha256"] == hashlib.sha256(value).hexdigest()
+        assert row["reason"] == ("truncated" if line == 6 else "malformed")
+        assert row["provisional"] == (line == 6)
+        assert not {"response", "identity", "native_kind", "context", "occupancy"} & row.keys()
+        offset += len(value)
+    assert rejected[0]["rate_limits"] == {"status": "malformed", "reason": "balance must be a finite number",
+                                         "basis": "native", "rule": "codex_rate_limits"}
+    assert rejected[1]["rate_limits"] == {"status": "ok", "at_ms": 1788514708000,
+                                         "balance": 3.5, "weekly_used_percent": None,
+                                         "basis": "native", "rule": "codex_rate_limits"}
+    assert all("rate_limits" not in row for row in rejected[2:])

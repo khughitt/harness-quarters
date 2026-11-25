@@ -4,7 +4,7 @@ from pathlib import Path
 
 from . import discover
 from .index_codex import codex_rate_limits
-from .lines import Place, _reject_constant, lines, ref, sha256
+from .lines import Place, lines, ref, sha256
 
 
 def _file(source, base, roots):
@@ -23,7 +23,7 @@ def _file(source, base, roots):
             if b"rate_limits" not in line.raw:
                 continue
             try:
-                record = json.loads(line.raw.decode("utf-8", errors="replace"), parse_constant=_reject_constant)
+                record = json.loads(line.raw)
             except (ValueError, RecursionError):
                 malformed += 1
                 continue
