@@ -32,6 +32,8 @@ POLICIES = {
     ("tasks", "hook", "halt-notice"): ("halt", "notice"),
     ("tasks", "hook", "claim-guard"): ("claim", "guard"),
 }
+# What a replayed subscriber runs by name: the owner commands, and the env that wraps an observer.
+COMMANDS = ("lore", "mindful", "tasks", "git-index-health", "harness-state-refresh", "env")
 ADDRESS = re.compile(r"(v[0-9]+\.[0-9]+\.[0-9]+)-([0-9a-f]{12})/relay/subscribers\.json")
 
 
@@ -221,9 +223,26 @@ def _assets(table, root, path_env, selected, home):
         (root / "owners/harness-state-refresh").symlink_to("../home/d/hq/.githooks/harness-state-refresh")
     _copy(_source("tasks", path_env), root / "owners/tasks")
     _copy(FIXTURES / "owner.py", root / "owner.py")
-    for name in ("lore", "mindful", "tasks", "git-index-health", "harness-state-refresh", "env"):
+    for name in COMMANDS:
         (root / "fixture-bin" / name).symlink_to("../owner.py")
     return binds
+
+
+def _listed(tree, search_path):
+    """Put the replay's commands first in the list a schema-3 file searches."""
+    commands = tree / "listed-bin"
+    for entry in search_path:
+        target = Path(re.sub(r"^/bin(?=/|$)", "/usr/bin", entry))  # As _sandbox links it.
+        toolchain = target.is_relative_to("/usr")
+        if toolchain and not target.is_dir():
+            continue  # relay passes over it, and the read-only toolchain cannot grow it.
+        commands.mkdir()
+        for name in COMMANDS:
+            # owner.py runs /usr/bin/env, so the toolchain's own stays itself.
+            if not (toolchain and name == "env"):
+                (commands / name).symlink_to("/fixture/owner.py")
+        return [(commands, target)]
+    raise ValueError(f"the replay can use no directory of the search path {search_path}")
 
 
 def _sandbox(tree, binds, action, payload=None):
@@ -245,7 +264,10 @@ def _sandbox(tree, binds, action, payload=None):
                    "--ro-bind", str(FIXTURES / "exercise.py"), "/exercise.py",
                    "--ro-bind", str(FIXTURES / "hosts"), "/etc/hosts"]
         for source, target in binds:
-            command.extend(["--ro-bind", str(source), str(target)])
+            if target.is_relative_to("/usr"):  # The toolchain keeps its programs beside what is bound there.
+                command.extend(["--overlay-src", str(target), "--overlay-src", str(source), "--ro-overlay", str(target)])
+            else:
+                command.extend(["--ro-bind", str(source), str(target)])
         command.extend(["--chdir", "/fixture", "--", "/usr/bin/python3", "/exercise.py", action, "/packages/relay",
                         os.readlink("/proc/self/ns/pid")])
     result = subprocess.run(command, env=env, cwd=tree, input=json.dumps(payload), capture_output=True,
@@ -274,6 +296,8 @@ def run(table, next_dir: Path, cases: Path, *, scratch: Path, path_env: str) -> 
                 tree = base / "fixture"
                 seed = base / "seed"
                 binds = _assets(table, tree, path_env, selected, home) + [(package, Path("/packages/relay"))]
+                search_path = json.loads(data).get("searchPath")
+                listed = [] if search_path is None else _listed(tree, search_path)
                 config = tree / "candidate/subscribers.json"
                 config.write_bytes(data)
                 config.chmod(0o600)
@@ -298,7 +322,7 @@ def run(table, next_dir: Path, cases: Path, *, scratch: Path, path_env: str) -> 
                             if replacement.exists():
                                 current.parent.mkdir(parents=True, exist_ok=True)
                                 replacement.rename(current)
-                    results[side] = _sandbox(tree, binds, side)
+                    results[side] = _sandbox(tree, binds + listed if side == "relay" else binds, side)
                     shutil.rmtree(tree)
             for policy in sorted(policies):
                 native, relay = (results[side][policy] for side in ("native", "relay"))

@@ -10,9 +10,10 @@ hook wiring and the relay subscriber template.
 | `homes` | Each home names its harness, repository-relative settings path and ordered bindings. Each binding names an event, an optional matcher and its ordered lines. |
 | Lines | Each names its policies and any harness timeout in seconds. A native line names its literal command. A relay line names a runtime, subscriber file and outer budget in milliseconds. `relay_event` supplies a distinct relay event argument when needed, and `relay_kind` records the expected selector kind. An agy bridge line names its transport command, runtime and ordered delegate argv. |
 | `states` | Policy defaults. A line's `states` map can replace a policy's metadata for that binding. Native routes name an owner and reason. Existing relay routes name an owner and the grant for the current deployment. Relay routes cite qualification `records`. Bridge routes cite fixture `evidence`. `activation` names the user grant task note that made a former target live. |
-| `runtimes` | Each version names the command, runtime script and relay commit in that runtime's lock. |
+| `runtimes` | Each version names the command, runtime script and relay commit in that runtime's lock. `subscriber_schema` is the subscriber file schema that relay reads, 2 by default or 3. |
+| `search_path` | The host's ordered command directories, each starting with `/` or `~/`. Every file whose runtime reads schema 3 is rendered with it, and needs it nonempty. |
 | `subscribers` | Each subscriber names its policy, role, argv and `timeoutMs`. Observers can declare a registry and event-specific `privateFields`. |
-| `subscriber_files` | Each file names a runtime for digest addressing or a literal deployed path, a repository-relative template output and ordered named selections. A selection can carry `harnesses`, `kinds`, `tools` and `nativeEvents` filters. `reconciliation_file` names the shared file for reconciliation. |
+| `subscriber_files` | Each file names a runtime for digest addressing or a literal deployed path, a repository-relative template output and ordered named selections. A selection can carry `harnesses`, `kinds`, `tools` and `nativeEvents` filters. A file declared by path renders schema 2, so it cannot serve a schema-3 runtime. `reconciliation_file` names the shared file for reconciliation. |
 | `target_files` | New compositions name a runtime version and ordered subscriber selections. `reconciliation_next` selects a target composition for reconciliation. |
 | `removals` | Each retirement names a subscriber and the authorizing owner task. Move every binding whose file contains that subscriber, and move reconciliation if it uses the file. |
 | `rollback_bases` | Retained subscriber file names and literal commands that still count as donor references. |
@@ -24,6 +25,14 @@ their literal paths, and subscriber argv uses the template's `@HOME@` placeholde
 Rendering Claude Code settings replaces only the top-level `hooks` value and
 preserves the surrounding bytes. Codex and agy hooks and the subscriber template
 are whole-file renders.
+
+A file renders in the schema its runtime reads: `{"schema": 2, "subscribers": …}`, or
+`{"schema": 3, "searchPath": …, "subscribers": …}` with `search_path` in it, placeholders
+and all. The list must be one relay accepts once this home is expanded (distinct,
+normalized, without `:`), and the table is refused otherwise. No declared runtime reads
+schema 3 yet, so no rendered file holds the list. The user confirms the list at the
+activation that first uses it; a later edit changes the digest of each file that holds it,
+and so needs a new deployment and new qualification of its routes.
 
 Run `tools/hook-routes check` to validate the table and compare the checkout with its
 live render using the current home. It compares Claude Code's parsed hook values by event and checks
@@ -138,7 +147,12 @@ Static checks use the versions in the records. Host version probes run in
   against the current home's render. Each consuming runtime loads the deployed file through relay's
   public config reader, including the standalone pin for reconciliation. Preflight
   checks the interpreter and script or observer behind the shipped `env` wrappers
-  and the executables in each agy bridge line’s declared delegate argv. Existing
+  and the executables in each agy bridge line’s declared delegate argv. Commands are
+  looked up on the caller's `PATH`, except that a schema-3 file's subscribers are looked up
+  as relay does, only in `search_path`: the first directory that holds the command decides
+  (`unusable-command` when it is not an executable regular file), and the interpreter an
+  `#!/usr/bin/env` script names must be found there too, for the command itself and for the
+  absolute script an `env` wrapper runs. Existing
   routes also undergo the host selection check. With
   `--next` it checks the review directory and the live relay selections that the
   cutover relies on for subscriber retention. A qualified binding needs
@@ -249,6 +263,9 @@ fixture hq checkout, and uses the fixture PATH for the owner commands.
 Profile replay copies the deployed native lore hook, source and profile files
 independently of the replacement executable selected on PATH. Both trees run at
 the same logical pathname so that recovery commands remain comparable.
+For a schema-3 file the relay side finds the owner commands through the file's own list:
+they are bound at its first usable directory, beside the system programs when that is one
+of the sandbox's own directories, and `PATH` must be the list.
 It rejects unexpected subscriber environment keys or values. Claude
 subscribers receive the two provenance values the pinned relay supplies for
 the synthetic event. The fixture runs the donor and owner stale-notice
@@ -262,3 +279,7 @@ differs from the caller's and that proc belongs to it before running any hooks.
 It also uses private mounts and loopback for existing absolute observer argv and
 the fixed capture endpoint. An unavailable namespace prevents a real replay.
 Admission-only checks use the pinned public budget API with a private environment.
+
+`HQ_TEST_RELAY_CANDIDATE`, naming an installed relay package that no runtime pins yet, runs
+the candidate cases of `tools/test_hook_routes_relay.py` and
+`tools/test_hook_routes_equivalence.py`; they skip without it.

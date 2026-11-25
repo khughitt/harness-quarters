@@ -51,6 +51,54 @@ def _command_findings(argv, home, path_env, where):
             yield Finding("missing-command", where, f"cannot execute {name}")
 
 
+def _first_candidate(name: str, directories: list[str]) -> tuple[Path | None, str | None]:
+    """relay's rule for a subscriber command: the first candidate that exists decides."""
+    for directory in directories:
+        candidate = Path(directory) / name
+        try:
+            candidate.lstat()
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return candidate, None
+        except (FileNotFoundError, NotADirectoryError):
+            continue
+        except OSError as error:
+            return None, f"cannot inspect {candidate}: {error.strerror}"
+        return None, f"{candidate} is not an executable regular file"
+    return None, None
+
+
+def _env_interpreter(script: Path) -> str | None:
+    """The program an env shebang makes env look up by name."""
+    try:
+        with script.open("rb") as source:
+            line = source.readline(4096)
+    except OSError:
+        return None  # The command findings report an unreadable command.
+    words = line[2:].decode("utf-8", "replace").split() if line.startswith(b"#!") else []
+    if not words or Path(words[0]).name != "env":
+        return None
+    return next((word for word in words[1:] if not word.startswith("-") and "=" not in word), None)
+
+
+def _listed_findings(argv, home, directories, where):
+    """One schema-3 subscriber: relay finds its command, and env its interpreter, only in the list."""
+    args = [expand_path(token, home) for token in argv]
+    command, problem = _first_candidate(args[0], directories)
+    if command is None:
+        yield (Finding("missing-command", where, f"cannot execute {args[0]}") if problem is None
+               else Finding("unusable-command", where, problem))
+        return
+    search = os.pathsep.join(directories)
+    scripts = [command]
+    if args[0] == "env" and len(args) >= 2 and Path(args[1]).is_absolute():
+        yield from _command_findings(args, home, search, where)
+        scripts.append(Path(args[1]))
+    for script in scripts:
+        interpreter = _env_interpreter(script)
+        if interpreter is not None and shutil.which(interpreter, path=search) is None:
+            yield Finding("missing-command", where, f"cannot execute {interpreter}, which {script} runs through env")
+
+
 def run(table, *, home: Path, path_env: str, next_dir: Path | None) -> list[Finding]:
     findings = validate(table, home=home)
     target = next_dir is not None
@@ -124,7 +172,9 @@ def run(table, *, home: Path, path_env: str, next_dir: Path | None) -> list[Find
             findings.append(Finding("deployed-file", name, f"missing regular subscriber file {path}"))
         for entry in source.subscribers:
             argv = table.subscribers[entry.name].argv
-            findings.extend(_command_findings(argv, home, path_env, f"{name}:{entry.name}"))
+            where = f"{name}:{entry.name}"
+            findings.extend(_command_findings(argv, home, path_env, where) if table.subscriber_schema(source) == 2
+                            else _listed_findings(argv, home, table.search_directories(home), where))
     versions = installed_versions(path_env)
     findings.extend(qualification_findings(table, home=home, target=target, versions=versions))
     return findings

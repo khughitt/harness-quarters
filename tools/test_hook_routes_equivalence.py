@@ -32,13 +32,29 @@ def executable(path, source):
     path.chmod(0o755)
 
 
-def candidate(root, subscribers, event="SessionStart"):
-    data = (json.dumps({"schema": 2, "subscribers": subscribers}) + "\n").encode()
-    address = "v0.5.0-" + sha256(data).hexdigest()[:12] + "/relay/subscribers.json"
+@pytest.fixture
+def candidate_runtime(monkeypatch):
+    """The unreleased relay behind v0.6.0, the version its package still has."""
+    if not (package := os.environ.get("HQ_TEST_RELAY_CANDIDATE")):
+        pytest.skip("HQ_TEST_RELAY_CANDIDATE names no relay package")
+    lock = json.loads((Path(package).parents[1] / "package-lock.json").read_bytes())
+    pin = TABLE.runtimes["v0.6.0"]
+    # A tarball's lock entry names no commit; its resolved value identifies the package.
+    monkeypatch.setitem(TABLE.runtimes, "v0.6.0", replace(
+        pin, script=str(Path(package) / "bin/relay.js"), subscriber_schema=3,
+        commit=lock["packages"]["node_modules/relay"]["resolved"]))
+
+
+def candidate(root, subscribers, event="SessionStart", version="v0.5.0", search_path=None):
+    config = {"schema": 2, "subscribers": subscribers}
+    if search_path is not None:
+        config = {"schema": 3, "searchPath": search_path, "subscribers": subscribers}
+    data = (json.dumps(config) + "\n").encode()
+    address = version + "-" + sha256(data).hexdigest()[:12] + "/relay/subscribers.json"
     config = root / address
     config.parent.mkdir(parents=True)
     config.write_bytes(data)
-    command, script = TABLE.runtimes["v0.5.0"].argv(Path.home())
+    command, script = TABLE.runtimes[version].argv(Path.home())
     settings = {"hooks": {event: [{"hooks": [{"type": "command", "timeout": 60,
         "command": f"'{command}' '{script}' hook --harness claude-code --outer-ms 60000 "
                    f"--subscribers '{Path.home() / '.config/relay' / address}' {event}"}]}]}}
@@ -286,6 +302,82 @@ def test_dispatch_requires_private_process_namespace(tmp_path, monkeypatch):
     command, = calls
     assert command[0] == "/usr/bin/bwrap"
     assert "--unshare-all" in command and command[command.index("--proc") + 1] == "/proc"
+
+
+@pytest.mark.parametrize("target, flags", [
+    ("/h/.local/bin", ["--ro-bind", "{source}", "/h/.local/bin"]),
+    ("/usr/bin", ["--overlay-src", "/usr/bin", "--overlay-src", "{source}", "--ro-overlay", "/usr/bin"]),
+])
+def test_sandbox_keeps_its_toolchain_beside_bound_commands(tmp_path, monkeypatch, target, flags):
+    calls = []
+    def inspect(command, **kwargs):
+        calls.append([str(word) for word in command])
+        return subprocess.CompletedProcess(command, 0, stdout="{}", stderr="")
+    monkeypatch.setattr(subprocess, "run", inspect)
+    source = tmp_path / "listed-bin"
+    binds = [(tmp_path / "package", Path("/packages/relay")), (source, Path(target))]
+    equivalence._sandbox(tmp_path, binds, "relay")
+    command, = calls
+    expected = [word.format(source=source) for word in flags]
+    assert any(command[i:i + len(expected)] == expected for i in range(len(command)))
+
+
+@pytest.mark.parametrize("search_path, target", [
+    (["/h/.local/bin", "/usr/bin"], "/h/.local/bin"),
+    (["/usr/bin", "/h/bin"], "/usr/bin"),
+    (["/bin"], "/usr/bin"),
+    # relay passes over a listed directory that is absent, and the read-only toolchain cannot grow one.
+    (["/usr/no-such-directory", "/h/bin"], "/h/bin"),
+])
+def test_owner_commands_come_first_in_a_schema_3_list(tmp_path, search_path, target):
+    (source, where), = equivalence._listed(tmp_path, search_path)
+    assert where == Path(target)
+    names = {path.name for path in source.iterdir()}
+    assert {"lore", "mindful", "tasks", "git-index-health", "harness-state-refresh"} <= names
+    # owner.py runs /usr/bin/env, so the sandbox's own must stay there.
+    assert ("env" in names) == (target != "/usr/bin")
+    assert {os.readlink(path) for path in source.iterdir()} == {"/fixture/owner.py"}
+
+
+def test_a_list_the_replay_cannot_use_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="search path"):
+        equivalence._listed(tmp_path, ["/usr/no-such-directory"])
+
+
+@pytest.mark.parametrize("search_path", [None, ["/listed/one", "/usr/bin"]])
+def test_owner_expects_the_files_list_as_a_subscribers_path(tmp_path, search_path):
+    root = tmp_path / "fixture"
+    inherited = f"{root}/fixture-bin:/usr/bin"
+    listed = inherited if search_path is None else ":".join(search_path)
+    env = {"HOME": str(root / "home"), "PATH": inherited, "LANG": "C.UTF-8"}
+    for name in ("home", "owners", "candidate", "fixture-bin"):
+        (root / name).mkdir(parents=True)
+    executable(root / "owners/tasks", "print('owner ran')")
+    shutil.copy2(CASES / "owner.py", root / "owner.py")
+    (root / "fixture-bin/tasks").symlink_to("../owner.py")
+    (root / "request.json").write_text(json.dumps({"harness": "codex", "selected": {}}))
+    (root / "environment.json").write_text(json.dumps(env))
+    config = {"schema": 2, "subscribers": []} if search_path is None else {"schema": 3, "searchPath": search_path, "subscribers": []}
+    (root / "candidate/subscribers.json").write_text(json.dumps(config))
+
+    def run(path):
+        return subprocess.run([root / "fixture-bin/tasks"], env=dict(env, PATH=path), input=b"", capture_output=True).returncode
+    assert run(inherited) == 0, "before relay starts, the native side's PATH"
+    (root / "relay-started").touch()
+    assert run(listed) == 0
+    assert run(inherited if search_path else "/usr/bin") == 3
+
+
+@pytest.mark.parametrize("start", ["hq", "system"])
+def test_candidate_replays_a_notice_through_its_search_path(candidate_runtime, tmp_path, start):
+    if not shutil.which("git-index-health"):
+        pytest.skip("an owner command is absent")
+    search_path = TABLE.search_directories(Path.home()) if start == "hq" else ["/usr/bin", "/bin"]
+    review = candidate(tmp_path / "candidate", [notice(["git-index-health", "--session-start"], "git-index-repair")],
+                       version="v0.6.0", search_path=search_path)
+    row, = equivalence.run(TABLE, review, cases(tmp_path, ["index-needing-repair"]), scratch=tmp_path / "scratch",
+                           path_env=os.environ["PATH"])
+    assert row.status == "passed", row.line
 
 
 def test_sibling_failure_preserves_delivered_notice(portable_replay, tmp_path):
