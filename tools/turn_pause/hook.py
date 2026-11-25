@@ -48,6 +48,7 @@ __all__ = (
     'MALFORMED_TEXT',
     'WAKE_TEXT',
     'PROTECTED_TEXT',
+    'ENDED_TEXT',
     'NODES_TEXT',
     'GRACE_TEXT',
     'HARNESS_NAMES',
@@ -151,6 +152,10 @@ PROTECTED_TEXT = ('turn-pause: this call names a protected path (the pause state
                   'or readlink -f command using concrete expanded absolute or checkout-relative '
                   'paths, without tilde, globs, composition or extra execution fields. Paused reads '
                   'spend read grace; hq pause status and hq pause limits remain available.')
+ENDED_TEXT = ('turn-pause: root session ended; a genuine root prompt is required to resume. '
+              'Another process on the same session may have ended it. Until that prompt only '
+              'single-line tasks feedback, tasks note, tasks park and hq pause status or limits run: '
+              'report a wrong block with one, then tell the user what is unfinished and end the turn.')
 NODES_TEXT = (f'turn-pause: the tool input has more than {MAX_NODES} JSON nodes, more than any real tool '
               'input needs and more than the hook can check in time, so the call is refused. Split the '
               'work into smaller calls.')
@@ -302,6 +307,28 @@ def current_harness_pid(recorded: int | None, start: int, proc='/proc') -> int |
     return find_harness_pid(start, proc)
 
 
+def _held_elsewhere(state: RootState, ending: int | None) -> bool:
+    """Whether the process of the root's last genuine prompt still runs and is not the one
+    ending: a session resumed in a second process has one root in two processes. An unknown
+    process holds nothing."""
+    holder = state.harness_pid
+    return (ending is not None and holder is not None and holder != ending
+            and find_harness_pid(holder) == holder)
+
+
+def _ended(harness: str, payload: dict, protected: list[str]) -> dict | None:
+    """The answer to a tool call on an ended root: bookkeeping passes, so a wrong block can
+    be reported; every other call is refused."""
+    from . import allowlist  # with shlex: only an ended or paused root needs it
+    tool_input = payload.get('tool_input')
+    if touches_protected(tool_input, protected):
+        return _deny(PROTECTED_TEXT)
+    owned = allowlist.Owned(frozenset(), frozenset(), None)
+    if allowlist.classify(harness, payload.get('tool_name'), tool_input, owned).klass == 'bookkeeping':
+        return None
+    return _deny(ENDED_TEXT)
+
+
 class Judge:
     """The real decision for one PreToolUse's tool_start."""
 
@@ -398,6 +425,7 @@ def _prompt(rs: RootState, harness: str, payload: dict, now: float, limits_path,
         elif isinstance(budget, Malformed):
             note = MALFORMED_TEXT.format(reason=budget.reason)
         engine.start_turn(rs, now, limits, sha, note)
+        rs.harness_pid = find_harness_pid(os.getppid())  # the process this turn runs in holds the root
         after_snap = history.snapshot(rs, compactions_counted=counted)
         history.start_turn(record, now, origin='genuine_user', before=before, after=after_snap)
         record.ended_at = None
@@ -536,7 +564,9 @@ def _decide(harness, event, payload, now, store, limits_path, env, oversized):
     counted = bool(facts.compact_events.get(harness))
     if event == 'SessionEnd':
         if agent is None:
-            store.end(harness, root, now, compactions_counted=counted)
+            ending = find_harness_pid(os.getppid())
+            store.end(harness, root, now, compactions_counted=counted,
+                      held=lambda state: _held_elsewhere(state, ending))
             store.prune(now, compactions_counted={h: bool(v) for h, v in facts.compact_events.items()})
         return None
     limits_sha = file_sha256(limits_path) if event == 'PreToolUse' else None
@@ -558,7 +588,7 @@ def _decide(harness, event, payload, now, store, limits_path, env, oversized):
                     return _context('UserPromptSubmit', WAKE_TEXT)
                 rs = record.state = RootState(harness, root, None)
             elif event == 'PreToolUse':
-                return _deny('turn-pause: root session ended; a genuine root prompt is required to resume.')
+                return _ended(harness, payload, protected)
             else:
                 return None
         if isinstance(payload.get('cwd'), str):

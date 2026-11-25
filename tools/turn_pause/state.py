@@ -620,12 +620,13 @@ class Store:
         record.ended_at = now
 
     def end(self, harness: str, root: str, now: float, *,
-            compactions_counted: bool, reason: str = 'session_end') -> bool:
+            compactions_counted: bool, reason: str = 'session_end', held=lambda state: False) -> bool:
+        """End the root's active state, unless held(state) says another process has it."""
         stem = self._stem(harness, root)
         path = self._path(stem + '.json')
         with self._flocked(stem):
             record = self._load(path)
-            if record is None or record.state is None:
+            if record is None or record.state is None or held(record.state):
                 return False
             self._end_record(record, now, compactions_counted, reason)
             self._write(path, record)

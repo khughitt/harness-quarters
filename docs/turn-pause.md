@@ -173,7 +173,12 @@ history omits cwd, private schedule material, `spend`, `spend_cache`,
 prompt_guards has cron digests and wake rows `[digest,not_before,not_after]`.
 Digests are SHA-256 fingerprints of stripped prompt text, not anonymization.
 Ending/idle clearing retains known guards; a genuine resume clears them until
-fresh schedule evidence arrives. Late tool calls on an ended root are refused.
+fresh schedule evidence arrives. Late tool calls on an ended root are refused,
+except the bookkeeping class below (so a wrong refusal can be reported).
+A root belongs to the process of its last genuine prompt: SessionEnd from another
+process resumed on the same session leaves the root, and any pause, as it is while
+that process runs. Two processes mid-turn on one session still share one set of
+counters, and the prompting one ending ends the root for both.
 Expired windows/evicted records cannot establish historical provenance.
 
 Ended roots expire lazily after 30 days or beyond 512 roots, with at most 32
