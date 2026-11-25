@@ -4,28 +4,40 @@ Type: guide; document types 1. Install, upgrade and recover the pinned standalon
 runtime and hook images. See [home links](../home-links.md) for launcher ownership
 and [capabilities](../harness-capabilities.md) for native/adapter/policy boundaries.
 
-`relay/package.json` selects v0.6.0; `relay/package-lock.json` fixes its commit to
-`9078727105f06b4a17ccbf177821806d7eed93be`. The declared home launcher resolves to
+`relay/package.json` selects v0.7.0; `relay/package-lock.json` fixes its commit to
+`e1bad200aa51becf88ad36cc832756179e12f6b2`. The declared home launcher resolves to
 `relay/bin/relay`, which reads that pin and runs the versioned installation under
 `$HOME/.local/share/relay/` (falling back to the account's passwd home when
 `HOME` is overridden and `RELAY_INSTALL_ROOT` is unset). Node and npm come from `/usr/bin`.
 
-For a standalone launcher upgrade, after approval for the live rollout, run `just relay-install` from the reviewed
-checkout before merging its pin into main. This installs the new runtime in its
-stable versioned directory before the home launcher selects it. Resolve
-`command -v relay`, inspect `readlink -f` of that path, and check `relay --version`
-after merging. Never point the home launcher at a worktree. Every host that shares
-this checkout selects the merged pin at once, and its launcher exits 127 until that
-version is installed there. Other hosts cannot see this host's worktrees, so run
-`just relay-install` in the main checkout on each of them as soon as the merge syncs.
+For a standalone launcher upgrade, after approval for the live rollout, run
+`just relay-install` and `tools/hook-routes deploy live` from the reviewed checkout, then
+`tools/hook-routes preflight`, all before merging its pin into main. This installs the new
+runtime in its stable versioned directory, and any reconciliation file it needs, before the
+home launcher selects them. Resolve `command -v relay`, inspect `readlink -f` of that path,
+and check `relay --version` after merging. Never point the home launcher at a worktree.
+
+Every other host that shares this checkout selects the merged pin as soon as it syncs, and
+its launcher exits 127 until that version is installed there. Those hosts cannot see this
+host's worktrees, so on each of them run `just relay-install`, `just relay-subscribers` and
+`tools/hook-routes preflight` in the main checkout right after the merge syncs. Merge
+before an unreachable host can do that only with approval that names it.
 
 On each host, `just relay-subscribers` runs `tools/hook-routes deploy live`.
 It installs each subscriber file named by the live route table and its reconciliation
-file. The active base is `~/.config/relay/v0.5.0-<digest-prefix>`. Different bytes
+file. The active hook base is `~/.config/relay/v0.5.0-<digest-prefix>`. The reconciliation
+base is `~/.config/relay/v0.7.0-<digest-prefix>`, because the standalone v0.7.0 refuses
+the hooks' schema-2 file. A pin move to a relay that reads another schema moves
+`reconciliation_file` with it, and a rollback reverts both together: the v0.7.0 pin
+refuses a schema-2 reconciliation file. Different bytes
 at an existing destination cause a refusal. A cutover keeps the previous base for
 rollback until the user accepts it and confirms its removal; no rollback base is
 retained now. Run `just relay-reap` for reconciliation.
-It points `XDG_CONFIG_HOME` at the live table's `reconciliation_file` base.
+It points `XDG_CONFIG_HOME` at the live table's `reconciliation_file` base. Relay treats
+an absent file as no subscribers and a failing subscriber as a diagnostic, so its exit
+status 0 proves neither the file nor its observers. Accept a standalone move on a host when
+preflight reports no `runtime`, `deployed-file` or `deployed-digest` finding for the
+reconciliation file and reap prints no `SUBSCRIBER_FAILED` line.
 
 Prepare each hook cutover on every host that shares the settings before
 requesting activation. Use the exact reviewed revision and install each new
@@ -47,8 +59,9 @@ See [hook routes](../hook-routes.md).
 Schema 2 resolves each subscriber's `argv[0]` on `PATH` and passes later arguments
 literally. A relay that reads schema 3 finds it only in the file's `searchPath`, which hq
 renders from `search_path` in `harnesses/hook-routes.toml` for a runtime declaring
-`subscriber_schema = 3`; that list is also the subscriber's `PATH`. Every installed runtime
-reads schema 2. The active template uses `env` followed by familiar's checkout path
+`subscriber_schema = 3`; that list is also the subscriber's `PATH`. v0.5.0 and v0.6.0 read
+schema 2. v0.7.0 reads schema 3 only.
+The active templates use `env` followed by familiar's checkout path
 and the `observe` command. The ops command guard is retired and no retained
 configuration names it.
 
@@ -123,8 +136,9 @@ edits trust hashes. The personal home's new `[hooks.state]` hashes land in track
 land in untracked local/codex/config.work.toml. A rollback stops Codex the same way
 and reverts the images commit (or runs `git revert -m 1 <merge>`, noting that a
 whole-merge revert also reverts any runbook and task-record changes in the merge),
-which returns the images to their previous runtime and subscriber file. The CLI pin moves
-in its own commit and stays where it is, and the restored table selects its previous subscriber and reconciliation files; Codex then
+which returns the images to their previous runtime and subscriber file. The CLI pin and
+`reconciliation_file` move in their own commit and stay where they are, and the restored
+hook bindings select their previous subscriber files; Codex then
 asks again, and the same review writes the old hashes back in both homes. Commit the
 personal home's restored `[hooks.state]` hashes in `harnesses/codex/config.toml` too.
 Restore no trust from a copy: the work file holds other live settings.

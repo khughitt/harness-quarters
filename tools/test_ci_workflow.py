@@ -263,4 +263,5 @@ launcher.write_text(f"console.log('fixture {prefix.name}')")
                                                "HQ_TEST_ARTIFACT_DIR": str(artifact)},
                             capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stderr
-    assert (artifact / "setup-report.txt").read_text().splitlines() == ["fixture v0.5.0", "fixture v0.6.0"]
+    assert (artifact / "setup-report.txt").read_text().splitlines() == [
+        "fixture v0.5.0", "fixture v0.6.0", "fixture v0.7.0"]

@@ -13,7 +13,7 @@ hook wiring and the relay subscriber template.
 | `runtimes` | Each version names the command, runtime script and relay commit in that runtime's lock. `subscriber_schema` is the subscriber file schema that relay reads, 2 by default or 3. |
 | `search_path` | The host's ordered command directories, each starting with `/` or `~/`. Every file whose runtime reads schema 3 is rendered with it, and needs it nonempty. |
 | `subscribers` | Each subscriber names its policy, role, argv and `timeoutMs`. Observers can declare a registry and event-specific `privateFields`. |
-| `subscriber_files` | Each file names a runtime for digest addressing or a literal deployed path, a repository-relative template output and ordered named selections. A selection can carry `harnesses`, `kinds`, `tools` and `nativeEvents` filters. A file declared by path renders schema 2, so it cannot serve a schema-3 runtime. `reconciliation_file` names the shared file for reconciliation. |
+| `subscriber_files` | Each file names a runtime for digest addressing or a literal deployed path, a repository-relative template output and ordered named selections. A selection can carry `harnesses`, `kinds`, `tools` and `nativeEvents` filters. A file declared by path renders schema 2, so it cannot serve a schema-3 runtime. `reconciliation_file` names the file the standalone relay reconciles through, in the schema its pin reads. |
 | `target_files` | New compositions name a runtime version and ordered subscriber selections. `reconciliation_next` selects a target composition for reconciliation. |
 | `removals` | Each retirement names a subscriber and the authorizing owner task. Move every binding whose file contains that subscriber, and move reconciliation if it uses the file. |
 | `rollback_bases` | Retained subscriber file names and literal commands that still count as donor references. |
@@ -29,10 +29,11 @@ are whole-file renders.
 A file renders in the schema its runtime reads: `{"schema": 2, "subscribers": …}`, or
 `{"schema": 3, "searchPath": …, "subscribers": …}` with `search_path` in it, placeholders
 and all. The list must be one relay accepts once this home is expanded (distinct,
-normalized, without `:`), and the table is refused otherwise. No declared runtime reads
-schema 3 yet, so no rendered file holds the list. The user confirms the list at the
-activation that first uses it; a later edit changes the digest of each file that holds it,
-and so needs a new deployment and new qualification of its routes.
+normalized, without `:`), and the table is refused otherwise. v0.7.0, the
+standalone pin, reads schema 3, so only the `reconcile-v0.7.0` file holds the list. The
+user confirms the list at the activation that first uses it; a later edit changes the
+digest of each file that holds it, and so needs a new deployment and new qualification of
+its routes.
 
 Run `tools/hook-routes check` to validate the table and compare the checkout with its
 live render using the current home. It compares Claude Code's parsed hook values by event and checks
@@ -161,7 +162,8 @@ Static checks use the versions in the records. Host version probes run in
   record with its fresh exact-version proof. Preflight exits 1 on a finding.
 - `tools/hook-routes reconcile-base` prints the live reconciliation file's XDG
   config base. `just relay-reap` uses it. Reverting a cutover restores the
-  previous reconciliation selection with the hook settings.
+  reconciliation selection that cutover moved. The selection follows the standalone pin,
+  so the two revert together.
 
 The bridge can call `relay_runtime.call(package, "project", payload)` with
 `harness`, `event`, raw native JSON text in `raw`, `invokingCwd`, `subscriber`
@@ -192,8 +194,8 @@ An owner allowance becomes `{}`. On a transport failure, agy's own termination
 reasons and positive safe-integer refires allow the turn to end. Other failures
 produce a one-line `continue` reason. Stop loads v0.5.0 and calls the guard once.
 The separate native Stop refresh still heals settings. All three agy relay
-bindings use v0.5.0 and the digest-addressed file shared with Claude Code,
-both Codex homes, and reconciliation.
+bindings use v0.5.0 and the digest-addressed file shared with Claude Code and
+both Codex homes. Reconciliation selects the same subscribers in `reconcile-v0.7.0`.
 
 The activation reference `hq-a83688:agy-owner-activation` reserves a note on
 hq-a83688 for the user's grant. On a candidate branch, the reference alone
@@ -217,7 +219,7 @@ notice after donor-2 was frozen, and donor-2 has no subscriber for it. The line
 has a 5 second timeout. Relay's latency support covers only the measured native
 entries, so with this extra line SessionStart latency is unknown by relay's rule.
 The user accepted this limitation on hq-8185d3. Stop is unaffected. Every other Claude
-Code relay line keeps the shared file, which still serves reconciliation. The
+Code relay line keeps the shared file. The
 Codex homes and the work Claude Code home are unchanged.
 
 The activation reference `hq-a83688:claude-donor-activation` reserves a note on
@@ -279,7 +281,3 @@ differs from the caller's and that proc belongs to it before running any hooks.
 It also uses private mounts and loopback for existing absolute observer argv and
 the fixed capture endpoint. An unavailable namespace prevents a real replay.
 Admission-only checks use the pinned public budget API with a private environment.
-
-`HQ_TEST_RELAY_CANDIDATE`, naming an installed relay package that no runtime pins yet, runs
-the candidate cases of `tools/test_hook_routes_relay.py` and
-`tools/test_hook_routes_equivalence.py`; they skip without it.

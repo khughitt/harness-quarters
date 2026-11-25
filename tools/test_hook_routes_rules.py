@@ -11,6 +11,7 @@ import sys
 import pytest
 
 from hook_routes.table import Binding, Line, load
+from test_hook_routes_relay import shared_table
 
 TABLE = Path(__file__).resolve().parents[1] / "harnesses/hook-routes.toml"
 
@@ -19,7 +20,7 @@ TABLE = Path(__file__).resolve().parents[1] / "harnesses/hook-routes.toml"
 def table(tmp_path):
     from hook_routes.table import RouteState
 
-    today = load(TABLE)
+    today = shared_table()
     file = today.subscriber_files[today.reconciliation_file]
     stop = Binding("Stop", None, (Line(("guard",), command="old-guard"),))
     codex = replace(today.homes["codex"], bindings=(stop,))
@@ -54,7 +55,7 @@ def _transition(table):
     from hook_routes.table import Subscriber, TargetSubscriberFile
 
     live = table.homes["codex"].bindings[0]
-    current = load(TABLE)
+    current = shared_table()
     template = current.subscriber_files[current.reconciliation_file].subscribers[0]
     target = TargetSubscriberFile("v0.5.0", (
         replace(template, name="guard", nativeEvents=["Stop"], kinds=["turn-end"], tools=None),
@@ -108,7 +109,7 @@ def test_nonselecting_argv_uses_the_composition_policy_state(table, prefix):
 def test_stored_argv_in_unbound_live_file_needs_an_owned_state(table, authorized):
     from hook_routes.table import RouteState, Subscriber
 
-    old = load(TABLE)
+    old = shared_table()
     source = old.subscriber_files[old.reconciliation_file]
     entry = replace(source.subscribers[0], name="unowned")
     donor = Path("d", "fixture", "hooks", "held-guard")
@@ -176,7 +177,7 @@ def test_removal_without_owner_refused(table):
 def test_retirement_leaving_containing_file_refused(table, all_moved):
     from hook_routes.table import Removal, RouteState, Subscriber, TargetSubscriberFile
 
-    base = load(TABLE)
+    base = shared_table()
     old = base.subscriber_files[base.reconciliation_file]
     # Both relay lines name the file. Its filter selects the old guard on Stop.
     entry = replace(old.subscribers[0], name="retired", kinds=["turn-end"], nativeEvents=["Stop"], tools=None)
@@ -231,7 +232,7 @@ def test_agy_bridge_allows_hq_transport_and_checks_delegate_paths(table, delegat
     transport = Path("d", "hq", "harnesses", "agy", "hook")
     line = Line(("guard",), command=f"{prefix}{transport}",
                 runtime="v0.5.0", delegates=((delegate, "Stop"),), states={"guard": state})
-    agy = replace(load(TABLE).homes["agy"], bindings=(Binding("Stop", None, (line,)),))
+    agy = replace(shared_table().homes["agy"], bindings=(Binding("Stop", None, (line,)),))
     package = tmp_path / "runtime"
     runtime = replace(table.runtimes["v0.5.0"], script=str(package / "bin/relay.js"))
     table = replace(table, homes={"agy": agy}, runtimes={"v0.5.0": runtime})
@@ -262,7 +263,7 @@ def test_today_table_is_valid():
 def test_reconciliation_move_keeps_reconcile_observers(table, complete):
     from hook_routes.table import TargetSubscriberFile
 
-    today = load(TABLE)
+    today = shared_table()
     old = today.subscriber_files[today.reconciliation_file]
     entries = {entry.name: entry for entry in old.subscribers}
     workers, familiar = entries["familiar-codex-workers"], entries["familiar"]
@@ -320,7 +321,7 @@ def test_render_candidate_accepts_unqualified_slice(table, tmp_path):
 
 
 def test_candidate_cli_writes_manifest_of_review_files(tmp_path):
-    table = load(TABLE)
+    table = shared_table()
     codex = table.homes["codex"]
     index = next(index for index, binding in enumerate(codex.bindings)
                  if binding.event == "Stop" and binding.lines[0].policies == ("claim-guard",))
@@ -361,7 +362,7 @@ def _codex_move(table, *, home="codex", event="Stop", relay=False, change):
 def test_target_cannot_drop_a_live_policy_without_replacement(policy, relay):
     from hook_routes.rules import validate
 
-    table = _codex_move(load(TABLE), relay=relay, change=lambda binding: replace(binding, next=()))
+    table = _codex_move(shared_table(), relay=relay, change=lambda binding: replace(binding, next=()))
     findings = validate(table)
     assert any(item.code == "missing-route" and policy in item.where for item in findings), findings
 
@@ -379,7 +380,7 @@ def test_target_cannot_drop_the_shipped_relay_subscriber(omission):
     from hook_routes.rules import route_status, validate
     from hook_routes.table import TargetSubscriberFile
 
-    table = load(TABLE)
+    table = shared_table()
     source = table.subscriber_files[table.reconciliation_file]
     event = "PreToolUse" if omission == "tools" else "Stop"
     subscriber = "familiar"
@@ -411,7 +412,7 @@ def test_slice_uses_state_and_only_its_own_directives(tmp_path):
     from hook_routes.render import render_candidate, render_live
     from hook_routes.table import Removal, RouteState, Subscriber, TargetSubscriberFile
 
-    table = _codex_move(load(TABLE), change=lambda binding: replace(
+    table = _codex_move(shared_table(), change=lambda binding: replace(
         binding, next=(replace(binding.lines[0], command="unrelated-personal-guard"),),
     ))
     shared = table.subscriber_files[table.reconciliation_file]

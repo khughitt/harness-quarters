@@ -11,7 +11,8 @@ FILES = ['harnesses/claude/settings.json', 'harnesses/codex/hooks.json', 'harnes
          'harnesses/claude/work/settings.json']
 # Hook upgrades have a separate approval gate from the CLI pin, per harness. The v0.5.0
 # cutover (hq-663049) moved every relayed harness together: schema-2 subscriber files are
-# refused by v0.3.0 and schema-1 files by v0.5.0, so one host runs one subscriber schema.
+# refused by v0.3.0 and schema-1 files by v0.5.0, so the hooks run one subscriber schema.
+# The standalone relay reads its own, through the reconciliation file.
 HOOK_VERSIONS = {
     FILES[0]: 'v0.5.0',
     FILES[1]: 'v0.5.0',
@@ -226,3 +227,14 @@ def test_donor_2_template_matches_its_qualification_records():
     assert [json.loads(r.read_text())['sessionMode'] for r in records] == ['interactive', 'non-interactive']
     for record in records:
         assert json.loads(record.read_text())['configDigest'] == sha256(data).hexdigest()
+
+
+def test_reconciliation_file_follows_the_standalone_pin():
+    from hook_routes.table import load
+
+    table = load(ROOT / 'harnesses/hook-routes.toml')
+    source = table.subscriber_files[table.reconciliation_file]
+    pin = json.loads((ROOT / 'relay/package.json').read_text())['dependencies']['relay'].rpartition('#')[2]
+    assert source.runtime == pin
+    # Reaping reaches the observers the hooks reach.
+    assert source.subscribers == table.subscriber_files['shared-v0.5.0-retired-guard'].subscribers
