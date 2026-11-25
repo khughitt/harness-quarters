@@ -4,8 +4,8 @@ Type: guide; document types 1. Install, upgrade and recover the pinned standalon
 runtime and hook images. See [home links](../home-links.md) for launcher ownership
 and [capabilities](../harness-capabilities.md) for native/adapter/policy boundaries.
 
-`relay/package.json` selects v0.6.0; `relay/package-lock.json` fixes its commit to
-`9078727105f06b4a17ccbf177821806d7eed93be`. The declared home launcher resolves to
+`relay/package.json` selects v0.7.0; `relay/package-lock.json` fixes its commit to
+`e1bad200aa51becf88ad36cc832756179e12f6b2`. The declared home launcher resolves to
 `relay/bin/relay`, which reads that pin and runs the versioned installation under
 `$HOME/.local/share/relay/` (falling back to the account's passwd home when
 `HOME` is overridden and `RELAY_INSTALL_ROOT` is unset). Node and npm come from `/usr/bin`.
@@ -21,7 +21,11 @@ version is installed there. Other hosts cannot see this host's worktrees, so run
 
 On each host, `just relay-subscribers` runs `tools/hook-routes deploy live`.
 It installs each subscriber file named by the live route table and its reconciliation
-file. The active base is `~/.config/relay/v0.5.0-<digest-prefix>`. Different bytes
+file. The active hook base is `~/.config/relay/v0.5.0-<digest-prefix>`. The reconciliation
+base is `~/.config/relay/v0.7.0-<digest-prefix>`, because the standalone v0.7.0 refuses
+the hooks' schema-2 file. A pin move to a relay that reads another schema moves
+`reconciliation_file` with it. Deploy that file on each host before merging, or
+`just relay-reap` fails there. Different bytes
 at an existing destination cause a refusal. A cutover keeps the previous base for
 rollback until the user accepts it and confirms its removal; no rollback base is
 retained now. Run `just relay-reap` for reconciliation.
@@ -47,8 +51,9 @@ See [hook routes](../hook-routes.md).
 Schema 2 resolves each subscriber's `argv[0]` on `PATH` and passes later arguments
 literally. A relay that reads schema 3 finds it only in the file's `searchPath`, which hq
 renders from `search_path` in `harnesses/hook-routes.toml` for a runtime declaring
-`subscriber_schema = 3`; that list is also the subscriber's `PATH`. Every installed runtime
-reads schema 2. The active template uses `env` followed by familiar's checkout path
+`subscriber_schema = 3`; that list is also the subscriber's `PATH`. v0.5.0 and v0.6.0 read
+schema 2. v0.7.0 reads schema 3 only.
+The active templates use `env` followed by familiar's checkout path
 and the `observe` command. The ops command guard is retired and no retained
 configuration names it.
 

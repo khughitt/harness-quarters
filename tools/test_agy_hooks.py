@@ -161,11 +161,12 @@ with Path({str(familiar_log)!r}).open("a") as f:
     )
 
     table = load(ROOT / "harnesses/hook-routes.toml")
-    # agy relays through the shared file; the donor-2 file serves only Claude Code SessionStart and Stop.
+    # agy relays through the shared file; the donor-2 file serves only Claude Code SessionStart and Stop,
+    # and the reconciliation file only the standalone relay.
     deployed = deploy(live_files(table, home), home)
     shared = table.subscriber_files["shared-v0.5.0-retired-guard"]
     subscribers = home / ".config/relay" / subscriber_address(shared, subscriber_bytes(table, shared, home), home)
-    assert subscribers in deployed and len(deployed) == 2
+    assert subscribers in deployed and len(deployed) == 3
 
     relay_state = tmp_path / "relay-state"
     relay_state.mkdir(mode=0o700)

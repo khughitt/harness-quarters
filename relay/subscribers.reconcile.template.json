@@ -1,0 +1,124 @@
+{
+  "schema": 3,
+  "searchPath": [
+    "@HOME@/.local/bin",
+    "@HOME@/bin",
+    "@HOME@/.cargo/bin",
+    "/usr/local/bin",
+    "/usr/bin",
+    "/bin"
+  ],
+  "subscribers": [
+    {
+      "name": "familiar",
+      "role": "observer",
+      "registry": "snapshot",
+      "harnesses": [
+        "claude-code",
+        "codex"
+      ],
+      "kinds": [
+        "session-start",
+        "prompt",
+        "before-tool",
+        "activity",
+        "idle",
+        "needs-input",
+        "needs-approval",
+        "turn-end",
+        "turn-error",
+        "reconcile"
+      ],
+      "privateFields": [
+        {
+          "nativeEvent": "Stop",
+          "fields": [
+            "backgroundTasks"
+          ]
+        }
+      ],
+      "argv": [
+        "env",
+        "@HOME@/d/familiar/bin/familiar",
+        "observe"
+      ],
+      "timeoutMs": 2000
+    },
+    {
+      "name": "familiar-codex-workers",
+      "role": "observer",
+      "registry": "snapshot",
+      "harnesses": [
+        "codex"
+      ],
+      "kinds": [
+        "child-start",
+        "child-stop"
+      ],
+      "argv": [
+        "env",
+        "@HOME@/d/familiar/bin/familiar",
+        "observe"
+      ],
+      "timeoutMs": 2000
+    },
+    {
+      "name": "familiar-opencode",
+      "role": "observer",
+      "registry": "snapshot",
+      "harnesses": [
+        "opencode"
+      ],
+      "kinds": [
+        "session-start",
+        "activity",
+        "idle",
+        "needs-approval",
+        "turn-error",
+        "session-end"
+      ],
+      "argv": [
+        "env",
+        "@HOME@/d/familiar/bin/familiar",
+        "observe"
+      ],
+      "timeoutMs": 1000
+    },
+    {
+      "name": "familiar-teardown",
+      "role": "observer",
+      "registry": "snapshot",
+      "harnesses": [
+        "claude-code"
+      ],
+      "kinds": [
+        "session-end"
+      ],
+      "argv": [
+        "env",
+        "@HOME@/d/familiar/bin/familiar",
+        "observe"
+      ],
+      "timeoutMs": 400
+    },
+    {
+      "name": "familiar-agy",
+      "role": "observer",
+      "registry": "snapshot",
+      "harnesses": [
+        "agy"
+      ],
+      "kinds": [
+        "session-start",
+        "before-tool",
+        "turn-end"
+      ],
+      "argv": [
+        "env",
+        "@HOME@/d/familiar/bin/familiar",
+        "observe"
+      ],
+      "timeoutMs": 2000
+    }
+  ]
+}

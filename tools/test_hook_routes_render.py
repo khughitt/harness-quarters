@@ -13,7 +13,7 @@ import pytest
 
 from hook_routes.render import render_live, render_next, splice_claude_hooks, subscriber_bytes
 from hook_routes.table import TargetSubscriberFile, load
-from test_hook_routes_relay import runtime  # noqa: F401  (pytest fixture)
+from test_hook_routes_relay import runtime, shared_table  # noqa: F401  (runtime is a pytest fixture)
 
 ROOT = Path(__file__).resolve().parents[1]
 TABLE = ROOT / 'harnesses/hook-routes.toml'
@@ -69,7 +69,7 @@ def schema_3(table, search_path=('~/.local/bin', '/usr/bin')):
 
 @pytest.mark.parametrize('home, listed', [(None, '@HOME@/.local/bin'), (Path('/h'), '/h/.local/bin')])
 def test_schema_3_runtime_renders_the_search_path(home, listed):
-    table = load(TABLE)
+    table = shared_table()
     source = table.subscriber_files[table.reconciliation_file]
     before = json.loads(subscriber_bytes(table, source, home))
     after = json.loads(subscriber_bytes(schema_3(table), source, home))
@@ -81,7 +81,7 @@ def test_schema_3_runtime_renders_the_search_path(home, listed):
 
 
 def test_a_target_file_keeps_its_runtimes_schema(tmp_path):
-    table = schema_3(load(TABLE))
+    table = schema_3(shared_table())
     source = table.subscriber_files[table.reconciliation_file]
     home = table.homes['codex']
     index, binding = next((i, b) for i, b in enumerate(home.bindings) if b.event == 'UserPromptSubmit' and b.lines[0].kind == 'relay')

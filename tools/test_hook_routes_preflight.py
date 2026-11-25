@@ -7,8 +7,8 @@ import stat
 
 import pytest
 
-from test_hook_routes_relay import qualified_table, runtime, TABLE
-from hook_routes.table import Binding, Line, load
+from test_hook_routes_relay import qualified_table, runtime, shared_table
+from hook_routes.table import Binding, Line
 
 
 def test_deploy_writes_private_digest_addressed_file(tmp_path):
@@ -40,7 +40,7 @@ def test_deploy_refuses_different_bytes(tmp_path):
 
 def today(tmp_path, native=False):
     """A one-binding Claude home holding an unqualified SessionStart relay line on the shared file."""
-    table = load(TABLE)
+    table = shared_table()
     # The personal home's SessionStart line runs the qualified donor-2 file, whose
     # records bind the account HOME. Select the Claude Code SessionStart line that
     # stays on the reconciliation file, which carries only existing-state policies.
@@ -367,7 +367,7 @@ def deployed_host(tmp_path, runtime):
     # The standalone launcher uses the checkout pin independently of the hook's runtime.
     installs = tmp_path / ".local/share/relay"
     installs.mkdir(parents=True)
-    for version in ("v0.5.0", "v0.6.0"):
+    for version in ("v0.5.0", "v0.6.0", "v0.7.0"):
         source = runtime.parents[2] / version
         assert source.is_dir(), f"missing relay installation for preflight: {source}"
         (installs / version).symlink_to(source, target_is_directory=True)
@@ -376,8 +376,8 @@ def deployed_host(tmp_path, runtime):
     guard_path = Path("d", "fixture", "hooks", "guard")
     guard = Subscriber("fixture-guard", "guard", ("env", "/usr/bin/python3", f"~/{guard_path}"), 500)
     state = RouteState("existing", owner="owner-123abc", grant="fixture")
-    reconcile = replace(source, path="~/.config/relay/v0.5.0/relay/subscribers.json", runtime=None,
-                        subscribers=(entry, *source.subscribers))
+    # The standalone relay reads schema 3 only.
+    reconcile = replace(table.subscriber_files["reconcile-v0.7.0"], subscribers=(entry, *source.subscribers))
     files = dict(table.subscriber_files, reconcile=reconcile)
     table = replace(table, reconciliation_file="reconcile", subscriber_files=files,
                     subscribers={**table.subscribers, entry.name: guard},
@@ -426,7 +426,7 @@ def test_preflight_checks_configured_agy_owner_commands(tmp_path, monkeypatch):
     from hook_routes.preflight import run
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("RELAY_INSTALL_ROOT", str(tmp_path / "standalone"))
-    table = load(TABLE)
+    table = shared_table()
     agy = table.homes["agy"]
     bindings = tuple(b for b in agy.bindings if b.lines[0].kind == "bridge")
     table = replace(table, homes={"agy": replace(agy, bindings=bindings)})
@@ -498,7 +498,7 @@ def test_target_agy_session_start_bridge_checks_only_declared_commands(tmp_path,
     line = Line(("claude-profile", "capture-notice"), runtime="v0.6.0", command=f"~/{transport}",
                 delegates=(("lore", "hook", "profile-notice"), ("mindful", "notice", "session-start")),
                 states={name: RouteState("bridge", evidence="fixture") for name in ("claude-profile", "capture-notice")})
-    agy = replace(load(TABLE).homes["agy"], bindings=(Binding("SessionStart", None, (), next=(line,)),))
+    agy = replace(shared_table().homes["agy"], bindings=(Binding("SessionStart", None, (), next=(line,)),))
     table = replace(table, homes={**table.homes, "agy": agy})
     directory = tmp_path / "review"
     for name, data in render_next(table, tmp_path).items():

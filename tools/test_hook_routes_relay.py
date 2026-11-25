@@ -13,6 +13,13 @@ from hook_routes.table import Binding, Line, RouteState, Subscriber, load
 CHECKOUT = Path(__file__).resolve().parents[1]
 TABLE = CHECKOUT / "harnesses/hook-routes.toml"
 MODES = ("interactive", "non-interactive")
+# The file every live hook line but the donor-2 ones runs.
+SHARED = "shared-v0.5.0-retired-guard"
+
+
+def shared_table():
+    """The live table reconciling through the shared hook file, whose runtime reads schema 2."""
+    return replace(load(TABLE), reconciliation_file=SHARED)
 
 
 @pytest.fixture
@@ -28,7 +35,7 @@ def runtime(tmp_path, monkeypatch):
 
 
 def qualified_table(tmp_path, runtime):
-    table = load(TABLE)
+    table = shared_table()
     pin = "v0.5.0"
     table.runtimes[pin] = replace(table.runtimes[pin], script=str(runtime / "bin/relay.js"))
     selection = table.subscriber_files[table.reconciliation_file].subscribers[0]
@@ -68,33 +75,30 @@ def qualified_table(tmp_path, runtime):
 
 
 @pytest.fixture
-def candidate(tmp_path, monkeypatch):
-    """The live table with the unreleased relay behind v0.6.0, the version its package still has."""
-    if not (root := os.environ.get("HQ_TEST_RELAY_CANDIDATE")):
-        pytest.skip("HQ_TEST_RELAY_CANDIDATE names no relay package")
-    package = Path(root)
-    assert (package / "bin/relay.js").is_file(), f"missing relay candidate: {package}"
-    monkeypatch.setenv("HOME", str(tmp_path))
-    lock = json.loads((package.parents[1] / "package-lock.json").read_bytes())
+def schema_3_relay(tmp_path, runtime):
+    """The live table and the installed relay that reads schema 3."""
+    package = runtime.parents[2] / "v0.7.0/node_modules/relay"
+    if not (package / "package.json").is_file():
+        if os.environ.get("HQ_TEST_RELAY_ROOT"):
+            pytest.fail(f"missing required pinned relay test installation: {package}")
+        pytest.skip("relay v0.7.0 is not installed")
     table = load(TABLE)
-    # A tarball's lock entry names no commit; its resolved value identifies the package.
-    table.runtimes["v0.6.0"] = replace(table.runtimes["v0.6.0"], script=str(package / "bin/relay.js"), subscriber_schema=3,
-                                       commit=lock["packages"]["node_modules/relay"]["resolved"])
+    table.runtimes["v0.7.0"] = replace(table.runtimes["v0.7.0"], script=str(package / "bin/relay.js"))
     return table, package
 
 
-def test_candidate_package_passes_the_pin_checks(candidate, tmp_path):
+def test_schema_3_package_passes_the_pin_checks(schema_3_relay, tmp_path):
     from hook_routes.relay_runtime import package_for
-    table, package = candidate
-    assert package_for(table, "v0.6.0", tmp_path) == package
+    table, package = schema_3_relay
+    assert package_for(table, "v0.7.0", tmp_path) == package
 
 
-def test_candidate_loads_the_rendered_schema_3_file(candidate, tmp_path):
+def test_schema_3_relay_loads_the_rendered_file(schema_3_relay, tmp_path):
     from hook_routes.relay_runtime import call
     from hook_routes.render import subscriber_bytes
-    table, package = candidate
+    table, package = schema_3_relay
     for name, source in table.subscriber_files.items():
-        data = subscriber_bytes(table, replace(source, runtime="v0.6.0"), tmp_path)
+        data = subscriber_bytes(table, replace(source, runtime="v0.7.0"), tmp_path)
         config = json.loads(data)
         assert config["schema"] == 3 and config["searchPath"][0] == f"{tmp_path}/.local/bin"
         path = tmp_path / name / "relay/subscribers.json"
@@ -108,17 +112,17 @@ def test_candidate_loads_the_rendered_schema_3_file(candidate, tmp_path):
             call(package, "load", {"path": str(path)})
 
 
-def test_candidate_admits_todays_bindings(candidate, tmp_path):
+def test_schema_3_relay_admits_todays_bindings(schema_3_relay, tmp_path):
     from hook_routes.qualification import admit_binding
     from hook_routes.render import subscriber_bytes
-    table, package = candidate
-    files = {name: replace(source, runtime="v0.6.0") for name, source in table.subscriber_files.items()}
+    table, package = schema_3_relay
+    files = {name: replace(source, runtime="v0.7.0") for name, source in table.subscriber_files.items()}
     bindings = set()
     for _, home, _, binding in table.bindings():
         for line in binding.lines:
             if line.kind == "relay":
                 data = subscriber_bytes(table, files[line.subscriber_file], tmp_path)
-                admit_binding(table, home, binding, replace(line, runtime="v0.6.0"), files, data, package)
+                admit_binding(table, home, binding, replace(line, runtime="v0.7.0"), files, data, package)
                 bindings.add((home.harness, line.relay_event or binding.event, line.outer_ms))
     assert len(bindings) >= 15
 

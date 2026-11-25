@@ -7,7 +7,7 @@ import subprocess
 import pytest
 
 from hook_routes.render import render_live
-from hook_routes.table import load
+from test_hook_routes_relay import shared_table
 
 TABLE = Path(__file__).resolve().parents[1] / "harnesses/hook-routes.toml"
 
@@ -20,7 +20,7 @@ def _ops_donor(name):
 def shared_guard_table():
     from hook_routes.table import Subscriber
 
-    table = load(TABLE)
+    table = shared_table()
     name = table.reconciliation_file
     source = table.subscriber_files[name]
     entry = replace(source.subscribers[0], name="fixture-guard", kinds=["before-tool"], tools=["Bash"])
@@ -70,7 +70,7 @@ def test_rollback_base_counts_until_dropped(shared_guard_table):
 def test_bridge_references_every_delegate():
     from hook_routes.references import donor_references
 
-    table = load(TABLE)
+    table = shared_table()
     agy = table.homes["agy"]
     binding = agy.bindings[0]
     donor = _ops_donor("capture-notice")
@@ -88,7 +88,7 @@ def test_bridge_references_every_delegate():
 def test_today_ops_references(donor, kind, binding):
     from hook_routes.references import donor_references
 
-    refs = donor_references(load(TABLE), _ops_donor(donor))
+    refs = donor_references(shared_table(), _ops_donor(donor))
 
     assert any(ref.kind == kind and binding in ref.where for ref in refs)
 
@@ -96,7 +96,7 @@ def test_today_ops_references(donor, kind, binding):
 def test_agy_notice_bridge_releases_both_donor_references():
     from hook_routes.references import donor_references
 
-    table = load(TABLE)
+    table = shared_table()
     for donor in (_ops_donor("capture-notice"), f"~/{Path('d', 'lore', 'hooks', 'claude-profile')}"):
         refs = donor_references(table, donor)
         assert any(ref.where.startswith("codex:SessionStart") for ref in refs)
@@ -108,7 +108,7 @@ def test_claude_cutover_releases_ops_donor_references(donor):
     # hq-8185d3 moved Claude Code SessionStart and Stop onto the donor-2 relay composition.
     from hook_routes.references import donor_references
 
-    refs = donor_references(load(TABLE), _ops_donor(donor))
+    refs = donor_references(shared_table(), _ops_donor(donor))
     assert not any(ref.where.startswith("claude:") for ref in refs)
     if donor == "claude-sessionstart":
         assert refs == []
@@ -117,12 +117,12 @@ def test_claude_cutover_releases_ops_donor_references(donor):
 def test_claude_posttooluse_donor_has_no_references():
     from hook_routes.references import donor_references
 
-    assert donor_references(load(TABLE), _ops_donor("claude-posttooluse")) == []
+    assert donor_references(shared_table(), _ops_donor("claude-posttooluse")) == []
 
 
 @pytest.fixture
 def codex_base(tmp_path, monkeypatch):
-    table = load(TABLE)
+    table = shared_table()
     home = tmp_path / "home"
     repo = tmp_path / "repo"
     home.mkdir()
@@ -196,7 +196,7 @@ def test_retained_schema_one_commands_survive_without_live_callers():
     from hook_routes.references import donor_references
     from hook_routes.table import RollbackBase
 
-    table = load(TABLE)
+    table = shared_table()
     empty = replace(table.subscriber_files[table.reconciliation_file], subscribers=())
     donors = (_ops_donor("relay-guard"), str(Path("~", "d", "familiar", "bin", "familiar")))
     base = RollbackBase(commands=(f"/usr/bin/python3 {donors[0]}", f"{donors[1]} observe"))
@@ -211,7 +211,7 @@ def test_rollback_donor_path_is_compared_lexically():
     from hook_routes.references import donor_references
     from hook_routes.table import RollbackBase
 
-    table = replace(load(TABLE), rollback_bases={"only": RollbackBase(commands=(
+    table = replace(shared_table(), rollback_bases={"only": RollbackBase(commands=(
         "python3 @HOME@/not-present/../donor", "report --value=unused/../token",
         "python3 scripts/unmade/../guard",
     ))})
@@ -230,5 +230,5 @@ def test_home_separator_in_rollback_reference(tmp_path, monkeypatch, query, reta
     from hook_routes.table import RollbackBase
 
     monkeypatch.setenv("HOME", str(tmp_path))
-    table = replace(load(TABLE), rollback_bases={"only": RollbackBase(commands=(f"python3 {retained}",))})
+    table = replace(shared_table(), rollback_bases={"only": RollbackBase(commands=(f"python3 {retained}",))})
     assert donor_references(table, query) == [Reference("rollback-base", "only:command[0]")]
