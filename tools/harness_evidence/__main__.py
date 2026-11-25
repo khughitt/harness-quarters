@@ -17,6 +17,13 @@ def _root(value: str) -> tuple[str, Path]:
     return harness, Path(path)
 
 
+def _nonnegative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("expected a nonnegative integer")
+    return parsed
+
+
 def _file_facts(place) -> tuple[dict | None, dict | None]:
     """Path facts and the side-input fingerprint from one snapshot of them."""
     from . import discover
@@ -32,7 +39,7 @@ def _discover(args: argparse.Namespace, envelope: dict) -> None:
     from . import discover
 
     roots = discover.roots(args.home, args.root)
-    listing = discover.list_files(roots, None)
+    listing = discover.list_files(roots, args.since_ms)
     for root, entry in zip(roots, listing.roots):
         aliases = []
         for path in listing.aliases:
@@ -86,6 +93,8 @@ def main(argv: list[str] | None = None) -> int:
     discover_parser = commands.add_parser("discover", help="list transcript paths and metadata")
     discover_parser.add_argument("--home", type=Path)
     discover_parser.add_argument("--root", type=_root, action="append")
+    discover_parser.add_argument("--since-ms", type=_nonnegative_int, metavar="NONNEG_INT",
+                                 help="minimum file mtime in Unix milliseconds (inclusive)")
     commands.add_parser("decode", help="decode framed JSON requests from stdin")
     commands.add_parser("header", help="select bounded transcript headers from stdin")
     args = parser.parse_args(argv)

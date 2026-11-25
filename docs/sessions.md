@@ -65,8 +65,8 @@ valid terminal index stops the listing with an error.
 
 The adapters share `Home` and home discovery from `tools/harness_evidence/homes.py`.
 That standalone package also names transcript stores without importing hq or its
-configuration. `tools/harness-evidence discover [--home PATH] [--root HARNESS=PATH]...`
-lists Claude Code, Codex, agy and Pi transcript paths and filesystem metadata as
+configuration. The `tools/harness-evidence discover` command accepts `--home PATH`,
+repeatable `--root HARNESS=PATH` and `--since-ms NONNEG_INT`. It lists Claude Code, Codex, agy and Pi transcript paths and filesystem metadata as
 JSONL under schema version 1 (`root`, `file`, then `discover_end`). Explicit roots replace
 all default roots; supported harness names are `claude-code`, `codex`, `agy` and `pi`. Defaults use
 the shared personal/work homes, including Codex's archived stores, and ignore obs's
@@ -82,8 +82,9 @@ roots are reported; a file that
 vanishes or has unavailable metadata after its name is enumerated retains a file
 object with null stat metadata and its observed state/error. Initial lstat/stat
 failures remain explicit even if a later lookup could succeed; known symlink
-aliases stay excluded from file objects. The listing helper retains candidates with unknown mtime
-when applying a cutoff; the command applies no cutoff.
+aliases stay excluded from file objects. A supplied `--since-ms` keeps files whose
+mtime in Unix milliseconds is at or after the cutoff, plus files with unknown mtime.
+Without the option discovery has no mtime cutoff.
 
 Every discovery file and alias also carries `filename_lookup`: null when no
 supported placed naming convention applies, otherwise sorted unique `session_ids`,
@@ -268,14 +269,18 @@ This profile emits `file_start`, one `index_event` per complete JSON object (key
 `E<byte offset>`), `unparsed` evidence for malformed lines or a partial tail, a final
 cumulative native `coverage`, `file_end`, then `request_end`. The terminal count
 includes every event, unparsed object and coverage object. A partial tail does not
-advance the checkpoint. Valid JSON with invalid native types retains the original
-index adapter's errors. Accept a file only after both terminals and the count have
-been validated. On a late invalidation `file_end.restart` carries a reason and an
+advance the checkpoint. When a native record violates an extraction assumption, the
+file ends with `status:"source_error"`, the adapter's error `type` and `message`,
+the observed offset and count, and null `state`, `restart` and `metadata`.
+Discard the failed file's output. The stream continues with the remaining files and
+`request_end`. Accept a file only after both terminals and the count have been validated. On a late invalidation `file_end.restart` carries a reason and an
 opaque from-zero seed; its `state` is null, so no successful checkpoint is exposed.
 Drain both terminals before retrying from zero with that seed. The transport supports
 this signal; Claude currently has no native restart trigger. Source-open failures
-stay framed with vanished/unreadable status and null state; protocol faults fail the
-request visibly. Each file releases its source handle and output before the next.
+stay framed with vanished/unreadable status and null state. An in-flight short
+read inside the fixed span exits 2 with a diagnostic on stderr. Protocol and in-flight
+I/O faults leave the current file incomplete and fail the request visibly. Each file
+releases its source handle and output before the next.
 
 Events carry recorded and normalized session identity, timestamps, response fragments,
 message origin evidence, ordered text blocks, native tool calls/results, attachment
@@ -466,6 +471,25 @@ compaction; the decoder does not classify it:
 
 Turn ids, token counts and windows pass through unrepaired, as JSON scalars. These reads
 are unwatched dimensions, so `field_presence` and `record_counts` are unchanged.
+
+### Codex meter readings
+
+Decoder v25 adds `rate_limits` to Codex index events, including token counts before
+session metadata. A native reading carries the observed timestamp as Unix milliseconds,
+the credit balance and the percent used in a 10,080-minute window. The primary window
+takes precedence when both windows have that duration. Unrecorded balances or weekly
+percentages are null. A missing reading is null, and a malformed reading carries
+`status:"malformed"` and its reason. Meter reads add no coverage populations.
+
+For a bounded historical scan, set `extract:"meters"` on a decode request. Send
+`files` with `path` and `size` and optional `roots`. Keep `cross_file`, `raw` and
+`text` false and omit `context`. The profile emits `file_start`, zero or more
+`meter_reading` frames keyed by physical line (`M1`, for example), then `file_end`
+for each file and `request_end` for the batch. Readings include a physical line number,
+byte offset, source ref, line hash and native meter values. A relevant line that fails
+JSON parsing or has a malformed meter increments `malformed_lines`; later readings
+still appear. Parseable records without a meter are ignored. The file terminal gives
+the reading count and `ok`, `vanished` or `unreadable` status.
 
 ### agy index events
 

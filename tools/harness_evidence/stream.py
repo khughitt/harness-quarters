@@ -9,7 +9,7 @@ from .lines import Place, UnknownFormat, decode, detect_format, lines, ref, sha2
 from .links import native_links, requested_model
 
 
-from ._protocol import ProtocolError, validate
+from ._protocol import IndexShortRead, ProtocolError, validate
 
 
 def serialized(value, *, canonical=False):
@@ -198,6 +198,10 @@ def objects(request, envelope):
         from .index_stream import objects as index_objects
         yield from index_objects(request, envelope)
         return
+    if request.get("extract") == "meters":
+        from ._meters import objects as meter_objects
+        yield from meter_objects(request, envelope)
+        return
     explicit = request.get("roots")
     roots = discover.roots(explicit=None if explicit is None else [(r["harness"], Path(r["path"])) for r in explicit])
     inherited = {}
@@ -239,7 +243,11 @@ def run(stdin, stdout, stderr, envelope):
         except (ValueError, RecursionError, ProtocolError) as error:
             print("protocol error: " + str(error).replace("\n", " "), file=stderr, flush=True)
             return 2
-        for value in objects(request, envelope):
-            stdout.write(serialized(value) + "\n")
-            stdout.flush()
+        try:
+            for value in objects(request, envelope):
+                stdout.write(serialized(value) + "\n")
+                stdout.flush()
+        except IndexShortRead as error:
+            print(f"protocol error: {error}", file=stderr, flush=True)
+            return 2
     return 0

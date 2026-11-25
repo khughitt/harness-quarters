@@ -61,6 +61,19 @@ def command(tmp_path, source, *, text=True, **overrides):
     return result
 
 
+def source_failure(proc, error_type):
+    assert proc.returncode == 0 and not proc.stderr, proc.stderr
+    rows = [json.loads(line) for line in proc.stdout.splitlines()]
+    assert rows[-1]["object"] == "request_end"
+    end = rows[-2]
+    assert end["object"] == "file_end" and end["status"] == "source_error"
+    assert end["error"]["type"] == error_type and end["error"]["message"]
+    assert end["count"] == len(rows) - 3
+    assert all(end[key] is None for key in ("state", "restart", "metadata"))
+    assert not any(row["object"] == "coverage" for row in rows)
+    return rows
+
+
 def decoded(tmp_path, name, **kw):
     source = FIXTURES / "index" / name
     parent = CONTROLS["cases"].get(name, {}).get("initial_state", {}).get("parent_session")
@@ -297,9 +310,7 @@ def test_native_coverage_matches_frozen_oracle(tmp_path, name):
     source = FIXTURES / "index" / name
     assert hashlib.sha256(source.read_bytes()).hexdigest() == control["sha256"]
     if "error" in control:
-        proc = command(tmp_path, source)
-        assert proc.returncode != 0
-        assert control["error"] in proc.stderr
+        source_failure(command(tmp_path, source), control["error"])
         return
     out = decoded(tmp_path, name)
     coverage = next(o for o in out if o["object"] == "coverage")
@@ -560,7 +571,7 @@ def test_overwritten_invalid_usage_is_opaque_until_old_flush(tmp_path, variant):
     assert rows[-1]["response"]["native"] == turn["native"]
     invalid = "fix1-usage-final-" + variant + ".jsonl"
     proc = command(tmp_path, FIXTURES / "index" / invalid)
-    assert proc.returncode != 0 and CONTROLS["cases"][invalid]["error"] in proc.stderr
+    source_failure(proc, CONTROLS["cases"][invalid]["error"])
 
 
 @pytest.mark.parametrize(
@@ -590,7 +601,7 @@ def test_native_skip_branches_do_not_read_ignored_message_data(tmp_path, name):
         "fix1-system-invalid-message.jsonl",
     ]:
         proc = command(tmp_path, FIXTURES / "index" / invalid)
-        assert proc.returncode != 0 and CONTROLS["cases"][invalid]["error"] in proc.stderr
+        source_failure(proc, CONTROLS["cases"][invalid]["error"])
 
 
 def test_text_disabled_stop_boundary_omits_command_from_whole_response(tmp_path):
@@ -694,10 +705,8 @@ def test_surviving_numeric_overflow_retains_old_flush_outcome(tmp_path, variant)
     old = CONTROLS["cases"][name]
     if "error" in old:
         proc = command(tmp_path, FIXTURES / "index" / name)
-        assert (
-            proc.returncode != 0 and old["error"] == "OverflowError" and old["error"] in proc.stderr
-        )
-        assert "in _flush" in proc.stderr
+        assert old["error"] == "OverflowError"
+        source_failure(proc, "OverflowError")
         return
     row = events(decoded(tmp_path, name))[0]["response"]
     turn = next(item for item in old["rows"] if item["table"] == "turns")
@@ -763,11 +772,9 @@ def test_usage_presence_is_safe_for_invalid_overwritten_fragments(tmp_path):
 @pytest.mark.parametrize("name", ["fix1-usage-final-nested.jsonl", "fix1-usage-final-nonmapping.jsonl", "fix1-usage-final-list.jsonl"])
 def test_usage_presence_does_not_move_final_invalid_failure_earlier(tmp_path, name):
     proc = command(tmp_path, FIXTURES / "index" / name)
-    assert proc.returncode != 0 and CONTROLS["cases"][name]["error"] in proc.stderr
-    out = [json.loads(line) for line in proc.stdout.splitlines()]
+    out = source_failure(proc, CONTROLS["cases"][name]["error"])
     response = events(out)[0]["response"]
     assert response["usage_present"] == {"output": False, "thinking": False}
-    assert not any(v["object"] in {"file_end", "request_end"} for v in out)
 
 
 def test_usage_presence_has_native_provenance_and_no_new_populations(tmp_path):
@@ -1141,3 +1148,29 @@ def test_long_and_non_ascii_diagnostics_round_trip_the_command_route(tmp_path):
 def test_claude_text_free_profile_drops_the_diagnostic(tmp_path):
     result, _ = failure_result(tmp_path, "boom", text=False)
     assert "diagnostic" not in result and result["empty"] is False
+
+
+CLAUDE_PERSISTED_NOTICE = ("<persisted-output>\nOutput too large (30KB). Full output saved to: "
+                           "/x/tool-results/b1.txt\n\nPreview (first 2KB):\nhead")
+
+
+@pytest.mark.parametrize("content,meta,kind,size", [
+    ("plain", {}, "none", None),
+    (CLAUDE_PERSISTED_NOTICE, {"persistedOutputSize": 30749}, "persisted", 30749),
+    (CLAUDE_PERSISTED_NOTICE, {}, "persisted", None),
+    ([{"type": "text", "text": CLAUDE_PERSISTED_NOTICE}], {"persistedOutputSize": 7}, "persisted", 7),
+    ("Exit code 1\nhead\n\n... [4931 characters truncated] ...\n\ntail", {}, "dropped", None),
+    ("cat said " + CLAUDE_PERSISTED_NOTICE, {}, "none", None),
+], ids=["ordinary", "persisted-with-size", "persisted-without-size", "persisted-text-block",
+        "inline-elision", "notice-inside-prose"])
+def test_claude_truncation_matches_original_cases(tmp_path, content, meta, kind, size):
+    path = tmp_path / "result.jsonl"
+    path.write_text(json.dumps({"type": "user", "sessionId": "same", "toolUseResult": meta,
+                                "timestamp": "2026-11-11T23:59:00Z",
+                                "message": {"content": [{"type": "tool_result", "tool_use_id": "x",
+                                                        "content": content}]}}) + "\n")
+    proc = command(tmp_path, path)
+    assert proc.returncode == 0, proc.stderr
+    result, = [result for row in map(json.loads, proc.stdout.splitlines())
+               for result in row.get("results", [])]
+    assert result["truncation"] == {"kind": kind, "original_tokens": None, "original_bytes": size}

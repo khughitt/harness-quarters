@@ -6,14 +6,15 @@ policy and accumulated turn replacement remain outside the decoder.
 import copy
 import hashlib
 import json
+import math
 import posixpath
 import re
 
 from . import labels, index_codex_runs as runs, index_codex_tools as tools
 from . import _index_codex_skills as skills, _index_codex_outcomes as outcomes
 from .index_events import Restart, _at_ms, _size, _join
-from .index_codex_coverage import (COUNTERS, KNOWN_KINDS, WATCHED, APPLIED, UNWATCHED, COMMON_READS, record_kind,
-                                   day_of, count_record, applied, coverage_rows)
+from .index_codex_coverage import (COUNTERS, KNOWN_KINDS, RATE_LIMIT_PATHS, WATCHED, APPLIED, UNWATCHED,
+                                   COMMON_READS, record_kind, day_of, count_record, applied, coverage_rows)
 from .lines import Place, ref, _finite_float, _reject_constant
 
 USAGE = {"cache_read": "cached_input_tokens", "cache_write": "cache_write_input_tokens",
@@ -63,6 +64,7 @@ PROVENANCE = {
     "execution": ["type"], "notifications": ["type"],
     "fork_boundary": ["type"], "turn_end": ["type"],
     "at_ms": ["timestamp", "payload.timestamp"],
+    "rate_limits": ["type", "payload.type", "timestamp", "payload.timestamp", *RATE_LIMIT_PATHS],
     "identity.session": ["payload.id"], "identity.index_session": ["payload.id"],
     "identity.agent": ["payload.id", "payload.thread_source"],
     "identity.parent": ["payload.parent_thread_id", "payload.source.subagent.thread_spawn.parent_thread_id"],
@@ -364,6 +366,59 @@ def _call(payload, cwd):
     return call, arguments, normalization
 
 
+def _meter_number(value, field):
+    if value is None:
+        return None
+    if not isinstance(value, (int, float, str)) or isinstance(value, bool):
+        raise ValueError(f"{field} must be a finite number")
+    try:
+        number = float(value)
+    except (ValueError, OverflowError):
+        raise ValueError(f"{field} must be a finite number") from None
+    if not math.isfinite(number):
+        raise ValueError(f"{field} must be a finite number")
+    return number
+
+
+def codex_rate_limits(record: object) -> dict | None:
+    """Read the native Codex credit balance and weekly limit, independently of usage."""
+    if not isinstance(record, dict) or record.get("type") != "event_msg":
+        return None
+    payload = record.get("payload")
+    if not isinstance(payload, dict) or payload.get("type") != "token_count":
+        return None
+    limits = payload.get("rate_limits")
+    if limits is None:
+        return None
+
+    provenance = {"basis": "native", "rule": "codex_rate_limits"}
+    try:
+        if not isinstance(limits, dict):
+            raise ValueError("rate_limits must be an object")
+        credits = limits.get("credits")
+        if credits is not None and not isinstance(credits, dict):
+            raise ValueError("credits must be an object or null")
+        timestamp = record.get("timestamp") or payload.get("timestamp")
+        if not isinstance(timestamp, str) or not timestamp:
+            raise ValueError("rate_limits requires an ISO timestamp")
+        at_ms = _at_ms(timestamp)
+        balance = _meter_number(credits.get("balance") if credits is not None else None, "balance")
+        weekly = None
+        for name in ("primary", "secondary"):
+            window = limits.get(name)
+            if window is None:
+                continue
+            if not isinstance(window, dict):
+                raise ValueError(f"{name} must be an object or null")
+            if window.get("window_minutes") == 10080:
+                weekly = _meter_number(window.get("used_percent"), "used_percent")
+                break
+    except (ValueError, OverflowError, OSError) as error:
+        return {"status": "malformed", "reason": str(error), **provenance}
+    return {"status": "ok", "at_ms": at_ms, "balance": balance,
+            "weekly_used_percent": weekly, **provenance}
+
+
 def extract(lines, state, *, place: Place, text: bool):
     """Yield independent physical facts and cumulative native coverage."""
     state.setdefault("usage_source", "none")
@@ -413,6 +468,7 @@ def extract(lines, state, *, place: Place, text: bool):
         count_record(state, session, day, native_kind, native_kind in KNOWN_KINDS, record, WATCHED)
         event = {"object": "index_event", **position, "native_kind": native_kind,
                  "identity": identity, "at_ms": at_ms, "eligible": session is not None,
+                 "rate_limits": codex_rate_limits(record),
                  "response": None, "flush_response": False, "message": None, "context": None,
                  "calls": [], "results": [], "injections": [], "notifications": [],
                  "compaction": None, "interruption": None, "fork_boundary": None, "turn_end": None,

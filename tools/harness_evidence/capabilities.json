@@ -1,13 +1,14 @@
 {
  "built_from": {
   "catalogue_sha256": "77d9bd48145c700ea1070b268740153e5ca4f60d310794fe43d1fc2042206e47",
-  "index_catalogue_sha256": "f2c789ffa479f92b1cebf2be3e8c664fb8caf67befad7bfa20d473bbab1ae6a4",
+  "index_catalogue_sha256": "d77c156529eac9f3007ff6fcc5031b4ce5ca52989f7ecc126b5c22370359bafd",
   "index_samples": {
    "codex-basic.jsonl": "a7238f2c4cc4903f0247967deb9b95360302563cbf315624ae92ac2cb588fe76",
    "codex-compaction.jsonl": "acfb33d93e23fcafa976b624cf251f4305b315409fcc78f43bb779a2d109ab5d",
    "codex-context.jsonl": "dcbe4630c1b00f0afc13d26e20c08d7ee5e37eb562204828d5204872194135d8",
    "codex-execution.jsonl": "210585b77ecc3ed7da3b06146a0db214d98d11aa3922cd54dc1f6bb15ec50191",
-   "codex-failure.jsonl": "890705ea02a8f63add0eaff97168483b726875361f9eec4e10c8d12917623cdd"
+   "codex-failure.jsonl": "890705ea02a8f63add0eaff97168483b726875361f9eec4e10c8d12917623cdd",
+   "codex-meters.jsonl": "c5822b09ba6ae37cca50ef3a4cdbef72de537e210f7aa15c979d8f5c2ffeddcd"
   },
   "samples": {
    "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000001/.system_generated/logs/transcript_full.jsonl": "665c7874fd0d6fd14d98b5d65ab52c6aa0257d634231a80d166a2ddea6b0eb54",
@@ -256,7 +257,7 @@
    "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl": "30b550b6f035815a4123c8a8fd18fbbf7059ec89c04b0749ecda738e24b2fde3"
   }
  },
- "decoder_version": "24",
+ "decoder_version": "25",
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
   "agy": {
@@ -3969,6 +3970,24 @@
       "payload.phase"
      ]
     },
+    "rate_limits": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.rate_limits",
+      "payload.rate_limits.credits",
+      "payload.rate_limits.credits.balance",
+      "payload.rate_limits.primary",
+      "payload.rate_limits.primary.used_percent",
+      "payload.rate_limits.primary.window_minutes",
+      "payload.rate_limits.secondary",
+      "payload.rate_limits.secondary.used_percent",
+      "payload.rate_limits.secondary.window_minutes",
+      "payload.timestamp",
+      "payload.type",
+      "timestamp",
+      "type"
+     ]
+    },
     "readable_text": {
      "coverage_keys": [],
      "provenance": [
@@ -4524,6 +4543,17 @@
      "event_msg:task_started": {
       "payload.turn_id": "dimension"
      },
+     "event_msg:token_count": {
+      "payload.rate_limits": "dimension",
+      "payload.rate_limits.credits": "dimension",
+      "payload.rate_limits.credits.balance": "dimension",
+      "payload.rate_limits.primary": "dimension",
+      "payload.rate_limits.primary.used_percent": "dimension",
+      "payload.rate_limits.primary.window_minutes": "dimension",
+      "payload.rate_limits.secondary": "dimension",
+      "payload.rate_limits.secondary.used_percent": "dimension",
+      "payload.rate_limits.secondary.window_minutes": "dimension"
+     },
      "event_msg:turn_started": {
       "payload.turn_id": "dimension"
      },
@@ -5040,6 +5070,7 @@
        "origin.unrecognized_tag.joined",
        "origin.unrecognized_tag.lead",
        "phase",
+       "rate_limits",
        "readable_text",
        "response.id",
        "response.native",
@@ -5078,6 +5109,7 @@
       "index:codex-basic.jsonl",
       "index:codex-execution.jsonl",
       "index:codex-failure.jsonl",
+      "index:codex-meters.jsonl",
       "origin/codex-agents_md.jsonl",
       "origin/codex-child-prompt.jsonl",
       "origin/codex-collaboration_mode.jsonl",

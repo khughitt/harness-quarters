@@ -735,7 +735,7 @@ def test_direct_provenance_changes_expand_to_frozen_full_oracle(tmp_path, route)
     command_revision = revision() if route == "command" else None
     pending = []
     def check_command(batch):
-        requests = copy.deepcopy([req for req, _, _ in batch])
+        requests = copy.deepcopy([req for req, _ in batch])
         for req in requests:
             for file in req["files"]:
                 if file.get("state"):
@@ -743,15 +743,9 @@ def test_direct_provenance_changes_expand_to_frozen_full_oracle(tmp_path, route)
         result = subprocess.run([str(TOOLS / "harness-evidence"), "decode"],
                                 input="".join(json.dumps(req) + "\n" for req in requests),
                                 text=True, capture_output=True, env=environment(tmp_path), timeout=120)
-        error = batch[-1][2]
-        assert (result.returncode != 0) == bool(error), result.stderr
-        if error:
-            last_error = result.stderr.splitlines()[-1]
-            assert last_error.split(":", 1)[0] == error["type"]
-            if error["message"].startswith("Claude "):
-                assert last_error == error["type"] + ": " + error["message"]
+        assert result.returncode == 0 and not result.stderr, result.stderr
         actual = normalize_oracle_wire([json.loads(line) for line in result.stdout.splitlines()])
-        expected = [v for _, rows, _ in batch for v in normalize_oracle_wire(rows)]
+        expected = [v for _, rows in batch for v in normalize_oracle_wire(rows)]
         assert len(actual) == len(expected)
         for left, right in zip(actual, expected):
             assert left == right, {key: (left.get(key), right.get(key))
@@ -769,15 +763,17 @@ def test_direct_provenance_changes_expand_to_frozen_full_oracle(tmp_path, route)
                                  size=old["size"], state=state), text=case["text"],
                           roots=[{"harness": "claude-code", "path": "/oracle/.claude/projects"}])
             req["id"] = number
-            rows = []
-            def consume():
-                rows.extend(stream.objects(req, ENVELOPE))
+            rows = read(req)
             if old["error"]:
-                with oracle_error(old["error"]):
-                    consume()
-                assert not any(v["object"] in {"file_end", "request_end"} for v in rows)
+                terminal = rows[-2]
+                assert terminal["status"] == "source_error"
+                assert all(terminal[key] is None for key in ("state", "restart", "metadata"))
+                assert terminal["error"]["type"] == old["error"]["type"]
+                assert terminal["error"]["message"]
+                if old["error"]["message"].startswith("Claude "):
+                    assert terminal["error"]["message"] == old["error"]["message"]
             else:
-                consume()
+                assert rows[-2]["status"] == "ok"
                 state = copy.deepcopy(rows[-2]["state"])
                 native = {**state["index"]["native"], "next_line": state["next_line"],
                           "next_offset": state["next_offset"]}
@@ -792,16 +788,10 @@ def test_direct_provenance_changes_expand_to_frozen_full_oracle(tmp_path, route)
                                 {"file_start", "file_end", "request_end"}],
                                rows[0]["provenance_defaults"]) == old["rows"]
             if route == "command":
-                if old["error"]:
-                    if pending:
-                        check_command(pending)
-                        pending.clear()
-                    check_command([(req, rows, old["error"])])
-                else:
-                    pending.append((req, rows, None))
-                    if len(pending) == 64:
-                        check_command(pending)
-                        pending.clear()
+                pending.append((req, rows))
+                if len(pending) == 64:
+                    check_command(pending)
+                    pending.clear()
     if pending:
         check_command(pending)
     assert number == 9552
@@ -1308,3 +1298,72 @@ def test_native_class_spoofed_scalar_fails_literal_framing(monkeypatch):
     monkeypatch.setattr(index_events, "_identity_subagent", supplied)
     with pytest.raises(stream.ProtocolError, match="basis, rule, ref or revision"):
         read(request(source(FIXTURES / "index/ownership.jsonl")))
+
+
+@pytest.mark.parametrize("bad,error_type", [
+    ([1], "AttributeError"),
+    ({"type": "event_msg", "timestamp": "yesterday"}, "ValueError"),
+    ({"type": "event_msg", "timestamp": 17}, "AttributeError"),
+    ({"type": "event_msg", "timestamp": "yesterday",
+      "payload": {"type": "token_count", "rate_limits": {}}}, "ValueError"),
+    ({"type": "event_msg", "payload": "s"}, "AttributeError"),
+    ({"type": "token_usage_record", "payload": {"usage": {"input_tokens": "1"}}}, "TypeError"),
+    ({"type": "response_item", "payload": {"type": "message", "role": "user",
+                      "content": [{"type": "input_text", "text": 5}]}}, "TypeError"),
+    ({"type": "response_item", "payload": {"type": "message", "role": "user",
+                      "content": [{"type": "input_text", "text": "\ud800"}]}}, "UnicodeEncodeError"),
+    ({"type": "event_msg", "payload": {"type": "token_count",
+                      "info": {"last_token_usage": [1]}}}, "TypeError"),
+    ({"type": "response_item", "payload": {"type": "function_call", "call_id": "call",
+                      "name": "exec_command", "arguments": "[" * 100_000 + "]" * 100_000}}, "RecursionError"),
+], ids=["array", "bad-timestamp", "integer-timestamp", "bad-meter-timestamp", "string-payload", "string-tokens",
+        "integer-message-text", "lone-surrogate", "nonobject-last-usage", "nested-arguments"])
+def test_codex_source_error_preserves_next_file(tmp_path, bad, error_type):
+    first, second = tmp_path / "first.jsonl", tmp_path / "second.jsonl"
+    meta = b'{"type":"session_meta","payload":{"id":"same-session"}}\n'
+    first.write_bytes(meta + (json.dumps(bad) + "\n").encode())
+    second.write_bytes(meta)
+    roots = [{"harness": "codex", "path": str(tmp_path)}]
+    req = request(source(first), source(second), roots=roots)
+    proc = subprocess.run([str(TOOLS / "harness-evidence"), "decode"],
+                          input=json.dumps(req) + "\n", text=True, capture_output=True,
+                          env=environment(tmp_path), timeout=60)
+    assert proc.returncode == 0, proc.stderr
+    assert not proc.stderr
+    rows = [json.loads(line) for line in proc.stdout.splitlines()]
+    assert [row["object"] for row in rows] == ["file_start", "index_event", "file_end",
+                                              "file_start", "index_event", "coverage",
+                                              "file_end", "request_end"]
+    bad_end, good_end = rows[2], rows[-2]
+    assert bad_end["status"] == "source_error" and bad_end["offset"] == first.stat().st_size
+    assert bad_end["count"] == 1
+    assert bad_end["state"] is bad_end["restart"] is bad_end["metadata"] is None
+    assert bad_end["error"].keys() == {"type", "message"}
+    assert bad_end["error"]["type"] == error_type and bad_end["error"]["message"]
+    assert rows[4]["identity"]["session"] == "same-session"
+    assert good_end["status"] == "ok" and good_end["count"] == 2
+    assert rows[-1]["files"] == 2
+
+
+def test_decode_short_read_exits_two_without_a_file_terminal(tmp_path):
+    from io import StringIO
+    from harness_evidence.__main__ import main
+    import sys
+
+    path = tmp_path / "truncated"
+    path.write_bytes(b"{}\n{}\n")
+    req = request(source(path))
+
+    class Output(StringIO):
+        def write(self, line):
+            if json.loads(line)["object"] == "file_start":
+                path.write_bytes(b"{}\n{")
+            return super().write(line)
+
+    from unittest.mock import patch
+    out, err = Output(), StringIO()
+    with patch.object(sys, "stdin", StringIO(json.dumps(req) + "\n")), \
+            patch.object(sys, "stdout", out), patch.object(sys, "stderr", err):
+        assert main(["decode"]) == 2
+    assert "short read within index fixed span" in err.getvalue()
+    assert [json.loads(line)["object"] for line in out.getvalue().splitlines()] == ["file_start", "index_event"]

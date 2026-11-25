@@ -145,7 +145,7 @@ def test_discovery_path_facts_cover_alias_names_without_opening_bytes(tmp_path, 
     def forbidden(*args, **kwargs):
         raise AssertionError('filename discovery must never open transcript bytes')
     monkeypatch.setattr(Path, 'open', forbidden)
-    _discover(argparse.Namespace(home=None, root=[('claude-code', root)]), {})
+    _discover(argparse.Namespace(home=None, root=[('claude-code', root)], since_ms=None), {})
     output = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert output[-1] == {'object': 'discover_end', 'roots': 1, 'files': 1}
     assert output[1]['filename_lookup']['session_ids'] == ['P']

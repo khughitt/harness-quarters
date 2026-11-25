@@ -152,7 +152,7 @@ def undeclared_fields(out, defaults):
             facts = {key: value[key] for key in ("native_kind", "at_ms", "eligible", "flush_response",
                 "identity", "context", "response", "message", "calls", "injections",
                 "execution", "notifications", "compaction", "interruption", "fork_boundary", "turn_end",
-                "turn", "occupancy")}
+                "turn", "occupancy", "rate_limits")}
             for field in leaves(facts, ""):
                 if value.get(field) is None and field in {"context", "response", "message", "turn", "occupancy"}:
                     continue
@@ -263,7 +263,7 @@ def undeclared_reads(monkeypatch, source):
 
 
 @pytest.mark.parametrize("sample", ["codex-basic.jsonl", "codex-context.jsonl", "codex-execution.jsonl",
-                                    "codex-compaction.jsonl", "codex-failure.jsonl"])
+                                    "codex-compaction.jsonl", "codex-failure.jsonl", "codex-meters.jsonl"])
 def test_basic_native_reads_are_declared_without_parent_wildcards(monkeypatch, sample):
     """Original support.tracing read audit, over this step's implemented controls."""
     from harness_evidence import index_codex_coverage as cv
@@ -516,10 +516,10 @@ def test_unexpected_compaction_types_fail_the_file_and_are_not_malformed_lines(t
     proc = subprocess.run([str(TOOLS / "harness-evidence"), "decode"],
                           input=json.dumps(request(source)) + "\n", text=True,
                           capture_output=True, timeout=60, env=environment(tmp_path))
-    assert proc.returncode != 0
-    assert message in proc.stderr
-    assert not any(json.loads(line).get("object") in ("unparsed", "coverage", "file_end")
-                   for line in proc.stdout.splitlines())
+    from test_harness_evidence_index import source_failure
+    rows = source_failure(proc, "TypeError")
+    assert rows[-2]["error"]["message"] == f"Codex compacted {message}"
+    assert not any(row["object"] == "unparsed" for row in rows)
 
 
 def test_own_marks_events_of_the_files_first_session_meta_thread():
@@ -582,3 +582,87 @@ def test_occupancy_refuses_a_token_count_usage_that_is_not_an_object(last):
     with pytest.raises(TypeError, match="^Codex token_count last_token_usage is not an object$"):
         native([META, record("token_usage_record", {"usage": {}}),
                 token_count(last_token_usage=last, model_context_window=1)])
+
+
+def meter(rate_limits, timestamp="2026-09-04T09:38:28.000Z"):
+    return record("event_msg", {"type": "token_count", "rate_limits": rate_limits}, timestamp)
+
+
+@pytest.mark.parametrize("rate_limits,want", [
+    ({"credits": {"balance": "3.5"}, "primary": {"window_minutes": 10080, "used_percent": 15},
+      "secondary": {"window_minutes": 300, "used_percent": 7}}, (3.5, 15.0)),
+    ({"credits": {"balance": 0}, "primary": {"window_minutes": 300, "used_percent": 10},
+      "secondary": {"window_minutes": 10080, "used_percent": 18.5}}, (0.0, 18.5)),
+    ({"primary": {"window_minutes": 300, "used_percent": 10}}, (None, None)),
+    ({"credits": None, "primary": None, "secondary": None}, (None, None)),
+])
+def test_codex_meters_are_emitted_even_before_session_metadata(rate_limits, want):
+    raw = meter(rate_limits)
+    rows, _ = native([raw, META, raw])
+    for event, eligible in [(rows[0], False), (rows[2], True)]:
+        assert event["eligible"] is eligible
+        assert event["rate_limits"] == {"status": "ok", "at_ms": 1788514708000,
+                                        "balance": want[0], "weekly_used_percent": want[1],
+                                        "basis": "native", "rule": "codex_rate_limits"}
+    assert rows[1]["rate_limits"] is None
+
+
+def test_codex_meter_uses_payload_timestamp_when_record_timestamp_is_absent():
+    raw = meter({})
+    raw["payload"]["timestamp"] = raw.pop("timestamp")
+    rows, _ = native([raw])
+    assert rows[0]["rate_limits"]["at_ms"] == 1788514708000
+    assert rows[0]["at_ms"] == 1788514708000
+
+
+@pytest.mark.parametrize("rate_limits,timestamp", [
+    ([], "2026-09-04T09:38:28.000Z"), ({"credits": []}, "2026-09-04T09:38:28.000Z"),
+    ({"credits": {"balance": True}}, "2026-09-04T09:38:28.000Z"),
+    ({"credits": {"balance": "NaN"}}, "2026-09-04T09:38:28.000Z"),
+    ({"credits": {"balance": "none"}}, "2026-09-04T09:38:28.000Z"),
+    ({"secondary": {"window_minutes": 10080, "used_percent": False}}, "2026-09-04T09:38:28.000Z"),
+    ({"secondary": {"window_minutes": 10080, "used_percent": "Infinity"}}, "2026-09-04T09:38:28.000Z"),
+    ({}, None), ({}, ""),
+])
+def test_codex_meter_defects_are_malformed_readings(rate_limits, timestamp):
+    raw = meter(rate_limits, timestamp)
+    if timestamp is None:
+        del raw["timestamp"]
+    rows, _ = native([raw])
+    reading = rows[0]["rate_limits"]
+    assert reading.keys() == {"status", "reason", "basis", "rule"}
+    assert reading["status"] == "malformed" and reading["reason"]
+    assert reading["basis"] == "native" and reading["rule"] == "codex_rate_limits"
+
+
+def test_codex_meter_parser_ignores_non_meter_records_and_rejects_nonfinite_numbers():
+    from harness_evidence import index_codex
+
+    for raw in (["rate_limits"], {"type": "event_msg", "payload": "s"},
+                record("event_msg", {"type": "other", "rate_limits": {}}), meter(None)):
+        assert index_codex.codex_rate_limits(raw) is None
+    for timestamp in ("yesterday", 17):
+        assert index_codex.codex_rate_limits(meter({}, timestamp))["status"] == "malformed"
+    for limits in ({"credits": {"balance": float("inf")}},
+                   {"primary": {"window_minutes": 10080, "used_percent": float("nan")}}):
+        assert index_codex.codex_rate_limits(meter(limits))["status"] == "malformed"
+
+
+def test_codex_meter_native_reads_are_declared_without_adding_coverage(monkeypatch):
+    from harness_evidence import index_codex, index_codex_coverage
+    raw = meter({"credits": {"balance": "3.5"}, "primary": {"window_minutes": 300, "used_percent": 7},
+                 "secondary": {"window_minutes": 10080, "used_percent": 16}})
+    item = record("event_msg", {"type": "item_completed", "item": {
+        "type": "CommandExecution", "id": "command-1", "command": "true",
+        "aggregated_output": "", "exit_code": 0, "process_id": "123"},
+        "started_at_ms": 1788514708000, "completed_at_ms": 1788514709000})
+    plain = copy.deepcopy(raw)
+    del plain["payload"]["rate_limits"]
+    before, _ = native([META, item, plain])
+    after, _ = native([META, item, raw])
+    assert before[-1] == after[-1]
+    assert {row["field"] for row in before[-1]["fields"] if row["record_kind"] == "applied:command_item"} >= {
+        "input:id", "input:exit_code", "input:command", "input:output"}
+    assert index_codex.provenance_defaults()["rate_limits"]["rule"] == "codex_rate_limits"
+    assert index_codex_coverage.UNWATCHED["event_msg:token_count"]["payload.rate_limits"] == "dimension"
+    assert undeclared_reads(monkeypatch, lines_of([META, raw, item])) == []

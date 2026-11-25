@@ -1698,7 +1698,7 @@ class DispatchCandidates(unittest.TestCase):
                         self.assertEqual(call['input_text'], str(native))
 
 
-def test_metadata_absence_and_late_fault_never_publish_partial_terminals(tmp_path):
+def test_metadata_absence_and_late_fault_never_publish_checkpoint(tmp_path):
     import subprocess
     from test_harness_evidence_index_codex import TOOLS
     source = tmp_path / 'control.jsonl'
@@ -1721,9 +1721,9 @@ def test_metadata_absence_and_late_fault_never_publish_partial_terminals(tmp_pat
                                              'name':'exec_command','arguments':'{"cmd":42}'}))
     proc = subprocess.run([str(TOOLS/'harness-evidence'),'decode'], input=json.dumps(request(source))+'\n',
         text=True,capture_output=True,timeout=30,env=environment(tmp_path))
-    assert proc.returncode != 0
-    objects = [json.loads(line)['object'] for line in proc.stdout.splitlines()]
-    assert 'index_event' in objects and 'file_end' not in objects and 'request_end' not in objects
+    from test_harness_evidence_index import source_failure
+    rows = source_failure(proc, "TypeError")
+    assert any(row["object"] == "index_event" for row in rows)
 
 
 from harness_evidence import index_codex_coverage as cv

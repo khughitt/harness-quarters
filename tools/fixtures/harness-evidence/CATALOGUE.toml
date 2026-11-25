@@ -42,3 +42,11 @@ provenance = "synthetic"
 profile = "index"
 source = "hq-0e4fa3: failure text and command identity facts"
 control = "codex-conformance.json"
+
+[[sample]]
+path = "codex-meters.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+source = "ops-6ce094: native Codex rate-limit declarations"

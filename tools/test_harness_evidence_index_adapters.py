@@ -4,7 +4,7 @@ The golden digests in fixtures/harness-evidence/claude-index-digests-3e346e26.js
 computed at hq 3e346e26, the Stage 3a base, before the registry existed. Every catalogued
 index sample is framed through index_stream.objects with text on and off. A sample that
 completes is digested whole; a catalogued index_error sample is checked for its exception
-and the digest of what it emitted before raising. Only transport values that depend on the
+and the digest of its pre-error stream. Only transport values that depend on the
 checkout or host are normalized; native evidence is compared as emitted.
 
 Regenerate (only at a deliberate behaviour change, never to make this test pass):
@@ -134,7 +134,7 @@ def project(obj: dict) -> tuple[dict, list]:
 
 
 def frame(path: Path, text: bool):
-    """Yield framed objects for one file; the caller collects until any raise."""
+    """Yield framed objects for one file."""
     info = path.stat()
     request = {"id": 1, "extract": "index", "roots": [], "cross_file": False, "text": text,
                "raw": False, "files": [{"path": str(path), "size": info.st_size,
@@ -151,14 +151,18 @@ def observe(normalize: Normalizer):
         name = sample["path"]
         path = CATALOGUE.parent / name
         for text in (True, False):
-            raw, error = [], None
-            try:
-                for obj in frame(path, text):
-                    raw.append(obj)
-            except Exception as raised:  # noqa: BLE001 - the catalogue names the expected type
-                error = raised
+            raw = list(frame(path, text))
+            terminal = raw[-2]
+            assert terminal["object"] == "file_end" and raw[-1]["object"] == "request_end"
+            assert terminal["count"] == len(raw) - 3
+            error = None
+            if terminal["status"] == "source_error":
+                error = terminal["error"]["type"]
+                assert terminal["error"]["message"]
+                assert all(terminal[key] is None for key in ("state", "restart", "metadata"))
+                raw = raw[:-2]  # The frozen oracle contains the prefix before source_error framing.
             emitted = []
-            for obj in raw:  # Projection runs outside the decode so its faults are not samples'.
+            for obj in raw:
                 obj, gone = project(obj)
                 if name not in ADDED_SAMPLES:  # An added sample's values are its own tests'.
                     removed.extend(gone)
@@ -167,8 +171,7 @@ def observe(normalize: Normalizer):
             if error is None:
                 completing.setdefault(name, {})[mode] = canonical(emitted)
             else:
-                failing.setdefault(name, {})[mode] = {"type": type(error).__name__,
-                                                      "prefix": canonical(emitted)}
+                failing.setdefault(name, {})[mode] = {"type": error, "prefix": canonical(emitted)}
     return completing, failing, removed
 
 
@@ -339,3 +342,20 @@ assert all(module.__name__.startswith(name + '.') for module in adapters.values(
                             cwd=tmp_path, env=environment(tmp_path), capture_output=True,
                             text=True, timeout=30)
     assert result.returncode == 0, result.stderr
+
+
+def test_rate_limits_are_absent_on_non_codex_events():
+    catalogue = tomllib.loads(CATALOGUE.read_text(encoding="utf-8"))["sample"]
+    envelope = {"schema": SCHEMA, "decoder": {"version": DECODER_VERSION, "revision": "test"}}
+    for harness in ("claude-code", "agy", "pi"):
+        sample = next(s for s in catalogue if s["harness"] == harness and s.get("profile") == "index")
+        path = CATALOGUE.parent / sample["path"]
+        root = next(parent for parent in path.parents if parent.name == "brain") if harness == "agy" else path.parent
+        info = path.stat()
+        req = {"id": 1, "extract": "index", "roots": [{"harness": harness, "path": str(root)}],
+               "files": [{"path": str(path), "size": info.st_size,
+                          "identity": {"device": info.st_dev, "inode": info.st_ino}}]}
+        rows = list(index_stream.objects(req, envelope))
+        events = [row for row in rows if row["object"] == "index_event"]
+        assert events and all("rate_limits" not in event for event in events)
+        assert "rate_limits" not in rows[0]["provenance_defaults"]

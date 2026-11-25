@@ -7,6 +7,10 @@ class ProtocolError(Exception):
     """The request, rather than a source file, violates the wire contract."""
 
 
+class IndexShortRead(ProtocolError):
+    """A held index source stopped supplying bytes within its declared span."""
+
+
 def _fields(value, allowed, required=()):
     if not isinstance(value, dict) or value.keys() - set(allowed) or set(required) - value.keys():
         raise ProtocolError("invalid object fields")
@@ -29,14 +33,19 @@ def validate(value):
         raise ProtocolError("id must be an integer")
     if not isinstance(value["files"], list):
         raise ProtocolError("files must be an array")
-    index = value.get("extract") == "index"
-    if "extract" in value and not index:
+    profile = value.get("extract")
+    index = profile == "index"
+    meters = profile == "meters"
+    if "extract" in value and not (index or meters):
         raise ProtocolError("unsupported extraction profile")
     if index and (value.get("cross_file", False) or value.get("raw", False) or value.get("context")):
         raise ProtocolError("index extraction requires cross_file:false, raw:false and no context")
+    if meters and any(value.get(key, False) for key in ("cross_file", "raw", "text", "context")):
+        raise ProtocolError("meters extraction requires cross_file:false, raw:false, text:false and no context")
     for file in value["files"]:
-        allowed = {"path", "read_path", "size", "state"} | ({"identity"} if index else set())
-        _fields(file, allowed, {"path", "size"} | ({"identity"} if index else set()))
+        required = {"path", "size", "identity"} if index else {"path", "size"}
+        allowed = required if meters else required | {"read_path", "state"}
+        _fields(file, allowed, required)
         if index:
             _fields(file["identity"], {"device", "inode"}, {"device", "inode"})
             for number in file["identity"].values():

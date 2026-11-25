@@ -9,7 +9,7 @@ from pathlib import Path
 from . import discover, index_adapters
 from .index_events import _factor_provenance, _check_proof_change, _own_proof_changes
 from .lines import Place
-from ._protocol import ProtocolError, validate
+from ._protocol import IndexShortRead, ProtocolError, validate
 
 
 def _plain_declaration(proof):
@@ -162,7 +162,7 @@ def _file(source, number, roots, request, envelope):
                 remaining = source["size"] - offset
                 raw = handle.readline(remaining)
                 if not raw or not raw.endswith(b"\n") and len(raw) < remaining:
-                    raise ProtocolError("short read within index fixed span")
+                    raise IndexShortRead("short read within index fixed span")
                 if raw.endswith(b"\n"):
                     digest.update(raw)
                 yield offset, raw
@@ -170,7 +170,20 @@ def _file(source, number, roots, request, envelope):
 
         count, restart = 0, None
         try:
-            for value in adapter.extract(physical_lines(), state, place=place, text=request.get("text", False)):
+            native = iter(adapter.extract(physical_lines(), state, place=place, text=request.get("text", False)))
+            while True:
+                try:
+                    value = next(native)
+                except StopIteration:
+                    break
+                except (ProtocolError, adapter.Restart, OSError):
+                    raise
+                except Exception as error:
+                    yield {**base, "object": "file_end", "key": "end", "status": "source_error",
+                           "error": {"type": type(error).__name__, "message": str(error)},
+                           "offset": state["next_offset"], "count": count,
+                           "state": None, "restart": None, "metadata": None}
+                    return
                 event = {**base, **value, "harness_version": value.get("identity", {}).get("version")}
                 if event["object"] == "index_event":
                     event["provenance"] = encode_provenance(event)

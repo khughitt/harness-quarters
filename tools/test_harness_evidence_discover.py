@@ -470,3 +470,40 @@ def test_index_filename_claim_preserves_strict_original_names():
         claim = api().filename_identity('codex', Path(name))
         assert claim['index_thread'] == expected
         assert claim['thread'] == (THREAD.upper() if name == f'rollout-time-{THREAD.upper()}.jsonl' else THREAD)
+
+
+def test_discover_since_ms_keeps_boundary_and_unknown_mtime(tmp_path, monkeypatch, capsys):
+    from harness_evidence.__main__ import main
+
+    root = tmp_path / "sessions"
+    root.mkdir()
+    old, at_cutoff, newer, unreadable = (root / f"{name}.jsonl" for name in
+                                        ("old", "at-cutoff", "newer", "unreadable"))
+    for path, ns in [(old, 999_999_999), (at_cutoff, 1_000_000_000),
+                     (newer, 1_001_000_000), (unreadable, 500_000_000)]:
+        path.touch()
+        os.utime(path, ns=(ns, ns))
+    stat = Path.stat
+
+    def deny_one_stat(path, *args, **kwargs):
+        if path == unreadable:
+            raise PermissionError("metadata unavailable")
+        return stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", deny_one_stat)
+    assert main(["discover", "--root", f"codex={root}", "--since-ms=1000"]) == 0
+    rows = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    files = {Path(row["path"]): row for row in rows if row["object"] == "file"}
+    assert files.keys() == {at_cutoff, newer, unreadable}
+    assert files[at_cutoff]["mtime_ns"] == 1_000_000_000
+    assert files[unreadable]["state"] == "unreadable" and files[unreadable]["mtime_ns"] is None
+    assert rows[0]["files"] == rows[-1]["files"] == 3
+
+
+@pytest.mark.parametrize("since_ms", ["-1", "1.5", "yesterday"])
+def test_discover_since_ms_rejects_invalid_threshold(tmp_path, since_ms):
+    result = subprocess.run([sys.executable, str(TOOLS / "harness-evidence"),
+                             "discover", "--since-ms", since_ms], cwd=tmp_path,
+                            env=clean_env(tmp_path / "home"), capture_output=True, text=True, timeout=30)
+    assert result.returncode == 2 and "--since-ms" in result.stderr
+    assert not result.stdout

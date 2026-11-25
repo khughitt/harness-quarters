@@ -98,12 +98,20 @@ APPLIED = {
     "shell_arguments": ("workdir",),           # each shell function call's JSON arguments
 }
 
+RATE_LIMIT_PATHS = (
+    "payload.rate_limits", "payload.rate_limits.credits", "payload.rate_limits.credits.balance",
+    "payload.rate_limits.primary", "payload.rate_limits.primary.window_minutes",
+    "payload.rate_limits.primary.used_percent", "payload.rate_limits.secondary",
+    "payload.rate_limits.secondary.window_minutes", "payload.rate_limits.secondary.used_percent",
+)
+
 UNWATCHED = {
     "session_meta": {"payload.source.subagent.thread_spawn.parent_thread_id": "applied:spawn",
                      "payload.parent_thread_id": "applied:spawn",
                      "payload.base_instructions.text": "applied:base_instructions",
                      "payload.forked_from_id": "dimension"},
     "turn_context": {"payload.cwd": "dimension", "payload.turn_id": "dimension"},
+    "event_msg:token_count": dict.fromkeys(RATE_LIMIT_PATHS, "dimension"),
     # Turn starts and compaction evidence: read for the compaction facts, no population.
     "event_msg:task_started": {"payload.turn_id": "dimension"},
     "event_msg:turn_started": {"payload.turn_id": "dimension"},
