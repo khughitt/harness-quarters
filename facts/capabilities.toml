@@ -1327,7 +1327,7 @@ value = ["background-wake", "blocking-call"]
 version = "2.1.332"
 date = 2026-11-25
 evidence = "hq-35df5d"
-note = "claude -p, stream-json output, 720 s in a background Bash command with the turn ended (each turn writes its own result record, so the first is not the run's end), and 780 s in one foreground Bash call with BASH_MAX_TIMEOUT_MS=3600000 in the environment and timeout 1500000 (the Bash tool's own documented foreground maximum is 10 minutes). A background command given no timeout was stopped at 600 s in print mode (a peer wait, killed at its time limit with no output; the run was woken, restarted it with timeout 7200000 and heard the message sent 17 minutes later), so a wait passes its timeout explicitly."
+note = "claude -p, stream-json output, 720 s in a background Bash command with the turn ended (each turn writes its own result record, so the first is not the run's end), and 780 s in one foreground Bash call with BASH_MAX_TIMEOUT_MS=3600000 in the environment and timeout 1500000 (the Bash tool's own documented foreground maximum is 10 minutes). A background command given no timeout was stopped at 600 s in print mode, while one in an interactive session of the same version ran its 690 s (a peer wait, killed at its time limit with no output; the run was woken, restarted it with timeout 7200000 and heard the message sent 17 minutes later), so a wait passes its timeout explicitly."
 
 
 [facts.headless-model-effort]
