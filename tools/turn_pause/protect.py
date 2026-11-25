@@ -1,6 +1,6 @@
 """The protected-path check every PreToolUse runs, and the structure bound that keeps it
 inside the hook's time budget. Kept apart from the allowlist so the hook loads the
-allowlist (with shlex) only once a turn is paused.
+allowlist (with shlex) only once a turn is paused or its root ended.
 
 The bound is on JSON nodes, not bytes: a payload just under the byte cap made of tiny
 elements (`[0,0,...]`, `[[],[],...]`) has some sixteen million nodes, and parsing and

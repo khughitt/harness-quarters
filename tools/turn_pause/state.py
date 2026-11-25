@@ -99,10 +99,11 @@ class Wakeup(Record):
 class RootState(Record):
     __slots__ = _fields = ('harness', 'root', 'turn', 'paused', 'grace_used', 'workers', 'worker_names',
                            'cron_jobs', 'wakeups', 'harness_pid', 'cwd', 'notified', 'notify_error', 'budget_note',
-                           'spend_cache', 'spend_snapshot')
+                           'spend_cache', 'spend_snapshot', 'other_pids')
     _defaults = {'paused': None, 'harness_pid': None, 'cwd': None, 'notified': False, 'notify_error': None,
                  'budget_note': None, 'spend_cache': None, 'spend_snapshot': None}
-    _factories = {'grace_used': dict, 'workers': set, 'worker_names': set, 'cron_jobs': dict, 'wakeups': list}
+    _factories = {'grace_used': dict, 'workers': set, 'worker_names': set, 'cron_jobs': dict, 'wakeups': list,
+                  'other_pids': set}
 
 
 class RootRecord(Record):
@@ -125,7 +126,7 @@ class RootRecord(Record):
 
 
 _ALL_STATE_FIELDS = frozenset(RootState._fields)
-_REQUIRED_STATE_FIELDS = _ALL_STATE_FIELDS - {'spend_cache', 'spend_snapshot'}
+_REQUIRED_STATE_FIELDS = _ALL_STATE_FIELDS - {'spend_cache', 'spend_snapshot', 'other_pids'}
 _ALL_RECORD_FIELDS = frozenset(RootRecord._fields)
 _REQUIRED_RECORD_FIELDS = _ALL_RECORD_FIELDS - {'spend'}
 
@@ -236,6 +237,8 @@ def state_dict(st: RootState) -> dict:
         out['spend_cache'] = signal_to_dict(st.spend_cache)
     if st.spend_snapshot is not None:
         out['spend_snapshot'] = entry_to_dict(st.spend_snapshot)
+    if st.other_pids:
+        out['other_pids'] = sorted(st.other_pids)
     return out
 
 
@@ -271,6 +274,8 @@ def state_from_dict(d: dict) -> RootState:
         budget_note=_opt(d['budget_note'], str, 'budget_note'),
         spend_cache=None if raw_cache is None else signal_from_dict(raw_cache),
         spend_snapshot=None if raw_snap is None else entry_from_dict(raw_snap),
+        other_pids={_check(p, int, 'other_pids item')
+                    for p in _check(d.get('other_pids', []), list, 'other_pids')},
     )
 
 
@@ -620,12 +625,17 @@ class Store:
         record.ended_at = now
 
     def end(self, harness: str, root: str, now: float, *,
-            compactions_counted: bool, reason: str = 'session_end') -> bool:
+            compactions_counted: bool, reason: str = 'session_end', held=lambda state: False) -> bool:
+        """End the root's active state, unless held(state), which may update it, says
+        another process has it."""
         stem = self._stem(harness, root)
         path = self._path(stem + '.json')
         with self._flocked(stem):
             record = self._load(path)
             if record is None or record.state is None:
+                return False
+            if held(record.state):
+                self._write(path, record)
                 return False
             self._end_record(record, now, compactions_counted, reason)
             self._write(path, record)
