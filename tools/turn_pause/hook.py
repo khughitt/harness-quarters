@@ -100,8 +100,9 @@ ROOT_TEXT = (
     + GOAL_CLAUSE
     + '. Then record the durable pause report the turn-pause rule describes with single-line '
     'tasks note calls (file writes are refused while paused; split across notes past 16,384 '
-    'characters), park your task --waiting-on user --reason decision, and end your turn '
-    'with the continuation decision and any exact budget: line in your closing message '
+    'characters), park your task --waiting-on user --reason decision '
+    '--decision-kind question --decision-origin workflow --decision-text "<the continuation decision>", '
+    'and end your turn with the continuation decision and any exact budget: line in your closing message '
     '(question tools are refused while paused). If '
     'another agent launched this session, park any claim --waiting-on agent for that agent and '
     'return a short status (done, left, running) instead of a pause report. Only bookkeeping, '
@@ -113,7 +114,9 @@ SPEND_ROOT_TEXT = (
     'your subagents and the sessions you launched, stop your background calls and processes'
     + GOAL_CLAUSE
     + '. Then record the signal (value, threshold, episode) with single-line tasks note calls, '
-    'park your task --waiting-on user --reason decision with the signal in the park note, '
+    'park your task --waiting-on user --reason decision --decision-kind question '
+    '--decision-origin workflow --decision-text "<how to proceed after the signal>" with the '
+    'signal in the park note, '
     'report the signal to the user, and end your turn. Investigation starts in the next turn. '
     'If another agent launched this session, park any claim --waiting-on agent for that agent '
     'and return a short status (done, left, running) instead. Only bookkeeping, plain reads and '

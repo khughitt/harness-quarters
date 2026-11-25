@@ -160,6 +160,8 @@ SHELL_PASSES = [
     ('tasks park lore-1 "next"', 'bookkeeping'),
     ('tasks note x "y"', 'bookkeeping'),
     ('tasks park lore-1 "next" --waiting-on user --reason decision', 'bookkeeping'),
+    ('tasks park lore-1 "next" --waiting-on user --reason decision --decision-kind question '
+     '--decision-origin workflow --decision-text "continue?"', 'bookkeeping'),
     ('tasks feedback --project hq --category friction --origin user -b "detail" "wrong block"', 'bookkeeping'),
     ('tasks feedback "unclear pause block" --project hq --category friction --origin agent', 'bookkeeping'),
     ('hq pause status', 'bookkeeping'),

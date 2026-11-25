@@ -42,8 +42,9 @@ ROOT_TEXT = (
     'and include a request for the user to authorize its pause; do not claim it is paused. '
     'Then record the durable pause report the turn-pause rule describes with single-line '
     'tasks note calls (file writes are refused while paused; split across notes past 16,384 '
-    'characters), park your task --waiting-on user --reason decision, and end your turn '
-    'with the continuation decision and any exact budget: line in your closing message '
+    'characters), park your task --waiting-on user --reason decision '
+    '--decision-kind question --decision-origin workflow --decision-text "<the continuation decision>", '
+    'and end your turn with the continuation decision and any exact budget: line in your closing message '
     '(question tools are refused while paused). If '
     'another agent launched this session, park any claim --waiting-on agent for that agent and '
     'return a short status (done, left, running) instead of a pause report. Only bookkeeping, '
@@ -73,7 +74,8 @@ MALFORMED_TEXT = ('turn-pause: the first line looks like a budget but does not p
                   'the default limits apply. Mention it in your next report; do not stop for it.')
 WAKE_TEXT = ('turn-pause: this prompt matches a pending scheduled prompt and was read as a scheduled '
              'wake, not a new turn; if the user typed it, ask them to rephrase.')
-PARK = 'tasks park hq-123456 "paused at calls" --waiting-on user --reason decision'
+PARK = ('tasks park hq-123456 "paused at calls" --waiting-on user --reason decision '
+        '--decision-kind question --decision-origin workflow --decision-text "continue or stop?"')
 
 
 # --- payloads -------------------------------------------------------------------------
@@ -492,7 +494,9 @@ def test_paused_scoped_tasks_write_note_and_release_claim(tmp_path, notices, har
         assert not denied(d.bash('ls'))
     assert denied(d.bash('ls'))
     for args in [('note', tid, 'paused from another directory'),
-                 ('park', tid, 'resume after review', '--waiting-on', 'user', '--reason', 'decision')]:
+                 ('park', tid, 'resume after review', '--waiting-on', 'user', '--reason', 'decision',
+                  '--decision-kind', 'question', '--decision-origin', 'workflow',
+                  '--decision-text', 'continue under a new budget or stop?')]:
         command = shlex.join(['tasks', '-C', str(project), *args])
         assert d.bash(command) is None
         run(*args)
