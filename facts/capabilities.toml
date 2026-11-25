@@ -1286,3 +1286,125 @@ note = "With a private scripted provider, relay model --harness codex verified t
 status = "unknown"
 note = "Not probed: Claude Code shell commands receive TASKS_MODEL and TASKS_AGENT from relay's built-in Claude provenance on its SessionStart and PostModelSwitch routes via CLAUDE_ENV_FILE (hq-663049; formerly ops claude-provenance, hq-d5a56c); resolving a session's or subagent's model from its transcript by thread id from inside a shell command was not probed."
 
+
+
+[facts.headless-relay-identity]
+type = "boolean"
+description = "A headless run (codex exec, claude -p) started from another agent session's shell is registered by relay's installed hooks, and relay whoami in its shell names the run's own session, so it can hold a relay peer role."
+
+[facts.headless-relay-identity.harness.codex]
+status = "probed"
+value = true
+version = "0.172.0"
+date = 2026-11-25
+evidence = "hq-35df5d"
+note = "codex exec started from a Claude Code shell and, as a reviewer over relay main 5e61636's peer commands, from a Claude Code lead; installed hooks relay 0.5.0. The same with the starting session's CLAUDE_* variables inherited and with a named-variables-only environment. Only under -s danger-full-access: in codex sandbox with the workspace-local, :workspace and :read-only profiles whoami is unresolved HIDDEN_ANCESTRY, since the sandbox's PID namespace hides the session process. The row goes at SessionEnd."
+
+[facts.headless-relay-identity.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.332"
+date = 2026-11-25
+evidence = "hq-35df5d"
+note = "claude -p started from a Claude Code shell and, as a reviewer, from an interactive Codex 0.172.0 session's shell; installed hooks relay 0.5.0. The same with the starting session's CLAUDE_* variables inherited and with a named-variables-only environment. Needs the hooks, so --bare and --safe-mode, which drop them, were not tried."
+
+
+[facts.headless-long-wait]
+type = "set"
+description = "How a headless run waited more than 12 minutes on its own command without ending or polling, and then acted on its result: background-wake (it ended its turn with the command in the background, the process stayed and the command's end started a new turn) or blocking-call (one shell call returned when the command finished)."
+
+[facts.headless-long-wait.harness.codex]
+status = "probed"
+value = ["blocking-call"]
+version = "0.172.0"
+date = 2026-11-25
+evidence = "hq-35df5d"
+note = "codex exec, one write_stdin at yield_time_ms 3600000 in an exec cell with the @exec pragma, with background_terminal_max_timeout 3600000: 840 s, three model calls in the whole run. Real relay peer waits blocked 447 s to a message and 1500 s to the command's own timeout (exit 5); the run then waited again and heard the message sent 27 minutes after it joined."
+
+[facts.headless-long-wait.harness.claude-code]
+status = "probed"
+value = ["background-wake", "blocking-call"]
+version = "2.1.332"
+date = 2026-11-25
+evidence = "hq-35df5d"
+note = "claude -p, stream-json output, 720 s in a background Bash command with the turn ended (each turn writes its own result record, so the first is not the run's end), and 780 s in one foreground Bash call with BASH_MAX_TIMEOUT_MS=3600000 in the environment and timeout 1500000 (the Bash tool's own documented foreground maximum is 10 minutes). A background command given no timeout was stopped at 600 s in print mode, while one in an interactive session of the same version ran its 690 s (a peer wait, killed at its time limit with no output; the run was woken, restarted it with timeout 7200000 and heard the message sent 17 minutes later), so a wait passes its timeout explicitly."
+
+
+[facts.headless-model-effort]
+type = "boolean"
+description = "The model and effort given on a headless run's command line are the ones its own record shows the harness used."
+
+[facts.headless-model-effort.harness.codex]
+status = "probed"
+value = true
+version = "0.172.0"
+date = 2026-11-25
+evidence = "hq-35df5d"
+note = "-m gpt-6.1-sol with -c model_reasoning_effort=medium and =high: the rollout's turn_context names each, and relay model --harness codex prints them (codex/gpt-6.1-sol@high), which is what review record put in the review note."
+
+[facts.headless-model-effort.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.332"
+date = 2026-11-25
+evidence = "hq-35df5d"
+note = "--model and --effort medium and high: the transcript's request records carry the model and output_config.effort asked for. A review note the run writes still names claude-code alone, without model or effort."
+
+
+[facts.headless-ambient-context]
+type = "set"
+description = "Context a headless run loaded without being asked for, beside its prompt: global-instructions, project-memory (the working directory's auto memory), session-start-hooks (their additional context), skills (their listing) and connectors (account and configured MCP tools)."
+
+[facts.headless-ambient-context.harness.codex]
+status = "probed"
+value = ["connectors", "global-instructions", "session-start-hooks", "skills"]
+version = "0.172.0"
+date = 2026-11-25
+evidence = "hq-35df5d"
+note = "Ordinary home, scratch working directory. The memories feature is disabled on this host (codex features list), so project memory was not loaded. The run carries none of the starting session's transcript. Its commands run as zsh -lc, and ANTHROPIC_API_KEY and OPENAI_API_KEY were set in them although the launcher had passed neither (inferred: the login shell exports them)."
+
+[facts.headless-ambient-context.harness.claude-code]
+status = "probed"
+value = ["connectors", "global-instructions", "project-memory", "session-start-hooks", "skills"]
+version = "2.1.332"
+date = 2026-11-25
+evidence = "hq-35df5d"
+note = "Ordinary home. Project memory is the working directory's, so a run started in the lead's project shares the memory the lead can write; CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 in the environment removes it (init's memory_paths null, its text absent from the transcript)."
+
+
+[facts.headless-env-api-key-wins]
+type = "boolean"
+description = "With an API key in the environment, a headless run uses it in place of the stored subscription sign-in."
+
+[facts.headless-env-api-key-wins.harness.codex]
+status = "unknown"
+note = "Not probed. codex login status reports the ChatGPT sign-in with OPENAI_API_KEY set, and no headless run was made with a key in the Codex process's own environment; CODEX_API_KEY is documented as an override."
+
+[facts.headless-env-api-key-wins.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.332"
+date = 2026-11-25
+evidence = "hq-35df5d"
+note = "claude auth status reports authMethod api_key with ANTHROPIC_API_KEY set and claude.ai without it. Every headless run here had it removed and reported apiKeySource none. No metered run was made, so what a run with the key would be billed is inferred from auth status and the CLI's documented precedence, not observed."
+
+
+[facts.headless-kill-reaps-shell]
+type = "boolean"
+description = "Killing a headless run's process ends the shell command it was waiting on."
+
+[facts.headless-kill-reaps-shell.harness.codex]
+status = "probed"
+value = true
+version = "0.172.0"
+date = 2026-11-25
+evidence = "hq-35df5d"
+note = "SIGKILL of codex exec blocked in relay peer wait: exit 137, no peer wait process left, and the lead's next peer wait exited 4 (peer gone). The registry row stays until a sweep after SIGKILL."
+
+[facts.headless-kill-reaps-shell.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.332"
+date = 2026-11-25
+evidence = "hq-35df5d"
+note = "SIGKILL and, in another run, SIGTERM of claude -p blocked in a foreground relay peer wait (exit 137 and 143): no peer wait process left, and the lead's next peer wait exited 4, 0.13 s after the SIGKILL. SIGTERM runs SessionEnd, so its registry row goes."
