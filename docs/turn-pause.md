@@ -160,7 +160,8 @@ worker IDs/names, scheduled cron/wakeup state, harness pid/cwd, notification
 status, budget note, and optional `spend_cache` (cached signal plus
 `(st_mtime_ns, st_size, st_ino)` identity) and `spend_snapshot` (the paused
 turn's spend entry snapshot, cleared when the next turn starts), both omitted
-when null. A turn records started/last time, limits/digest, active/call/spawn/
+when null, and `other_pids` (live prompting processes beside the harness pid),
+omitted when empty. A turn records started/last time, limits/digest, active/call/spawn/
 compaction usage, in-flight calls/tools, spawn keys and warned metrics. Alongside
 the pause state directory, turn limits, capabilities snapshot and hook wiring,
 the four `obs` spend files under `XDG_STATE_HOME/obs` (or the home
@@ -175,10 +176,9 @@ Digests are SHA-256 fingerprints of stripped prompt text, not anonymization.
 Ending/idle clearing retains known guards; a genuine resume clears them until
 fresh schedule evidence arrives. Late tool calls on an ended root are refused,
 except the bookkeeping class below (so a wrong refusal can be reported).
-A root belongs to the process of its last genuine prompt: SessionEnd from another
-process resumed on the same session leaves the root, and any pause, as it is while
-that process runs. Two processes mid-turn on one session still share one set of
-counters, and the prompting one ending ends the root for both.
+A session resumed in a second process has one root in both, sharing its turn,
+counters and any pause. The root keeps the live processes with a genuine prompt in
+it, and one's SessionEnd ends the root only when no other is left running.
 Expired windows/evicted records cannot establish historical provenance.
 
 Ended roots expire lazily after 30 days or beyond 512 roots, with at most 32

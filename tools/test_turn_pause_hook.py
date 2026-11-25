@@ -1634,15 +1634,51 @@ def test_session_end_from_another_process_keeps_a_root_whose_prompter_is_live(tm
     under(7002)
     d.prompt('work in the second window')
     under(7001)
-    d.prompt('approve')  # the last prompter holds the root
+    d.prompt('approve')
     before = d.state()
     under(7002)
     _end(d)
+    before.other_pids = set()
     assert d.state() == before
     under(7001)
     assert not denied(d.bash('ls'))
     _end(d)  # its own end still ends the root
     assert denied(d.bash('ls'))
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+def test_session_end_of_the_last_prompter_keeps_a_root_another_live_prompter_works_in(tmp_path, monkeypatch, harness):
+    d = Driver(tmp_path, harness)
+    live = {7001, 7002, 7003}
+    under = _under(monkeypatch, live)
+    for pid in (7001, 7003, 7002):
+        under(pid)
+        d.prompt('work')
+    live.remove(7003)  # killed: no SessionEnd
+    _end(d)
+    under(7001)
+    assert not denied(d.bash('ls'))
+    _end(d)
+    assert denied(d.bash('ls'))
+
+
+def test_a_root_prompted_by_one_process_stores_no_other_prompters(tmp_path, monkeypatch):
+    d = Driver(tmp_path, 'claude-code')
+    live = {7001, 7002}
+    under = _under(monkeypatch, live)
+    stored = lambda: json.loads((state_dir(d.env) / f'claude-code-{CLAUDE_ROOT}.json').read_text())['state']
+    under(7001)
+    d.prompt('work')
+    d.prompt('more work')
+    assert 'other_pids' not in stored()
+    under(7002)
+    d.prompt('second window')
+    assert stored()['other_pids'] == [7001] and stored()['harness_pid'] == 7002
+    _end(d)
+    assert 'other_pids' not in stored() and stored()['harness_pid'] == 7001
+    live.remove(7001)
+    d.prompt('resumed after a crash')
+    assert 'other_pids' not in stored() and stored()['harness_pid'] == 7002
 
 
 @pytest.mark.parametrize('ending', [7001, None])
@@ -1674,6 +1710,7 @@ def test_session_end_from_another_process_keeps_a_pause(tmp_path, monkeypatch):
     under(7001)
     d.pause_on_calls()
     under(7002)
+    assert d.bash('hq pause status') is None  # a paused call does not take the root over
     _end(d)
     assert d.state().paused == 'calls'
 
@@ -1690,7 +1727,9 @@ def test_an_ended_root_allows_bookkeeping_and_nothing_else(tmp_path, harness):
                 "tasks feedback --project hq 'x'; touch y"):
         out = d.bash(cmd)
         assert denied(out), cmd
-        assert 'tasks feedback' in reason(out)
+        assert 'tasks feedback' in reason(out) and 'This call:' in reason(out)
+    assert 'outside quotes' in reason(d.bash("tasks feedback --project hq 'x' 2>&1"))
+    assert 'root session ended' in reason(d.bash(f'cat {d.limits}'))
     out = d.bash(f"tasks note hq-000001 'see {d.limits}'")
     assert denied(out) and 'protected path' in reason(out)
     assert d.state() is None

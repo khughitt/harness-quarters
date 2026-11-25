@@ -1,8 +1,9 @@
 """The turn-pause hook: one native hook call in, at most one JSON decision out.
 
 Every event goes through engine.feed under the root's state lock. The PreToolUse
-decision checks, in order: a changed limits file or a crossed limit (the pause), a
-protected path, then, while paused, the closing allowlist with its grace. A PreToolUse
+decision checks, in order: an ended root (bookkeeping only), a changed limits file or a
+crossed limit (the pause), a protected path, then, while paused, the closing allowlist
+with its grace. A PreToolUse
 the hook cannot judge is refused with the error; no other event is ever blocked or
 answered with a decision (a blocked Stop makes the agent continue). Slow work (the
 notification) runs after the state is written, and its result is recorded in a second
@@ -11,7 +12,7 @@ short locked update. Spec: docs/turn-pause.md.
 Every call pays for its imports (they were most of its latency), so this module and
 those it imports keep to _json, os, sys, time, stat, fcntl and _sha2: no json, re,
 dataclasses, typing, tempfile, pathlib or hashlib, and the allowlist (with shlex) loads
-only on the paused path. tools/test_turn_pause_hook.py checks the import set.
+only for a paused or ended root. tools/test_turn_pause_hook.py checks the import set.
 """
 from __future__ import annotations
 
@@ -307,26 +308,40 @@ def current_harness_pid(recorded: int | None, start: int, proc='/proc') -> int |
     return find_harness_pid(start, proc)
 
 
-def _held_elsewhere(state: RootState, ending: int | None) -> bool:
-    """Whether the process of the root's last genuine prompt still runs and is not the one
-    ending: a session resumed in a second process has one root in two processes. An unknown
-    process holds nothing."""
-    holder = state.harness_pid
-    return (ending is not None and holder is not None and holder != ending
-            and find_harness_pid(holder) == holder)
+def _live_prompters(rs: RootState, leaving: int | None) -> set[int]:
+    """The processes with a genuine prompt in this root that still run, without `leaving`.
+    A session resumed in a second process has one root in two processes."""
+    return {p for p in rs.other_pids | {rs.harness_pid}
+            if p is not None and p != leaving and find_harness_pid(p) == p}
+
+
+def _take(rs: RootState) -> None:
+    """Record the process of a genuine prompt, beside the other live prompters."""
+    pid = find_harness_pid(os.getppid())
+    rs.other_pids = _live_prompters(rs, pid)
+    rs.harness_pid = pid
+
+
+def _leave(rs: RootState, ending: int | None) -> bool:
+    """Drop an ending process; whether another live prompter keeps the root. An ending
+    process that cannot be identified ends the root."""
+    left = set() if ending is None else _live_prompters(rs, ending)
+    if left:
+        rs.harness_pid = rs.harness_pid if rs.harness_pid in left else min(left)
+        rs.other_pids = left - {rs.harness_pid}
+    return bool(left)
 
 
 def _ended(harness: str, payload: dict, protected: list[str]) -> dict | None:
     """The answer to a tool call on an ended root: bookkeeping passes, so a wrong block can
     be reported; every other call is refused."""
-    from . import allowlist  # with shlex: only an ended or paused root needs it
+    from . import allowlist  # with shlex: only a paused or ended root needs it
     tool_input = payload.get('tool_input')
-    if touches_protected(tool_input, protected):
-        return _deny(PROTECTED_TEXT)
     owned = allowlist.Owned(frozenset(), frozenset(), None)
-    if allowlist.classify(harness, payload.get('tool_name'), tool_input, owned).klass == 'bookkeeping':
-        return None
-    return _deny(ENDED_TEXT)
+    verdict = allowlist.classify(harness, payload.get('tool_name'), tool_input, owned)
+    if verdict.klass != 'bookkeeping':
+        return _deny(f'{ENDED_TEXT} This call: {verdict.reason}.')
+    return _deny(PROTECTED_TEXT) if touches_protected(tool_input, protected) else None
 
 
 class Judge:
@@ -373,8 +388,8 @@ class Judge:
 
     def _paused(self, rs: RootState, ev: Event, tool_input) -> Decision:
         from . import allowlist  # with shlex: only a paused turn needs it
-        rs.harness_pid = current_harness_pid(rs.harness_pid, os.getppid())
-        owned = allowlist.Owned(frozenset(rs.worker_names), frozenset(rs.cron_jobs), rs.harness_pid)
+        owned = allowlist.Owned(frozenset(rs.worker_names), frozenset(rs.cron_jobs),
+                                current_harness_pid(rs.harness_pid, os.getppid()))
         verdict = allowlist.classify(self.harness, ev.tool, tool_input, owned)
         if verdict.klass in ('bookkeeping', 'cancellation'):
             return Decision(True, None, None)
@@ -425,7 +440,7 @@ def _prompt(rs: RootState, harness: str, payload: dict, now: float, limits_path,
         elif isinstance(budget, Malformed):
             note = MALFORMED_TEXT.format(reason=budget.reason)
         engine.start_turn(rs, now, limits, sha, note)
-        rs.harness_pid = find_harness_pid(os.getppid())  # the process this turn runs in holds the root
+        _take(rs)
         after_snap = history.snapshot(rs, compactions_counted=counted)
         history.start_turn(record, now, origin='genuine_user', before=before, after=after_snap)
         record.ended_at = None
@@ -566,7 +581,7 @@ def _decide(harness, event, payload, now, store, limits_path, env, oversized):
         if agent is None:
             ending = find_harness_pid(os.getppid())
             store.end(harness, root, now, compactions_counted=counted,
-                      held=lambda state: _held_elsewhere(state, ending))
+                      held=lambda rs: _leave(rs, ending))
             store.prune(now, compactions_counted={h: bool(v) for h, v in facts.compact_events.items()})
         return None
     limits_sha = file_sha256(limits_path) if event == 'PreToolUse' else None
