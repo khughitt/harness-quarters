@@ -122,15 +122,16 @@ jobs:
         run: |
           set -euo pipefail
           relay_root=$(mktemp -d "$RUNNER_TEMP/hq-relay.XXXXXX")
-          # The deployed hook bindings retain the frozen v0.5.0 lock from this hq revision.
-          hook_pin=0bfce24bdc62a91e0376dd39123f074f354310e8
-          hook_install="$relay_root/v0.5.0"
-          mkdir "$hook_install"
-          for file in package.json package-lock.json; do
-            git show "$hook_pin:relay/$file" > "$hook_install/$file"
+          # The deployed hook bindings retain the frozen v0.5.0 and v0.6.0 locks from these hq revisions.
+          for pin in v0.5.0=0bfce24bdc62a91e0376dd39123f074f354310e8 v0.6.0=614907c5def98349a90274f1ff884d6fbfe188b1; do
+            hook_install="$relay_root/${pin%%=*}"
+            mkdir "$hook_install"
+            for file in package.json package-lock.json; do
+              git show "${pin#*=}:relay/$file" > "$hook_install/$file"
+            done
+            "$RELAY_NPM" ci --prefix "$hook_install" --ignore-scripts --allow-git=root --no-fund --no-audit
+            /usr/bin/node "$hook_install/node_modules/relay/bin/relay.js" --version >> "$HQ_TEST_ARTIFACT_DIR/setup-report.txt"
           done
-          "$RELAY_NPM" ci --prefix "$hook_install" --ignore-scripts --allow-git=root --no-fund --no-audit
-          /usr/bin/node "$hook_install/node_modules/relay/bin/relay.js" --version >> "$HQ_TEST_ARTIFACT_DIR/setup-report.txt"
           RELAY_INSTALL_ROOT="$relay_root" just relay-install
           RELAY_INSTALL_ROOT="$relay_root" relay/bin/relay --version >> "$HQ_TEST_ARTIFACT_DIR/setup-report.txt"
           printf 'HQ_TEST_RELAY_ROOT=%s\n' "$relay_root" >> "$GITHUB_ENV"

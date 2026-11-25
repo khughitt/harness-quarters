@@ -42,8 +42,9 @@ ROOT_TEXT = (
     'and include a request for the user to authorize its pause; do not claim it is paused. '
     'Then record the durable pause report the turn-pause rule describes with single-line '
     'tasks note calls (file writes are refused while paused; split across notes past 16,384 '
-    'characters), park your task --waiting-on user --reason decision, and end your turn '
-    'with the continuation decision and any exact budget: line in your closing message '
+    'characters), park your task --waiting-on user --reason decision '
+    '--decision-kind question --decision-origin workflow --decision-text "<the continuation decision>", '
+    'and end your turn with the continuation decision and any exact budget: line in your closing message '
     '(question tools are refused while paused). If '
     'another agent launched this session, park any claim --waiting-on agent for that agent and '
     'return a short status (done, left, running) instead of a pause report. Only bookkeeping, '
@@ -73,7 +74,8 @@ MALFORMED_TEXT = ('turn-pause: the first line looks like a budget but does not p
                   'the default limits apply. Mention it in your next report; do not stop for it.')
 WAKE_TEXT = ('turn-pause: this prompt matches a pending scheduled prompt and was read as a scheduled '
              'wake, not a new turn; if the user typed it, ask them to rephrase.')
-PARK = 'tasks park hq-123456 "paused at calls" --waiting-on user --reason decision'
+PARK = ('tasks park hq-123456 "paused at calls" --waiting-on user --reason decision '
+        '--decision-kind question --decision-origin workflow --decision-text "continue or stop?"')
 
 
 # --- payloads -------------------------------------------------------------------------
@@ -492,7 +494,9 @@ def test_paused_scoped_tasks_write_note_and_release_claim(tmp_path, notices, har
         assert not denied(d.bash('ls'))
     assert denied(d.bash('ls'))
     for args in [('note', tid, 'paused from another directory'),
-                 ('park', tid, 'resume after review', '--waiting-on', 'user', '--reason', 'decision')]:
+                 ('park', tid, 'resume after review', '--waiting-on', 'user', '--reason', 'decision',
+                  '--decision-kind', 'question', '--decision-origin', 'workflow',
+                  '--decision-text', 'continue under a new budget or stop?')]:
         command = shlex.join(['tasks', '-C', str(project), *args])
         assert d.bash(command) is None
         run(*args)
@@ -1606,6 +1610,133 @@ def test_harness_pid_is_the_nearest_claude_or_codex_else_node_running_one(tmp_pa
     _proc(none, 40, 'node', 1, ['node', 'server.js'])
     _proc(none, 1, 'systemd', 0)
     assert hook.find_harness_pid(50, none) is None
+
+
+def _under(monkeypatch, live):
+    """Run the hook under a chosen harness process: returns a setter. `live` is the set of
+    harness pids that still exist; looking one of them up from itself finds it."""
+    current = {'pid': None}
+
+    def find(start, proc='/proc'):
+        if start == os.getppid():
+            return current['pid']
+        return start if start in live else None
+    monkeypatch.setattr(hook, 'find_harness_pid', find)
+    return lambda pid: current.update(pid=pid)
+
+
+def _end(d):
+    d('SessionEnd', (claude_bare if d.harness == 'claude-code' else codex_bare)('SessionEnd'))
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+def test_session_end_from_another_process_keeps_a_root_whose_prompter_is_live(tmp_path, monkeypatch, harness):
+    d = Driver(tmp_path, harness)
+    under = _under(monkeypatch, {7001, 7002})
+    under(7001)
+    d.prompt('work')
+    under(7002)
+    d.prompt('work in the second window')
+    under(7001)
+    d.prompt('approve')
+    before = d.state()
+    under(7002)
+    _end(d)
+    before.other_pids = set()
+    assert d.state() == before
+    under(7001)
+    assert not denied(d.bash('ls'))
+    _end(d)  # its own end still ends the root
+    assert denied(d.bash('ls'))
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+def test_session_end_of_the_last_prompter_keeps_a_root_another_live_prompter_works_in(tmp_path, monkeypatch, harness):
+    d = Driver(tmp_path, harness)
+    live = {7001, 7002, 7003}
+    under = _under(monkeypatch, live)
+    for pid in (7001, 7003, 7002):
+        under(pid)
+        d.prompt('work')
+    live.remove(7003)  # killed: no SessionEnd
+    _end(d)
+    under(7001)
+    assert not denied(d.bash('ls'))
+    _end(d)
+    assert denied(d.bash('ls'))
+
+
+def test_a_root_prompted_by_one_process_stores_no_other_prompters(tmp_path, monkeypatch):
+    d = Driver(tmp_path, 'claude-code')
+    live = {7001, 7002}
+    under = _under(monkeypatch, live)
+    stored = lambda: json.loads((state_dir(d.env) / f'claude-code-{CLAUDE_ROOT}.json').read_text())['state']
+    under(7001)
+    d.prompt('work')
+    d.prompt('more work')
+    assert 'other_pids' not in stored()
+    under(7002)
+    d.prompt('second window')
+    assert stored()['other_pids'] == [7001] and stored()['harness_pid'] == 7002
+    _end(d)
+    assert 'other_pids' not in stored() and stored()['harness_pid'] == 7001
+    live.remove(7001)
+    d.prompt('resumed after a crash')
+    assert 'other_pids' not in stored() and stored()['harness_pid'] == 7002
+
+
+@pytest.mark.parametrize('ending', [7001, None])
+def test_session_end_ends_the_root_when_no_other_live_prompter_is_known(tmp_path, monkeypatch, ending):
+    d = Driver(tmp_path, 'claude-code')
+    under = _under(monkeypatch, {7001})
+    under(7001)
+    d.prompt('work')
+    under(ending)
+    _end(d)
+    assert d.state() is None
+
+
+def test_session_end_from_a_resumed_process_ends_a_root_whose_prompter_died(tmp_path, monkeypatch):
+    d = Driver(tmp_path, 'claude-code')
+    live = {7001, 7002}
+    under = _under(monkeypatch, live)
+    under(7001)
+    d.prompt('work')
+    live.remove(7001)
+    under(7002)
+    _end(d)
+    assert d.state() is None
+
+
+def test_session_end_from_another_process_keeps_a_pause(tmp_path, monkeypatch):
+    d = Driver(tmp_path, 'claude-code')
+    under = _under(monkeypatch, {7001, 7002})
+    under(7001)
+    d.pause_on_calls()
+    under(7002)
+    assert d.bash('hq pause status') is None  # a paused call does not take the root over
+    _end(d)
+    assert d.state().paused == 'calls'
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+def test_an_ended_root_allows_bookkeeping_and_nothing_else(tmp_path, harness):
+    d = Driver(tmp_path, harness)
+    d.prompt('work')
+    _end(d)
+    for cmd in ("tasks feedback --project hq 'blocked wrongly' --category friction",
+                "tasks note hq-000001 'state'", 'hq pause status'):
+        assert d.bash(cmd) is None, cmd
+    for cmd in ('ls', 'cat /etc/hostname', 'tasks start hq-000001', f'kill {os.getpid()}',
+                "tasks feedback --project hq 'x'; touch y"):
+        out = d.bash(cmd)
+        assert denied(out), cmd
+        assert 'tasks feedback' in reason(out) and 'This call:' in reason(out)
+    assert 'outside quotes' in reason(d.bash("tasks feedback --project hq 'x' 2>&1"))
+    assert 'root session ended' in reason(d.bash(f'cat {d.limits}'))
+    out = d.bash(f"tasks note hq-000001 'see {d.limits}'")
+    assert denied(out) and 'protected path' in reason(out)
+    assert d.state() is None
 
 
 def test_entry_deeply_nested_payload_is_refused_on_pretooluse_and_dropped_elsewhere(tmp_path):

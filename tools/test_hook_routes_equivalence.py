@@ -33,16 +33,14 @@ def executable(path, source):
 
 
 @pytest.fixture
-def candidate_runtime(monkeypatch):
-    """The unreleased relay behind v0.6.0, the version its package still has."""
-    if not (package := os.environ.get("HQ_TEST_RELAY_CANDIDATE")):
-        pytest.skip("HQ_TEST_RELAY_CANDIDATE names no relay package")
-    lock = json.loads((Path(package).parents[1] / "package-lock.json").read_bytes())
-    pin = TABLE.runtimes["v0.6.0"]
-    # A tarball's lock entry names no commit; its resolved value identifies the package.
-    monkeypatch.setitem(TABLE.runtimes, "v0.6.0", replace(
-        pin, script=str(Path(package) / "bin/relay.js"), subscriber_schema=3,
-        commit=lock["packages"]["node_modules/relay"]["resolved"]))
+def schema_3_runtime(monkeypatch):
+    """The installed relay that reads schema 3."""
+    install = os.environ.get("HQ_TEST_RELAY_ROOT")
+    script = (Path(install) if install else Path.home() / ".local/share/relay") / "v0.7.0/node_modules/relay/bin/relay.js"
+    if not script.is_file():
+        assert not install, "missing CI relay installation"
+        pytest.skip("relay v0.7.0 is not installed")
+    monkeypatch.setitem(TABLE.runtimes, "v0.7.0", replace(TABLE.runtimes["v0.7.0"], script=str(script)))
 
 
 def candidate(root, subscribers, event="SessionStart", version="v0.5.0", search_path=None):
@@ -369,12 +367,12 @@ def test_owner_expects_the_files_list_as_a_subscribers_path(tmp_path, search_pat
 
 
 @pytest.mark.parametrize("start", ["hq", "system"])
-def test_candidate_replays_a_notice_through_its_search_path(candidate_runtime, tmp_path, start):
+def test_schema_3_file_replays_a_notice_through_its_search_path(schema_3_runtime, tmp_path, start):
     if not shutil.which("git-index-health"):
         pytest.skip("an owner command is absent")
     search_path = TABLE.search_directories(Path.home()) if start == "hq" else ["/usr/bin", "/bin"]
     review = candidate(tmp_path / "candidate", [notice(["git-index-health", "--session-start"], "git-index-repair")],
-                       version="v0.6.0", search_path=search_path)
+                       version="v0.7.0", search_path=search_path)
     row, = equivalence.run(TABLE, review, cases(tmp_path, ["index-needing-repair"]), scratch=tmp_path / "scratch",
                            path_env=os.environ["PATH"])
     assert row.status == "passed", row.line

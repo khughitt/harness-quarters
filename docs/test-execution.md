@@ -98,11 +98,12 @@ storage route, together with curl for the verified download.
 The disposable runner installs
 tools at the exact /usr/bin paths its fixtures use. It runs setup,
 portable hygiene and the same complete suite, with TT_FORCE=1 at job scope.
-The job prepares two relay installations under a temporary `HQ_TEST_RELAY_ROOT`.
+The job prepares three relay installations under a temporary `HQ_TEST_RELAY_ROOT`.
 The v0.5.0 hook and qualification tests use the frozen lock from hq commit
-`0bfce24bdc62a91e0376dd39123f074f354310e8`. The standalone launcher and
-SessionStart notice tests use v0.6.0 from the checkout's `just relay-install`.
-The preflight tests exercise both versions. A missing installation there fails the tests.
+`0bfce24bdc62a91e0376dd39123f074f354310e8`. The SessionStart notice tests use v0.6.0
+from the frozen lock of hq commit `614907c5def98349a90274f1ff884d6fbfe188b1`. The
+standalone launcher and schema-3 tests use v0.7.0 from the checkout's `just relay-install`.
+The preflight tests exercise every version. A missing installation there fails the tests.
 All branch pushes and manual dispatch are covered, with no duplicate PR trigger.
 
 The always-run artifact upload retains HQ_TEST_ARTIFACT_DIR for seven days. Its

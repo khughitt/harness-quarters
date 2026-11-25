@@ -8,6 +8,7 @@ import pytest
 
 from hook_routes.render import render_live
 from hook_routes.table import load
+from test_hook_routes_relay import shared_table
 
 TABLE = Path(__file__).resolve().parents[1] / "harnesses/hook-routes.toml"
 
@@ -20,7 +21,7 @@ def _ops_donor(name):
 def shared_guard_table():
     from hook_routes.table import Subscriber
 
-    table = load(TABLE)
+    table = shared_table()
     name = table.reconciliation_file
     source = table.subscriber_files[name]
     entry = replace(source.subscribers[0], name="fixture-guard", kinds=["before-tool"], tools=["Bash"])
@@ -196,7 +197,7 @@ def test_retained_schema_one_commands_survive_without_live_callers():
     from hook_routes.references import donor_references
     from hook_routes.table import RollbackBase
 
-    table = load(TABLE)
+    table = shared_table()
     empty = replace(table.subscriber_files[table.reconciliation_file], subscribers=())
     donors = (_ops_donor("relay-guard"), str(Path("~", "d", "familiar", "bin", "familiar")))
     base = RollbackBase(commands=(f"/usr/bin/python3 {donors[0]}", f"{donors[1]} observe"))

@@ -1,10 +1,10 @@
 # Ordered bindings for the checked-in hook settings.
 # relay_kind and subscriber policies are the coverage observed for the pinned relay.
-reconciliation_file = "shared-v0.5.0-retired-guard"
+reconciliation_file = "reconcile-v0.7.0"
 
 # Where a relay that reads subscriber schema 3 finds subscriber commands, their env
-# interpreters and their helpers, in order. No runtime below reads it yet. The list is the
-# host's choice: the user confirms it at the activation that first uses it.
+# interpreters and their helpers, in order. The list is the host's choice: the user confirms
+# it at the activation that first uses it.
 search_path = ["~/.local/bin", "~/bin", "~/.cargo/bin", "/usr/local/bin", "/usr/bin", "/bin"]
 
 [runtimes."v0.5.0"]
@@ -16,6 +16,13 @@ commit = "1f1c28da62e7867caf3acaddf16ba13079a37e85"
 command = "/usr/bin/node"
 script = "~/.local/share/relay/v0.6.0/node_modules/relay/bin/relay.js"
 commit = "9078727105f06b4a17ccbf177821806d7eed93be"
+
+# The standalone launcher's pin. No hook line selects it.
+[runtimes."v0.7.0"]
+command = "/usr/bin/node"
+script = "~/.local/share/relay/v0.7.0/node_modules/relay/bin/relay.js"
+commit = "e1bad200aa51becf88ad36cc832756179e12f6b2"
+subscriber_schema = 3
 
 [states.claude-sessionstart]
 state = "native"
@@ -173,6 +180,18 @@ registry = "occurrence"
 [subscriber_files."shared-v0.5.0-retired-guard"]
 runtime = "v0.5.0"
 output = "relay/subscribers.template.json"
+subscribers = [
+  { name = "familiar", harnesses = ["claude-code", "codex"], kinds = ["session-start", "prompt", "before-tool", "activity", "idle", "needs-input", "needs-approval", "turn-end", "turn-error", "reconcile"] },
+  { name = "familiar-codex-workers", harnesses = ["codex"], kinds = ["child-start", "child-stop"] },
+  { name = "familiar-opencode", harnesses = ["opencode"], kinds = ["session-start", "activity", "idle", "needs-approval", "turn-error", "session-end"] },
+  { name = "familiar-teardown", harnesses = ["claude-code"], kinds = ["session-end"] },
+  { name = "familiar-agy", harnesses = ["agy"], kinds = ["session-start", "before-tool", "turn-end"] },
+]
+
+# The same composition in the schema the standalone relay reads, for `just relay-reap`.
+[subscriber_files."reconcile-v0.7.0"]
+runtime = "v0.7.0"
+output = "relay/subscribers.reconcile.template.json"
 subscribers = [
   { name = "familiar", harnesses = ["claude-code", "codex"], kinds = ["session-start", "prompt", "before-tool", "activity", "idle", "needs-input", "needs-approval", "turn-end", "turn-error", "reconcile"] },
   { name = "familiar-codex-workers", harnesses = ["codex"], kinds = ["child-start", "child-stop"] },
