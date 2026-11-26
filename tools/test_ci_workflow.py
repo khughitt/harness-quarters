@@ -12,7 +12,7 @@ import pytest
 from test_test_execution import miniature_suite, world
 
 ROOT = Path(__file__).resolve().parents[1]
-TASKS_PIN = "000a65d134b293a5a08e53beb1cb1abc8723df39"
+TASKS_PIN = "7838de53af433fd367c15c0891d6c8a7e780f330"
 HISTORICAL_PIN = "6b434eb206c4464c062137e3600dcd303a543f68"
 DOTFILES_PIN = "2a686c0c4915ba0daae9f6455cfe45233780fc33"
 WORK_LINK_SHA256 = "6400d9a8431d3af3777d5038716d4322d283ebd127c574c06d7516dd1a784ff4"
