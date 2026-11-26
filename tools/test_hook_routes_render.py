@@ -318,3 +318,37 @@ def test_check_rejects_a_subscriber_role_override(qualified_checkout):
 
     assert result.returncode == 1
     assert 'familiar' in result.stderr and 'role' in result.stderr
+
+
+def test_ask_line_renders_relay_ask_command_and_validates_shape(tmp_path):
+    from hook_routes.table import Binding, Line, RouteState
+
+    table = shared_table()
+    home = tmp_path / 'home'
+    state = RouteState('ask', owner='relay-f58531', evidence='relay:docs/evidence/claude-code-answer-routes.json@2.1.332')
+    pre = Binding('PreToolUse', 'AskUserQuestion', (Line(('claude-ask',), runtime='v0.7.0', ask=True, handback=True, timeout=86400),))
+    post = Binding('PostToolUse', 'AskUserQuestion', (Line(('claude-ask',), runtime='v0.7.0', ask=True, timeout=10),))
+    claude = replace(table.homes['claude'], bindings=(pre, post))
+    configured = replace(table, states={**table.states, 'claude-ask': state}, homes={**table.homes, 'claude': claude})
+    hooks = json.loads(render_live(configured, home)[CLAUDE])['hooks']
+    script = f"'{home}/.local/share/relay/v0.7.0/node_modules/relay/bin/relay.js'"
+    assert hooks['PreToolUse'] == [{
+        'matcher': 'AskUserQuestion',
+        'hooks': [{'type': 'command', 'command': f"'/usr/bin/node' {script} ask --harness claude-code --handback PreToolUse", 'timeout': 86400}],
+    }]
+    assert hooks['PostToolUse'] == [{
+        'matcher': 'AskUserQuestion',
+        'hooks': [{'type': 'command', 'command': f"'/usr/bin/node' {script} ask --harness claude-code PostToolUse", 'timeout': 10}],
+    }]
+    for bad in [
+        '[homes.codex]\nharness = "codex"\npath = "harnesses/codex/hooks.json"\nbindings = [\n  { event = "PreToolUse", matcher = "AskUserQuestion", lines = [{ policies = ["claude-ask"], runtime = "v0.7.0", ask = true, timeout = 86400 }] },',
+        '  { event = "PostToolUse", matcher = "AskUserQuestion", lines = [{ policies = ["claude-ask"], runtime = "v0.7.0", ask = true, handback = true, timeout = 10 }] },',
+        '  { event = "PreToolUse", matcher = "*", lines = [{ policies = ["claude-ask"], runtime = "v0.7.0", ask = true, timeout = 86400 }] },',
+        '  { event = "PreToolUse", matcher = "AskUserQuestion", lines = [{ policies = ["claude-ask"], command = "echo", handback = true }] },',
+    ]:
+        base = '[states.claude-ask]\nstate = "ask"\nowner = "relay-f58531"\nevidence = "probe@2.1.332"\n\n'
+        target = '[homes.codex]\nharness = "codex"\npath = "harnesses/codex/hooks.json"\nbindings = [' if bad.startswith('[homes.codex]') else '  { event = "SessionStart", matcher = "startup|resume", lines = [{ policies = ["tasks-notices"], command = "tasks notices --pretty", timeout = 5 }] },'
+        replacement = bad if bad.startswith('[homes.codex]') else f'{target}\n{bad}'
+        path = edited_table(tmp_path / str(abs(hash(bad))), ('[states.claude-sessionstart]\n', base + '[states.claude-sessionstart]\n'), (target, replacement))
+        with pytest.raises(ValueError, match='ask|handback'):
+            load(path)

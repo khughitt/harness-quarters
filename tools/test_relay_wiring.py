@@ -28,7 +28,7 @@ TEMPLATES = {'shared': 'relay/subscribers.template.json', 'donor-2': 'relay/subs
 
 def parse_relay_command(command, version):
     argv = shlex.split(command)
-    if len(argv) < 2 or not argv[1].endswith('/relay/bin/relay.js'):
+    if len(argv) < 3 or not argv[1].endswith('/relay/bin/relay.js') or argv[2] != 'hook':
         return None
     assert len(argv) == 10
     assert argv[0] == '/usr/bin/node'
@@ -46,6 +46,18 @@ def parse_relay_command(command, version):
         addresses[root / '.config/relay' / f'{version}-{sha256(data).hexdigest()[:12]}' / 'relay/subscribers.json'] = name
     assert Path(argv[8]) in addresses
     return argv[4], int(argv[6]), argv[9], addresses[Path(argv[8])]
+
+
+def parse_relay_ask_command(command, version):
+    argv = shlex.split(command)
+    if len(argv) < 3 or not argv[1].endswith('/relay/bin/relay.js') or argv[2] != 'ask':
+        return None
+    assert argv[0] == '/usr/bin/node'
+    assert Path(argv[1]).is_absolute()
+    assert argv[1].endswith(f'/.local/share/relay/{version}/node_modules/relay/bin/relay.js')
+    assert argv[2:4] == ['ask', '--harness']
+    assert argv[5:-1] in ([], ['--handback'])
+    return argv[4], argv[5:-1] == ['--handback'], argv[-1]
 
 
 def hook_entries(file):
@@ -158,12 +170,29 @@ def test_no_familiar_hook_or_native_guard(file):
         assert 'relay-guard' not in hook['command']
 
 
+def test_claude_relay_ask_entries():
+    ask_entries = [
+        (event, matcher, *parsed, hook['timeout'])
+        for event, matcher, hook in hook_entries(FILES[0])
+        if (parsed := parse_relay_ask_command(hook['command'], 'v0.7.0')) is not None
+    ]
+    assert ask_entries == [
+        ('PreToolUse', 'AskUserQuestion', 'claude-code', True, 'PreToolUse', 86400),
+        ('PostToolUse', 'AskUserQuestion', 'claude-code', False, 'PostToolUse', 10),
+    ]
+    for file in FILES[1:]:
+        assert [hook for _, _, hook in hook_entries(file)
+                if parse_relay_ask_command(hook['command'], 'v0.7.0') is not None] == []
+
+
 @pytest.mark.parametrize('file', FILES)
 def test_native_entries_kept_in_order(file):
     native = {}
     for event, _, hook in hook_entries(file):
         if '/turn-pause ' in hook['command']:
             continue  # pinned by test_turn_pause_wiring.py
+        if parse_relay_ask_command(hook['command'], 'v0.7.0') is not None:
+            continue  # pinned by test_claude_relay_ask_entries
         if parse_relay_command(hook['command'], HOOK_VERSIONS[file]) is None:
             native.setdefault(event, []).append(hook['command'])
     if file == FILES[0]:
