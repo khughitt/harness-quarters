@@ -91,7 +91,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: khughitt/tasks
-          ref: 000a65d134b293a5a08e53beb1cb1abc8723df39
+          ref: 7838de53af433fd367c15c0891d6c8a7e780f330
           path: .ci-tools/tasks-src
           persist-credentials: false
 
@@ -102,7 +102,7 @@ jobs:
           "$HOME/.cargo/bin/cargo" +1.99.1 build --locked --release \
             --manifest-path .ci-tools/tasks-src/Cargo.toml --target-dir .ci-tools/tasks-target
           sudo install -m 755 .ci-tools/tasks-target/release/tasks /usr/bin/tasks
-          test "$(git -C .ci-tools/tasks-src rev-parse HEAD)" = 000a65d134b293a5a08e53beb1cb1abc8723df39
+          test "$(git -C .ci-tools/tasks-src rev-parse HEAD)" = 7838de53af433fd367c15c0891d6c8a7e780f330
           test "$(command -v python3)" = /usr/bin/python3
           {
             /usr/bin/python3 -c 'import os,sys; os.pidfd_open; print(sys.executable, sys.version)'
