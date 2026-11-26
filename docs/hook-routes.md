@@ -8,8 +8,8 @@ hook wiring and the relay subscriber template.
 | Table | Fields |
 | --- | --- |
 | `homes` | Each home names its harness, repository-relative settings path and ordered bindings. Each binding names an event, an optional matcher and its ordered lines. |
-| Lines | Each names its policies and any harness timeout in seconds. A native line names its literal command. A relay line names a runtime, subscriber file and outer budget in milliseconds. `relay_event` supplies a distinct relay event argument when needed, and `relay_kind` records the expected selector kind. A Claude `AskUserQuestion` `ask` line (`ask = true`, optional `handback = true` on `PreToolUse`) names its runtime and timeout and renders `relay ask`. An agy bridge line names its transport command, runtime and ordered delegate argv. |
-| `states` | Policy defaults. A line's `states` map can replace a policy's metadata for that binding. Native routes name an owner and reason. Existing relay routes name an owner and the grant for the current deployment. Relay routes cite qualification `records`. Ask routes name an owner and `@<version>` capability `evidence`. Bridge routes cite fixture `evidence`. `activation` names the user grant task note that made a former target live. |
+| Lines | Each names its policies and any harness timeout in seconds. A native line names its literal command. A relay line names a runtime, subscriber file and outer budget in milliseconds. `relay_event` supplies a distinct relay event argument when needed, and `relay_kind` records the expected selector kind. An agy bridge line names its transport command, runtime and ordered delegate argv. |
+| `states` | Policy defaults. A line's `states` map can replace a policy's metadata for that binding. Native routes name an owner and reason. Existing relay routes name an owner and the grant for the current deployment. Relay routes cite qualification `records`. Bridge routes cite fixture `evidence`. `activation` names the user grant task note that made a former target live. |
 | `runtimes` | Each version names the command, runtime script and relay commit in that runtime's lock. `subscriber_schema` is the subscriber file schema that relay reads, 2 by default or 3. |
 | `search_path` | The host's ordered command directories, each starting with `/` or `~/`. Every file whose runtime reads schema 3 is rendered with it, and needs it nonempty. |
 | `subscribers` | Each subscriber names its policy, role, argv and `timeoutMs`. Observers can declare a registry and event-specific `privateFields`. |
@@ -227,23 +227,6 @@ hq-a83688 for the user's grant. Before merging, deploy and preflight on each hos
 then pause Claude Code sessions. To roll back, revert the merge with
 `git revert -m 1 <merge>` and restart Claude Code sessions. The digest-addressed file
 can stay deployed.
-
-## Claude Code AskUserQuestion route
-
-The personal Claude Code home's `AskUserQuestion` `PreToolUse` (`handback = true`,
-86400 s timeout) and `PostToolUse` (10 s timeout) lines run `relay ask` from the
-`v0.7.0` runtime pin. Their `claude-ask` `ask` state cites the exact probed Claude
-Code version in `evidence` (`<source>@<version>`). Static `check` validates the
-`@<version>` citation portably; `status` and `preflight` compare it against the
-installed `claude` version and report `qualification` drift after a Claude Code
-upgrade until `relay`'s answer-route probes re-prove the new version or the route is
-removed. On a host where `relay-serve.service` is absent or stopped, `relay ask`
-exits 0 with empty output (`SERVE_UNAVAILABLE`) and leaves `AskUserQuestion` native.
-
-The activation reference `ops-764942:claude-ask-activation` reserves a note on
-ops-764942 for the user's grant. Before merging, verify the runtime pin and `claude`
-version on each host and pause Claude Code sessions. To roll back, revert the merge
-with `git revert -m 1 <merge>` and restart Claude Code sessions.
 
 ## Donor policy equivalence
 

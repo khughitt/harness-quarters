@@ -510,31 +510,3 @@ def test_target_agy_session_start_bridge_checks_only_declared_commands(tmp_path,
     (tmp_path / "mindful").unlink()
     findings = run(table, **options)
     assert [(f.code, f.message) for f in findings] == [("missing-command", "cannot execute mindful")]
-
-
-def test_preflight_checks_ask_line_runtime_and_version(tmp_path, deployed_host, monkeypatch, capsys):
-    from hook_routes import cli
-    from hook_routes.preflight import run
-    from hook_routes.table import RouteState
-
-    line = Line(("claude-ask",), runtime="v0.7.0", ask=True, handback=True, timeout=86400)
-    claude = replace(deployed_host.homes["claude"],
-                     bindings=(*deployed_host.homes["claude"].bindings, Binding("PreToolUse", "AskUserQuestion", (line,))))
-    state = RouteState("ask", owner="relay-f58531", evidence="probe@9.8.7")
-    table = replace(deployed_host, states={**deployed_host.states, "claude-ask": state},
-                    homes={**deployed_host.homes, "claude": claude})
-    path_env = f"{version_command(tmp_path)}:/usr/bin:/bin"
-    assert not run(table, home=tmp_path, path_env=path_env, next_dir=None)
-    broken = replace(table.runtimes["v0.7.0"], script=str(tmp_path / "missing/relay.js"))
-    findings = run(replace(table, runtimes={**table.runtimes, "v0.7.0": broken}),
-                   home=tmp_path, path_env=path_env, next_dir=None)
-    assert any(f.code == "runtime" and "claude:PreToolUse" in f.where for f in findings)
-    drifted = replace(table, states={**table.states, "claude-ask": RouteState("ask", owner="relay-f58531", evidence="probe@2.1.332")})
-    drift_findings = run(drifted, home=tmp_path, path_env=path_env, next_dir=None)
-    assert any(f.code == "qualification" and "9.8.7" in f.message and "2.1.332" in f.message for f in drift_findings)
-    missing_version = run(table, home=tmp_path, path_env="/usr/bin:/bin", next_dir=None)
-    assert any(f.code == "qualification" and "installed version" in f.message for f in missing_version)
-    monkeypatch.setattr(cli, "load", lambda _: drifted)
-    monkeypatch.setenv("PATH", path_env)
-    assert cli.main(["status"]) == 0
-    assert "9.8.7" in capsys.readouterr().out and "claude-ask" in str(drift_findings)

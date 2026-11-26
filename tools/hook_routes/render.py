@@ -87,9 +87,6 @@ def _command(table, binding, line, harness, home):
     if line.kind == "native":
         return line.command
     command, script = table.runtimes[line.runtime].argv(home)
-    if line.kind == "ask":
-        handback = " --handback" if line.handback else ""
-        return f"{_quote(command)} {_quote(script)} ask --harness {harness}{handback} {binding.event}"
     subscribers = table.subscriber_files[line.subscriber_file]
     address = subscriber_address(subscribers, subscriber_bytes(table, subscribers, home), home)
     subscriber_path = home / ".config/relay" / address

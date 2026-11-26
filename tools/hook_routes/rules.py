@@ -7,23 +7,12 @@ import shlex
 
 from .table import Finding, RouteState, Table
 
-__all__ = [
-    "PolicyRoute", "RELAY_BUILTINS", "ask_evidence_version", "fixed_tool",
-    "possible_entries", "route_status", "selected_entries", "validate",
-]
+__all__ = ["PolicyRoute", "RELAY_BUILTINS", "fixed_tool", "possible_entries", "route_status", "selected_entries", "validate"]
 
 _NOTIFICATION_MATCHERS = {"idle_prompt", "permission_prompt"}
 _HOME_PREFIXES = ("~/", "@HOME@/", "$HOME/", "${HOME}/")
 _AGY_BRIDGE = "d/hq/harnesses/agy/hook"
-_ASK_EVIDENCE = re.compile(r"\S+@(\d+\.\d+\.\d+(?:[-+][\w.+-]+)?)\Z")
 RELAY_BUILTINS = {"relay-hooks", "relay-provenance"}
-
-
-def ask_evidence_version(evidence: str | None) -> str | None:
-    if not isinstance(evidence, str):
-        return None
-    match = _ASK_EVIDENCE.fullmatch(evidence.strip())
-    return None if match is None else match[1]
 
 
 @dataclass(frozen=True)
@@ -109,9 +98,7 @@ def _state_problem(state, kind, *, records):
         return None
     if state.kind == kind == "bridge" and _text(state.evidence):
         return None
-    if state.kind == kind == "ask" and _text(state.owner) and ask_evidence_version(state.evidence) is not None:
-        return None
-    return f"{state.kind} state on a {kind} line needs its owner and reason, owner and grant, records, ask owner and @version evidence, or bridge evidence"
+    return f"{state.kind} state on a {kind} line needs its owner and reason, owner and grant, records or bridge evidence"
 
 
 def _text(value):
@@ -161,7 +148,7 @@ def _repository_tokens(table, binding, line, home, render_home):
         args.extend(command)
     for argv in line.delegates:
         args.extend(argv)
-    if line.kind in ("relay", "ask"):
+    if line.kind == "relay":
         args.extend(table.runtimes[line.runtime].argv(render_home))
     return [arg for arg in args if _repository_paths(arg, render_home)]
 

@@ -17,18 +17,12 @@ command = "/usr/bin/node"
 script = "~/.local/share/relay/v0.6.0/node_modules/relay/bin/relay.js"
 commit = "9078727105f06b4a17ccbf177821806d7eed93be"
 
-# The standalone launcher's pin, also used by the Claude AskUserQuestion route.
+# The standalone launcher's pin. No hook line selects it.
 [runtimes."v0.7.0"]
 command = "/usr/bin/node"
 script = "~/.local/share/relay/v0.7.0/node_modules/relay/bin/relay.js"
 commit = "e1bad200aa51becf88ad36cc832756179e12f6b2"
 subscriber_schema = 3
-
-[states.claude-ask]
-state = "ask"
-owner = "relay-f58531"
-evidence = "relay:docs/evidence/claude-code-answer-routes.json@2.1.332"
-activation = "ops-764942:claude-ask-activation"
 
 [states.claude-sessionstart]
 state = "native"
@@ -235,7 +229,6 @@ bindings = [
   { event = "UserPromptSubmit", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code UserPromptSubmit", timeout = 5 }] },
   { event = "PreToolUse", matcher = "*", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "before-tool", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600 }] },
   { event = "PreToolUse", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code PreToolUse", timeout = 5 }] },
-  { event = "PreToolUse", matcher = "AskUserQuestion", lines = [{ policies = ["claude-ask"], runtime = "v0.7.0", ask = true, handback = true, timeout = 86400 }] },
   { event = "Notification", matcher = "idle_prompt", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "needs-input", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600, relay_event = "Notification:idle_prompt" }] },
   { event = "Notification", matcher = "permission_prompt", lines = [{ policies = ["relay-hooks", "familiar"], runtime = "v0.5.0", relay_kind = "needs-approval", subscriber_file = "shared-v0.5.0-retired-guard", outer_ms = 600000, timeout = 600, relay_event = "Notification:permission_prompt" }] },
   { event = "Stop", lines = [{ policies = ["relay-hooks", "familiar", "claim-guard", "harness-state-refresh"], runtime = "v0.5.0", relay_kind = "turn-end", subscriber_file = "donor-2-shared", outer_ms = 600000, timeout = 600, states = { "claim-guard" = { state = "relay", records = ["claude-code-2.1.331-interactive-v0.5.0-19b427ac306a.json", "claude-code-2.1.331-non-interactive-v0.5.0-19b427ac306a.json"], activation = "hq-a83688:claude-donor-activation" }, "harness-state-refresh" = { state = "relay", records = ["claude-code-2.1.331-interactive-v0.5.0-19b427ac306a.json", "claude-code-2.1.331-non-interactive-v0.5.0-19b427ac306a.json"], activation = "hq-a83688:claude-donor-activation" } } }] },
@@ -245,7 +238,6 @@ bindings = [
   { event = "SessionEnd", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code SessionEnd", timeout = 5 }] },
   { event = "PostToolUse", matcher = "Bash", lines = [{ policies = ["claude-posttooluse"], command = "tt-posttooluse" }] },
   { event = "PostToolUse", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code PostToolUse", timeout = 5 }] },
-  { event = "PostToolUse", matcher = "AskUserQuestion", lines = [{ policies = ["claude-ask"], runtime = "v0.7.0", ask = true, timeout = 10 }] },
   { event = "PostToolUseFailure", matcher = "Bash", lines = [{ policies = ["claude-posttooluse"], command = "tt-posttooluse" }] },
   { event = "PostToolUseFailure", matcher = "*", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code PostToolUseFailure", timeout = 5 }] },
   { event = "SubagentStop", lines = [{ policies = ["turn-pause"], command = "~/d/hq/tools/turn-pause --harness claude-code SubagentStop", timeout = 5 }] },

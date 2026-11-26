@@ -6,7 +6,7 @@ import sys
 
 from .relay_runtime import budget_payload, call, package_for
 from .render import subscriber_address, subscriber_bytes
-from .rules import RELAY_BUILTINS, ask_evidence_version, fixed_tool, possible_entries, selected_entries
+from .rules import RELAY_BUILTINS, fixed_tool, possible_entries, selected_entries
 from .table import Finding
 
 __all__ = ["admit_binding", "check_binding", "qualification_findings"]
@@ -104,24 +104,9 @@ def check_binding(table, binding, records_dir: Path, *, home=None, target=None, 
     for which, lines in variants:
         files = table.subscriber_files if which == "state" else table.subscriber_files | table.target_files
         for line in lines:
-            where = f"{name}:{binding.event}[{index}]:{which}"
-            if line.kind == "ask":
-                if versions is None:
-                    continue
-                for policy in line.policies:
-                    state = table.policy_state(policy, line)
-                    probed = None if state is None or state.kind != "ask" else ask_evidence_version(state.evidence)
-                    if probed is None:
-                        continue
-                    if settings.harness not in versions:
-                        findings.append(Finding("qualification", f"{where}:{policy}",
-                                                f"could not observe the installed version for {settings.harness}"))
-                    elif versions[settings.harness] != probed:
-                        findings.append(Finding("qualification", f"{where}:{policy}",
-                                                f"{settings.harness} {versions[settings.harness]} differs from ask route evidence {probed}"))
-                continue
             if line.kind != "relay":
                 continue
+            where = f"{name}:{binding.event}[{index}]:{which}"
             try:
                 findings.extend(_line_findings(table, settings, binding, line, files, records_dir,
                                                 render_home, versions, where))
