@@ -117,6 +117,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.7.0/node_modules/relay/bin/relay.js' ask --harness claude-code --handback PreToolUse",
+            "timeout": 86400
+          }
+        ]
       }
     ],
     "Notification": [
@@ -209,6 +219,16 @@
             "type": "command",
             "command": "~/d/hq/tools/turn-pause --harness claude-code PostToolUse",
             "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.7.0/node_modules/relay/bin/relay.js' ask --harness claude-code PostToolUse",
+            "timeout": 10
           }
         ]
       }

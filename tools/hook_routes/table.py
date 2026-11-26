@@ -31,7 +31,7 @@ class Finding:
 
 @dataclass(frozen=True)
 class RouteState:
-    kind: Literal["relay", "bridge", "native", "existing"]
+    kind: Literal["relay", "bridge", "native", "existing", "ask"]
     owner: str | None = None
     reason: str | None = None
     grant: str | None = None
@@ -97,9 +97,13 @@ class Line:
     states: dict[str, RouteState] = field(default_factory=dict)
     delegates: tuple[tuple[str, ...], ...] = ()
     relay_kind: str | None = None
+    ask: bool = False
+    handback: bool = False
 
     @property
     def kind(self) -> str:
+        if self.ask:
+            return "ask"
         if self.runtime is None:
             return "native"
         return "relay" if self.command is None else "bridge"
@@ -306,9 +310,23 @@ def _validate_structure(table, *, required_outputs):
                     if policy not in table.states and policy not in line.states:
                         raise ValueError(f"{where}: unknown policy {policy!r}")
                     all_policies.add(policy)
+                if line.handback is not False and (line.handback is not True or line.kind != "ask"):
+                    raise ValueError(f"{where}: handback requires an ask line")
+                if line.ask is not False and line.ask is not True:
+                    raise ValueError(f"{where}: ask must be a boolean")
                 if line.kind == "native":
                     if not line.command or line.subscriber_file is not None or line.delegates:
                         raise ValueError(f"{where}: native line needs a command")
+                elif line.kind == "ask":
+                    if (home.harness != "claude-code"
+                            or binding.event not in ("PreToolUse", "PostToolUse")
+                            or binding.matcher != "AskUserQuestion"
+                            or (line.handback and binding.event != "PreToolUse")
+                            or line.command is not None or line.subscriber_file is not None
+                            or line.outer_ms is not None or line.relay_event is not None
+                            or line.delegates or line.runtime not in table.runtimes
+                            or type(line.timeout) is not int or line.timeout <= 0):
+                        raise ValueError(f"{where}: ask line needs Claude AskUserQuestion PreToolUse or PostToolUse, a known runtime and a positive timeout")
                 elif line.kind == "bridge":
                     if (home.harness != "agy" or binding.event not in ("SessionStart", "Stop")
                             or not line.command or line.runtime not in table.runtimes
