@@ -77,7 +77,7 @@ def _status(args, table):
         for route in routes:
             print(json.dumps(asdict(route)))
         versions = {}
-        if any(state and state.kind == "relay" for r in routes for state in (r.state, r.next)):
+        if any(state and state.kind in ("relay", "ask") for r in routes for state in (r.state, r.next)):
             versions = installed_versions(os.environ.get("PATH", os.defpath))
         for finding in qualification_findings(table, versions=versions):
             print(json.dumps(asdict(finding)))
